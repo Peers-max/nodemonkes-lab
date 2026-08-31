@@ -245,6 +245,18 @@ export interface Translations {
   theatreFxMatrix: string;
   theatreFxFade: string;
   theatreSpeedTitle: string;
+  theatreBgTitle: string;
+  theatreBgVoid: string;
+  theatreBgBtc: string;
+  theatreBgCyber: string;
+  theatreBgEmerald: string;
+  theatreBgStarfield: string;
+  theatreBgSunset: string;
+  theatreBgRetroGrid: string;
+  theatreBgFlame: string;
+  theatreBgUpload: string;
+  theatreBgCustom: string;
+  theatreBgDim: string;
 
   // Toast Messages
   toastGifLoaded: string;
@@ -503,6 +515,18 @@ export const translations: Record<Language, Translations> = {
     theatreFxMatrix: '👁️ 矩阵扫描',
     theatreFxFade: '🫧 极简呼吸',
     theatreSpeedTitle: '轮播速度',
+    theatreBgTitle: '背景氛围',
+    theatreBgVoid: '🌌 深空曜黑',
+    theatreBgBtc: '🟠 比特币橙金',
+    theatreBgCyber: '🟣 赛博霓虹',
+    theatreBgEmerald: '🟢 矩阵祖母绿',
+    theatreBgStarfield: '✨ 浩瀚星空',
+    theatreBgSunset: '🌅 暮光日落',
+    theatreBgRetroGrid: '🕹️ 极光网格',
+    theatreBgFlame: '🔥 熔岩烈焰',
+    theatreBgUpload: '📁 上传自定义背景',
+    theatreBgCustom: '🖼️ 自定义壁纸',
+    theatreBgDim: '背景压暗',
 
     // Toast Messages
     toastGifLoaded: '已载入动图工坊',
@@ -759,6 +783,18 @@ export const translations: Record<Language, Translations> = {
     theatreFxMatrix: '👁️ Matrix Scan',
     theatreFxFade: '🫧 Fade Breathe',
     theatreSpeedTitle: 'Speed',
+    theatreBgTitle: 'Background',
+    theatreBgVoid: '🌌 Deep Void',
+    theatreBgBtc: '🟠 BTC Gold',
+    theatreBgCyber: '🟣 Cyber Neon',
+    theatreBgEmerald: '🟢 Matrix Green',
+    theatreBgStarfield: '✨ Starfield',
+    theatreBgSunset: '🌅 Twilight Sunset',
+    theatreBgRetroGrid: '🕹️ Synth Grid',
+    theatreBgFlame: '🔥 Magma Flame',
+    theatreBgUpload: '📁 Upload Custom BG',
+    theatreBgCustom: '🖼️ Custom Wallpaper',
+    theatreBgDim: 'Dimming',
 
     // Toast Messages
     toastGifLoaded: 'Loaded in GIF Studio',
