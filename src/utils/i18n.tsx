@@ -272,14 +272,6 @@ export interface Translations {
   theatreCatAsics9: string;
   theatreCatDeathbot: string;
   theatreCatHoodie: string;
-  theatreMusicTitle: string;
-  theatreMusicPlay: string;
-  theatreMusicMute: string;
-  theatreMusicTrack: string;
-  theatreVisTitle: string;
-  theatreVisBars: string;
-  theatreVisWave: string;
-  theatreVisOff: string;
 
   // Toast Messages
   toastGifLoaded: string;
@@ -565,14 +557,6 @@ export const translations: Record<Language, Translations> = {
     theatreCatAsics9: '⚡ 矿机神兽',
     theatreCatDeathbot: '🤖 死亡机器人',
     theatreCatHoodie: '🧥 连帽卫衣',
-    theatreMusicTitle: '赛博电台',
-    theatreMusicPlay: '🎵 开启电台',
-    theatreMusicMute: '🔇 静音电台',
-    theatreMusicTrack: '⏭️ 切换曲目',
-    theatreVisTitle: '音频动效',
-    theatreVisBars: '📊 频谱柱',
-    theatreVisWave: '🌊 涟漪波',
-    theatreVisOff: '✕ 关闭动效',
 
     // Toast Messages
     toastGifLoaded: '已载入动图工坊',
@@ -856,14 +840,6 @@ export const translations: Record<Language, Translations> = {
     theatreCatAsics9: '⚡ ASICS9',
     theatreCatDeathbot: '🤖 Deathbot',
     theatreCatHoodie: '🧥 Hoodie',
-    theatreMusicTitle: 'Lo-Fi Radio',
-    theatreMusicPlay: '🎵 Play Radio',
-    theatreMusicMute: '🔇 Mute Radio',
-    theatreMusicTrack: '⏭️ Next Track',
-    theatreVisTitle: 'Visualizer',
-    theatreVisBars: '📊 Bars',
-    theatreVisWave: '🌊 Wave',
-    theatreVisOff: '✕ Off',
 
     // Toast Messages
     toastGifLoaded: 'Loaded in GIF Studio',
