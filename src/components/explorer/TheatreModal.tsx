@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Play, Pause, Sparkles, Gift, Maximize, Minimize } from 'lucide-react';
 import type { Monke } from '../../types';
@@ -76,8 +77,12 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
 
       // Request browser fullscreen on open
       try {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
+        const doc = document as any;
+        const el = document.documentElement as any;
+        const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+        if (!isFs) {
+          const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+          if (rfs) rfs.call(el).catch(() => {});
         }
       } catch (e) {
         console.warn('Fullscreen auto-request error:', e);
@@ -94,11 +99,18 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   // Listen to browser fullscreen change
   useEffect(() => {
     const onFullscreenChange = () => {
-      const fs = !!document.fullscreenElement;
+      const doc = document as any;
+      const fs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
       setIsFullscreen(fs);
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', onFullscreenChange);
+    };
   }, []);
 
   const handlePrev = useCallback(() => {
@@ -150,7 +162,6 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         e.preventDefault();
         setIsPlaying((p) => !p);
       }
-      // Note: We deliberately let F11 handle browser full screen toggle natively!
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -166,7 +177,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         if (isPlaying) setShowHud(false);
-      }, 3000);
+      }, 2500);
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -181,22 +192,22 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const currentMonke = monkes[currentIndex] || monkes[0];
   const attrs = currentMonke.attributes;
 
-  return (
+  const content = (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-[#05070B] flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none"
+        className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[999999] w-screen h-screen bg-[#030508] flex flex-col justify-between p-4 sm:p-6 select-none overflow-hidden m-0"
       >
-        {/* Top Floating HUD */}
+        {/* Top Floating HUD (Auto fades when idle) */}
         <motion.div
           animate={{ opacity: showHud ? 1 : 0, y: showHud ? 0 : -20 }}
-          transition={{ duration: 0.25 }}
-          className="flex flex-col sm:flex-row items-center justify-between gap-3 z-30 w-full"
+          transition={{ duration: 0.3 }}
+          className={`flex flex-col sm:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
         >
           {/* Left Title & Status */}
-          <div className="flex items-center gap-3 bg-black/70 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-3 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-mono text-sm font-bold shadow-lg">
               📺
             </div>
@@ -228,12 +239,12 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           </div>
 
           {/* Center Hint Prompt Badge */}
-          <div className="hidden lg:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/85 border border-amber-500/30 text-amber-300/90 text-xs font-mono shadow-xl">
+          <div className="hidden lg:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300/90 text-xs font-mono shadow-xl">
             <span>💡 提示：按 <strong>ESC</strong> 退出屏保 • <strong>F11</strong> 切换全屏 • <strong>空格键</strong> 暂停/播放 • <strong>← / →</strong> 切猴</span>
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-2 bg-black/70 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
             {/* Play / Pause Toggle */}
             <button
               onClick={() => setIsPlaying((p) => !p)}
@@ -264,56 +275,56 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           </div>
         </motion.div>
 
-        {/* Center Stage: Huge Pixel Art Monke with Ambient Pulsing Aura */}
-        <div className="relative flex-1 flex items-center justify-center my-2 sm:my-4">
+        {/* Center Stage: Magnificent Huge Pixel Art Monke with Ambient Pulsing Aura */}
+        <div className="relative flex-1 flex items-center justify-center my-auto w-full h-full">
           
           {/* Ambient Glow Aura */}
-          <div className="absolute w-[420px] sm:w-[680px] h-[420px] sm:h-[680px] bg-gradient-to-tr from-amber-500/15 via-orange-500/10 to-rose-500/10 rounded-full blur-[140px] pointer-events-none animate-pulse" />
+          <div className="absolute w-[500px] sm:w-[750px] h-[500px] sm:h-[750px] bg-gradient-to-tr from-amber-500/20 via-orange-500/10 to-rose-500/10 rounded-full blur-[160px] pointer-events-none animate-pulse" />
 
           {/* Left Arrow Button */}
           <motion.button
-            animate={{ opacity: showHud ? 1 : 0.15 }}
+            animate={{ opacity: showHud ? 1 : 0 }}
             onClick={handlePrev}
-            className="absolute left-2 sm:left-8 z-30 p-4 rounded-2xl bg-black/60 hover:bg-black/90 text-slate-300 hover:text-white border border-white/10 backdrop-blur-xl transition-all active:scale-90 shadow-2xl"
+            className={`absolute left-4 sm:left-10 z-30 p-4 rounded-3xl bg-black/60 hover:bg-black/90 text-slate-300 hover:text-white border border-white/10 backdrop-blur-xl transition-all active:scale-90 shadow-2xl ${!showHud ? 'pointer-events-none' : ''}`}
             title={t.theatrePrev}
           >
-            <ChevronLeft className="w-7 h-7" />
+            <ChevronLeft className="w-8 h-8" />
           </motion.button>
 
-          {/* Monke Image Stage */}
+          {/* Monke Image Stage - Expanded for true full screen canvas */}
           <div className="relative z-10 flex flex-col items-center justify-center">
             <motion.div
               key={currentMonke.id}
-              initial={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }}
+              initial={{ opacity: 0, scale: 0.93, filter: 'blur(8px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="w-[280px] h-[280px] sm:w-[420px] sm:h-[420px] md:w-[500px] md:h-[500px] lg:w-[560px] lg:h-[560px] rounded-3xl bg-black/40 border border-white/10 p-4 sm:p-6 shadow-[0_30px_70px_rgba(0,0,0,0.9)] flex items-center justify-center backdrop-blur-md"
+              exit={{ opacity: 0, scale: 0.93, filter: 'blur(8px)' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+              className="w-[min(80vw,min(75vh,640px))] h-[min(80vw,min(75vh,640px))] rounded-3xl bg-black/50 border border-white/10 p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.95)] flex items-center justify-center backdrop-blur-md"
             >
               <img
                 src={getMonkeImageUrl(currentMonke.id)}
                 alt={`NodeMonke #${currentMonke.id}`}
-                className="w-full h-full object-contain pixelated filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
+                className="w-full h-full object-contain pixelated filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]"
               />
             </motion.div>
           </div>
 
           {/* Right Arrow Button */}
           <motion.button
-            animate={{ opacity: showHud ? 1 : 0.15 }}
+            animate={{ opacity: showHud ? 1 : 0 }}
             onClick={handleNext}
-            className="absolute right-2 sm:right-8 z-30 p-4 rounded-2xl bg-black/60 hover:bg-black/90 text-slate-300 hover:text-white border border-white/10 backdrop-blur-xl transition-all active:scale-90 shadow-2xl"
+            className={`absolute right-4 sm:right-10 z-30 p-4 rounded-3xl bg-black/60 hover:bg-black/90 text-slate-300 hover:text-white border border-white/10 backdrop-blur-xl transition-all active:scale-90 shadow-2xl ${!showHud ? 'pointer-events-none' : ''}`}
             title={t.theatreNext}
           >
-            <ChevronRight className="w-7 h-7" />
+            <ChevronRight className="w-8 h-8" />
           </motion.button>
         </div>
 
-        {/* Bottom HUD Bar: Traits & Quick Links */}
+        {/* Bottom HUD Bar: Traits & Quick Links (Auto fades when idle) */}
         <motion.div
           animate={{ opacity: showHud ? 1 : 0, y: showHud ? 0 : 20 }}
-          transition={{ duration: 0.25 }}
-          className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-white/10 backdrop-blur-2xl z-30 w-full shadow-2xl"
+          transition={{ duration: 0.3 }}
+          className={`flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-950/85 border border-white/10 backdrop-blur-2xl z-30 w-full shadow-2xl ${!showHud ? 'pointer-events-none' : ''}`}
         >
           {/* Traits Chips */}
           <div className="flex items-center gap-2 flex-wrap font-mono text-xs">
@@ -377,4 +388,6 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       </motion.div>
     </AnimatePresence>
   );
+
+  return createPortal(content, document.body);
 };
