@@ -234,8 +234,15 @@ export interface Translations {
   theatreFxZoom: string;
   theatreFxSlide: string;
   theatreFxFlip3d: string;
+  theatreFxFlip3dX: string;
   theatreFxDrop: string;
+  theatreFxLaunch: string;
   theatreFxGlitch: string;
+  theatreFxSpin: string;
+  theatreFxCube: string;
+  theatreFxPulse: string;
+  theatreFxSwing: string;
+  theatreFxMatrix: string;
   theatreFxFade: string;
   theatreSpeedTitle: string;
 
@@ -481,13 +488,20 @@ export const translations: Record<Language, Translations> = {
     theatreAutoPlay: '自动播放',
     theatrePause: '暂停',
     theatreFxTitle: '进场动效',
-    theatreFxRandom: '🎲 随机特效',
+    theatreFxRandom: '🎲 随机轮播',
     theatreFxZoom: '🚀 时空跃进',
     theatreFxSlide: '↔️ 电影平移',
-    theatreFxFlip3d: '🔄 3D 翻转',
+    theatreFxFlip3d: '🔄 水平3D翻转',
+    theatreFxFlip3dX: '🔃 垂直翻滚',
     theatreFxDrop: '🪂 弹性坠落',
+    theatreFxLaunch: '🔥 冲天发射',
     theatreFxGlitch: '⚡ 赛博故障',
-    theatreFxFade: '🫧 极简渐变',
+    theatreFxSpin: '🌀 漩涡引力',
+    theatreFxCube: '🧊 3D立方体',
+    theatreFxPulse: '💓 能量心跳',
+    theatreFxSwing: '🪢 钟摆秋千',
+    theatreFxMatrix: '👁️ 矩阵扫描',
+    theatreFxFade: '🫧 极简呼吸',
     theatreSpeedTitle: '轮播速度',
 
     // Toast Messages
@@ -733,9 +747,16 @@ export const translations: Record<Language, Translations> = {
     theatreFxRandom: '🎲 Random FX',
     theatreFxZoom: '🚀 Warp Zoom',
     theatreFxSlide: '↔️ Cinema Slide',
-    theatreFxFlip3d: '🔄 3D Flip',
+    theatreFxFlip3d: '🔄 3D Flip (Y)',
+    theatreFxFlip3dX: '🔃 3D Flip (X)',
     theatreFxDrop: '🪂 Orbit Drop',
+    theatreFxLaunch: '🔥 Rocket Launch',
     theatreFxGlitch: '⚡ Cyber Glitch',
+    theatreFxSpin: '🌀 Vortex Spin',
+    theatreFxCube: '🧊 3D Cube',
+    theatreFxPulse: '💓 Energy Pulse',
+    theatreFxSwing: '🪢 Pendulum Swing',
+    theatreFxMatrix: '👁️ Matrix Scan',
     theatreFxFade: '🫧 Fade Breathe',
     theatreSpeedTitle: 'Speed',
 

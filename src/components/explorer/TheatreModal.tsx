@@ -11,17 +11,31 @@ import {
   Gift, 
   Maximize, 
   Minimize,
-  Shuffle,
   Wand2,
   Clock,
-  Gauge
+  Gauge,
+  Sliders
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
 import { getMonkeImageUrl } from '../../utils/api';
 import { useLanguage } from '../../utils/i18n';
 
-export type EntranceFx = 'random' | 'zoom' | 'slide' | 'flip3d' | 'drop' | 'glitch' | 'fade';
+export type EntranceFx = 
+  | 'random' 
+  | 'zoom' 
+  | 'slide' 
+  | 'flip3d' 
+  | 'flip3dX' 
+  | 'drop' 
+  | 'launch' 
+  | 'glitch' 
+  | 'spin' 
+  | 'cube' 
+  | 'pulse' 
+  | 'swing' 
+  | 'matrix' 
+  | 'fade';
 
 interface TheatreModalProps {
   isOpen: boolean;
@@ -38,15 +52,22 @@ const FX_LIST: { id: EntranceFx; icon: string }[] = [
   { id: 'zoom', icon: '🚀' },
   { id: 'slide', icon: '↔️' },
   { id: 'flip3d', icon: '🔄' },
+  { id: 'flip3dX', icon: '🔃' },
   { id: 'drop', icon: '🪂' },
+  { id: 'launch', icon: '🔥' },
   { id: 'glitch', icon: '⚡' },
+  { id: 'spin', icon: '🌀' },
+  { id: 'cube', icon: '🧊' },
+  { id: 'pulse', icon: '💓' },
+  { id: 'swing', icon: '🪢' },
+  { id: 'matrix', icon: '👁️' },
   { id: 'fade', icon: '🫧' },
 ];
 
 const SPEED_OPTIONS = [
-  { label: '2.0s', val: 2000 },
-  { label: '3.0s', val: 3000 },
-  { label: '4.5s', val: 4500 },
+  { label: '1.5s', val: 1500 },
+  { label: '2.5s', val: 2500 },
+  { label: '4.0s', val: 4000 },
   { label: '6.0s', val: 6000 },
 ];
 
@@ -69,13 +90,16 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const [selectedFx, setSelectedFx] = useState<EntranceFx>('random');
   const [activeFx, setActiveFx] = useState<Exclude<EntranceFx, 'random'>>('zoom');
   const [direction, setDirection] = useState<number>(1);
-  const [intervalSpeed, setIntervalSpeed] = useState<number>(3000);
+  const [intervalSpeed, setIntervalSpeed] = useState<number>(2500);
 
   const timerRef = useRef<any>(null);
 
-  // Pick random effect helper
+  // Pick random effect helper among 13 concrete effects
   const pickRandomFx = useCallback((): Exclude<EntranceFx, 'random'> => {
-    const candidates: Exclude<EntranceFx, 'random'>[] = ['zoom', 'slide', 'flip3d', 'drop', 'glitch', 'fade'];
+    const candidates: Exclude<EntranceFx, 'random'>[] = [
+      'zoom', 'slide', 'flip3d', 'flip3dX', 'drop', 'launch', 
+      'glitch', 'spin', 'cube', 'pulse', 'swing', 'matrix', 'fade'
+    ];
     const idx = Math.floor(Math.random() * candidates.length);
     return candidates[idx];
   }, []);
@@ -245,50 +269,99 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const currentMonke = monkes[currentIndex] || monkes[0];
   const attrs = currentMonke.attributes;
 
-  // Animation Variant Generator based on activeFx
+  // 14 Entrance Animation Variants Generator
   const getVariants = () => {
     switch (activeFx) {
-      case 'zoom':
+      case 'zoom': // 1. Warp Zoom
         return {
           initial: { scale: 0.15, opacity: 0, filter: 'blur(20px)' },
           animate: { scale: 1, opacity: 1, filter: 'blur(0px)' },
           exit: { scale: 1.3, opacity: 0, filter: 'blur(16px)' },
           transition: { type: 'spring' as const, stiffness: 260, damping: 20 },
         };
-      case 'slide':
+      case 'slide': // 2. Cinema Slide
         return {
           initial: { x: direction * 380, opacity: 0, filter: 'blur(12px)' },
           animate: { x: 0, opacity: 1, filter: 'blur(0px)' },
           exit: { x: -direction * 380, opacity: 0, filter: 'blur(12px)' },
           transition: { type: 'spring' as const, stiffness: 230, damping: 24 },
         };
-      case 'flip3d':
+      case 'flip3d': // 3. Horizontal 3D Flip (Y)
         return {
           initial: { rotateY: 90, opacity: 0, scale: 0.7 },
           animate: { rotateY: 0, opacity: 1, scale: 1 },
           exit: { rotateY: -90, opacity: 0, scale: 0.7 },
           transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
         };
-      case 'drop':
+      case 'flip3dX': // 4. Vertical 3D Flip (X)
         return {
-          initial: { y: -350, opacity: 0, scale: 0.8 },
+          initial: { rotateX: 90, opacity: 0, scale: 0.75 },
+          animate: { rotateX: 0, opacity: 1, scale: 1 },
+          exit: { rotateX: -90, opacity: 0, scale: 0.75 },
+          transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+        };
+      case 'drop': // 5. Orbit Drop & Spring Bounce
+        return {
+          initial: { y: -360, opacity: 0, scale: 0.8 },
           animate: { y: 0, opacity: 1, scale: 1 },
-          exit: { y: 200, opacity: 0, scale: 0.8 },
+          exit: { y: 220, opacity: 0, scale: 0.8 },
           transition: { type: 'spring' as const, stiffness: 280, damping: 18 },
         };
-      case 'glitch':
+      case 'launch': // 6. Rocket Launch from bottom
+        return {
+          initial: { y: 360, opacity: 0, scale: 0.85 },
+          animate: { y: 0, opacity: 1, scale: 1 },
+          exit: { y: -260, opacity: 0, scale: 0.85 },
+          transition: { type: 'spring' as const, stiffness: 270, damping: 22 },
+        };
+      case 'glitch': // 7. Cyber Matrix Glitch
         return {
           initial: { x: -40, opacity: 0, scale: 1.15, filter: 'hue-rotate(90deg) contrast(1.6) blur(6px)' },
           animate: { x: 0, opacity: 1, scale: 1, filter: 'hue-rotate(0deg) contrast(1) blur(0px)' },
           exit: { x: 40, opacity: 0, scale: 0.9, filter: 'hue-rotate(-90deg) blur(6px)' },
           transition: { duration: 0.35, ease: 'easeOut' as const },
         };
-      case 'fade':
+      case 'spin': // 8. Vortex Swirl Spin
+        return {
+          initial: { rotate: 180, scale: 0.15, opacity: 0, filter: 'blur(16px)' },
+          animate: { rotate: 0, scale: 1, opacity: 1, filter: 'blur(0px)' },
+          exit: { rotate: -180, scale: 0.15, opacity: 0, filter: 'blur(16px)' },
+          transition: { type: 'spring' as const, stiffness: 220, damping: 22 },
+        };
+      case 'cube': // 9. 3D Cube Isometric Slide
+        return {
+          initial: { x: direction * 280, rotateY: direction * 45, opacity: 0, scale: 0.75 },
+          animate: { x: 0, rotateY: 0, opacity: 1, scale: 1 },
+          exit: { x: -direction * 280, rotateY: -direction * 45, opacity: 0, scale: 0.75 },
+          transition: { duration: 0.48, ease: 'easeOut' as const },
+        };
+      case 'pulse': // 10. Energy Pulse Heartbeat
+        return {
+          initial: { scale: 0.4, opacity: 0 },
+          animate: { scale: 1, opacity: 1 },
+          exit: { scale: 1.4, opacity: 0 },
+          transition: { type: 'spring' as const, stiffness: 350, damping: 15 },
+        };
+      case 'swing': // 11. Pendulum Clock Swing
+        return {
+          initial: { rotate: -40, opacity: 0, scale: 0.8 },
+          animate: { rotate: 0, opacity: 1, scale: 1 },
+          exit: { rotate: 40, opacity: 0, scale: 0.8 },
+          transition: { type: 'spring' as const, stiffness: 240, damping: 16 },
+        };
+      case 'matrix': // 12. Matrix Hologram Scan
+        return {
+          initial: { scaleY: 0.05, opacity: 0, filter: 'brightness(2.2) blur(8px)' },
+          animate: { scaleY: 1, opacity: 1, filter: 'brightness(1) blur(0px)' },
+          exit: { scaleY: 0.05, opacity: 0, filter: 'brightness(2.2) blur(8px)' },
+          transition: { duration: 0.42, ease: [0.16, 1, 0.3, 1] as const },
+        };
+      case 'fade': // 13. Ambient Breathe Fade
       default:
         return {
-          initial: { opacity: 0, scale: 0.95 },
+          initial: { opacity: 0, scale: 0.94 },
           animate: { opacity: 1, scale: 1 },
-          exit: { opacity: 0, scale: 1.05 },
+          exit: { opacity: 0, scale: 1.06 },
           transition: { duration: 0.45, ease: 'easeInOut' as const },
         };
     }
@@ -302,8 +375,15 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       case 'zoom': return t.theatreFxZoom;
       case 'slide': return t.theatreFxSlide;
       case 'flip3d': return t.theatreFxFlip3d;
+      case 'flip3dX': return t.theatreFxFlip3dX;
       case 'drop': return t.theatreFxDrop;
+      case 'launch': return t.theatreFxLaunch;
       case 'glitch': return t.theatreFxGlitch;
+      case 'spin': return t.theatreFxSpin;
+      case 'cube': return t.theatreFxCube;
+      case 'pulse': return t.theatreFxPulse;
+      case 'swing': return t.theatreFxSwing;
+      case 'matrix': return t.theatreFxMatrix;
       case 'fade': return t.theatreFxFade;
     }
   };
@@ -320,7 +400,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         <motion.div
           animate={{ opacity: showHud ? 1 : 0, y: showHud ? 0 : -20 }}
           transition={{ duration: 0.3 }}
-          className={`flex flex-col lg:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
+          className={`flex flex-col xl:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
         >
           {/* Left Title & Status */}
           <div className="flex items-center gap-3 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
@@ -354,9 +434,9 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             </div>
           </div>
 
-          {/* Center: Entrance Animation Effects & Speed Selector */}
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-3 rounded-2xl border border-white/10 shadow-2xl overflow-x-auto max-w-full">
-            <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1">
+          {/* Center: 14 Entrance Animation Effects Selector */}
+          <div className="flex items-center gap-1.5 bg-black/80 backdrop-blur-xl p-1.5 px-3 rounded-2xl border border-white/10 shadow-2xl overflow-x-auto max-w-full">
+            <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1 mr-1">
               <Wand2 className="w-3.5 h-3.5" />
               <span>{t.theatreFxTitle}:</span>
             </span>
@@ -370,7 +450,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                     setActiveFx(fx.id === 'random' ? pickRandomFx() : fx.id);
                   }}
                   className={clsx(
-                    'px-2.5 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95',
+                    'px-2.5 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95 flex items-center gap-1',
                     selectedFx === fx.id
                       ? 'bg-amber-500/25 border border-amber-400 text-amber-300 font-bold shadow-sm'
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
@@ -378,23 +458,26 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                   title={getFxLabel(fx.id)}
                 >
                   <span>{fx.icon}</span>
-                  <span className="hidden xl:inline ml-1">{getFxLabel(fx.id)}</span>
+                  <span className="hidden 2xl:inline text-[11px]">{getFxLabel(fx.id).split(' ')[1] || getFxLabel(fx.id)}</span>
                 </button>
               ))}
             </div>
+          </div>
 
-            <div className="w-[1px] h-4 bg-white/15 mx-1 hidden sm:block" />
-
-            {/* Speed Selector */}
-            <div className="hidden sm:flex items-center gap-1">
+          {/* Right Action Controls with Dedicated Speed Selector */}
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl">
+            
+            {/* Dedicated Speed Selector Group */}
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+              <Clock className="w-3.5 h-3.5 text-purple-400 ml-1" />
               {SPEED_OPTIONS.map((sp) => (
                 <button
                   key={sp.val}
                   onClick={() => setIntervalSpeed(sp.val)}
                   className={clsx(
-                    'px-2 py-0.5 rounded-lg text-[11px] font-mono transition-all',
+                    'px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold transition-all',
                     intervalSpeed === sp.val
-                      ? 'bg-purple-500/30 text-purple-300 font-bold border border-purple-400'
+                      ? 'bg-purple-500/30 text-purple-300 border border-purple-400/50 shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   )}
                 >
@@ -402,18 +485,19 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
+            <div className="w-[1px] h-4 bg-white/15" />
+
+            {/* Play / Pause Toggle */}
             <button
               onClick={() => setIsPlaying((p) => !p)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold transition-all active:scale-95"
             >
               {isPlaying ? <Pause className="w-4 h-4 text-amber-400" /> : <Play className="w-4 h-4 text-amber-400" />}
-              <span>{isPlaying ? t.screensaverPause : t.screensaverPlay}</span>
+              <span className="hidden sm:inline">{isPlaying ? t.screensaverPause : t.screensaverPlay}</span>
             </button>
 
+            {/* Fullscreen Toggle */}
             <button
               onClick={toggleFullscreen}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all active:scale-95"
@@ -422,6 +506,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
 
+            {/* Exit Screensaver */}
             <button
               onClick={handleExit}
               className="p-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-mono font-bold"
@@ -433,10 +518,10 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           </div>
         </motion.div>
 
-        {/* Center Stage: Magnificent Huge Pixel Art Monke with Entrance Transitions */}
+        {/* Center Stage: Magnificent Huge Pixel Art Monke with 14 Dynamic Entrance Animations */}
         <div className="relative flex-1 flex items-center justify-center my-auto w-full h-full perspective-[1200px]">
           
-          {/* Ambient Glow Aura */}
+          {/* Ambient Pulsing Aura */}
           <div className="absolute w-[500px] sm:w-[800px] h-[500px] sm:h-[800px] bg-gradient-to-tr from-amber-500/20 via-orange-500/10 to-purple-500/10 rounded-full blur-[170px] pointer-events-none animate-pulse" />
 
           {/* Left Arrow Button */}
@@ -458,7 +543,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                 animate={anim.animate}
                 exit={anim.exit}
                 transition={anim.transition}
-                className="w-[min(90vw,86vh)] h-[min(90vw,86vh)] max-w-[1200px] max-h-[1200px] flex items-center justify-center p-0 select-none transform-gpu"
+                className="w-[min(90vw,86vh)] h-[min(90vw,86vh)] max-w-[1200px] max-h-[1200px] flex items-center justify-center p-0 select-none transform-gpu origin-center"
                 style={{ transformStyle: 'preserve-3d' }}
               >
                 <img
