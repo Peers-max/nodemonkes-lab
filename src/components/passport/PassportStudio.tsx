@@ -334,14 +334,23 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
         ctx.lineTo(innerX + innerW - 45, headerY + 62);
         ctx.stroke();
 
-        // B. Center Body (Avatar Left & Identity Right)
-        const bodyY = headerY + 95;
-        const avatarBoxSize = 390;
-        const avatarX = innerX + 50;
+        // B. Center Body (Proportional 5:7 Grid Match with CSS layout)
+        const bodyTopY = headerY + 62; // 107
+        const bodyBottomY = innerY + innerH - 65; // 709
+        const bodyH = bodyBottomY - bodyTopY; // 602
+        const bodyCenterY = bodyTopY + bodyH / 2; // 408
 
-        // Avatar Frame Box
-        drawRoundRect(ctx, avatarX, bodyY, avatarBoxSize, avatarBoxSize, 28);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        // Left Column (5/12 = 41.6% width)
+        const leftColW = innerW * 0.416; // ~504px
+        const leftColCenterX = innerX + leftColW / 2; // 26 + 252 = 278
+
+        // Avatar Frame Box (340 x 340, centered in left column)
+        const avatarBoxSize = 340;
+        const avatarX = Math.round(leftColCenterX - avatarBoxSize / 2); // 108
+        const avatarY = Math.round(bodyCenterY - avatarBoxSize / 2); // 238
+
+        drawRoundRect(ctx, avatarX, avatarY, avatarBoxSize, avatarBoxSize, 26);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.lineWidth = 2;
@@ -357,109 +366,112 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
         });
 
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, avatarX + 20, bodyY + 20, avatarBoxSize - 40, avatarBoxSize - 40);
+        ctx.drawImage(img, avatarX + 18, avatarY + 18, avatarBoxSize - 36, avatarBoxSize - 36);
 
         // Avatar Top-Left ID Badge (#209)
-        drawRoundRect(ctx, avatarX + 16, bodyY + 16, 76, 28, 8);
+        drawRoundRect(ctx, avatarX + 14, avatarY + 14, 72, 26, 6);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
+        ctx.font = 'bold 12px "Space Mono", ui-monospace, monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`#${currentMonke.id}`, avatarX + 16 + 38, bodyY + 16 + 19);
+        ctx.fillText(`#${currentMonke.id}`, avatarX + 14 + 36, avatarY + 14 + 18);
 
-        // Right Info Content
-        const infoX = avatarX + avatarBoxSize + 48;
-        let curInfoY = bodyY + 50;
+        // Right Column (7/12 width) - Identity Content
+        const rightColX = innerX + leftColW + 20; // ~550px
+        const rightGroupH = 220;
+        const rightStartY = Math.round(bodyCenterY - rightGroupH / 2); // ~298
 
         // 1. Owner Handle & Verified Badge
+        let curInfoY = rightStartY + 30;
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 40px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = '900 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(ownerHandle, infoX, curInfoY);
+        ctx.fillText(ownerHandle, rightColX, curInfoY);
 
         const handleTextWidth = ctx.measureText(ownerHandle).width;
-        drawVerifiedBadge(ctx, infoX + handleTextWidth + 14, curInfoY - 30, 32);
+        drawVerifiedBadge(ctx, rightColX + handleTextWidth + 12, curInfoY - 26, 28);
 
         // 2. Title Badge Pill
-        curInfoY += 38;
-        ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
+        curInfoY += 24;
+        ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
         const titleText = customTitle.toUpperCase();
         const titleTextW = ctx.measureText(titleText).width;
-        const titleBoxW = titleTextW + 30;
-        const titleBoxH = 34;
+        const titleBoxW = titleTextW + 24;
+        const titleBoxH = 28;
 
-        drawRoundRect(ctx, infoX, curInfoY, titleBoxW, titleBoxH, 8);
+        drawRoundRect(ctx, rightColX, curInfoY, titleBoxW, titleBoxH, 6);
         ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
         ctx.fill();
         ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
         ctx.fillStyle = '#FDE68A';
         ctx.textAlign = 'center';
-        ctx.fillText(titleText, infoX + titleBoxW / 2, curInfoY + 23);
+        ctx.fillText(titleText, rightColX + titleBoxW / 2, curInfoY + 19);
 
-        // 3. Info Metadata Rows
-        curInfoY += 68;
-        const rowLineH = 42;
+        // 3. Info Metadata Rows (Clean, aligned)
+        curInfoY += 56;
+        const rowLineH = 34;
 
         // Inscription Row
         ctx.textAlign = 'left';
-        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.font = '19px "Space Mono", ui-monospace, monospace';
         ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Inscription: ', infoX, curInfoY);
+        ctx.fillText('Inscription: ', rightColX, curInfoY);
         const inscLabelW = ctx.measureText('Inscription: ').width;
         ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`#${currentMonke.inscription}`, infoX + inscLabelW, curInfoY);
+        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`#${currentMonke.inscription}`, rightColX + inscLabelW, curInfoY);
 
         // Block Height Row
         curInfoY += rowLineH;
-        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.font = '19px "Space Mono", ui-monospace, monospace';
         ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Block Height: ', infoX, curInfoY);
+        ctx.fillText('Block Height: ', rightColX, curInfoY);
         const blockLabelW = ctx.measureText('Block Height: ').width;
         ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`#${currentMonke.block}`, infoX + blockLabelW, curInfoY);
+        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`#${currentMonke.block}`, rightColX + blockLabelW, curInfoY);
 
         // Traits Count Row
         curInfoY += rowLineH;
-        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.font = '19px "Space Mono", ui-monospace, monospace';
         ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Traits: ', infoX, curInfoY);
+        ctx.fillText('Traits: ', rightColX, curInfoY);
         const traitsLabelW = ctx.measureText('Traits: ').width;
         ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`${currentMonke.attributes.Count || 4} Parts`, infoX + traitsLabelW, curInfoY);
+        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`${currentMonke.attributes.Count || 4} Parts`, rightColX + traitsLabelW, curInfoY);
 
-        // C. Footer (Bottom y: innerY + innerH - 55)
-        const footerY = innerY + innerH - 45;
+        // C. Footer (Bottom)
+        const footerDividerY = innerY + innerH - 65;
+        const footerTextY = footerDividerY + 38;
 
         // Footer Divider Line
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(innerX + 45, footerY - 24);
-        ctx.lineTo(innerX + innerW - 45, footerY - 24);
+        ctx.moveTo(innerX + 45, footerDividerY);
+        ctx.lineTo(innerX + innerW - 45, footerDividerY);
         ctx.stroke();
 
         // Footer Motto
         ctx.fillStyle = '#94A3B8';
-        ctx.font = 'italic 20px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'italic 17px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(`"${customMotto}"`, innerX + 45, footerY + 8);
+        ctx.fillText(`"${customMotto}"`, innerX + 45, footerTextY);
 
         // Footer Verified Tag
         ctx.fillStyle = '#FBBF24';
-        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
+        ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
         ctx.textAlign = 'right';
-        ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerY + 8);
+        ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerTextY);
 
       } else {
         // ================= BACK FACE (1:1 UI MATCH) =================
