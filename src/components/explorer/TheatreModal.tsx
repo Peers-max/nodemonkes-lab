@@ -14,8 +14,7 @@ import {
   Wand2,
   Clock,
   Palette,
-  Upload,
-  Image as ImageIcon
+  Upload
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
@@ -121,7 +120,36 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const [bgDim, setBgDim] = useState<number>(35);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Smooth Mouse Drag-to-Scroll for HUD Middle Bar
+  const middleBarRef = useRef<HTMLDivElement>(null);
+  const isDraggingBarRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+
   const timerRef = useRef<any>(null);
+
+  const handleBarMouseDown = (e: React.MouseEvent) => {
+    if (!middleBarRef.current) return;
+    isDraggingBarRef.current = true;
+    hasDraggedRef.current = false;
+    startXRef.current = e.pageX - middleBarRef.current.offsetLeft;
+    scrollLeftRef.current = middleBarRef.current.scrollLeft;
+  };
+
+  const handleBarMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingBarRef.current || !middleBarRef.current) return;
+    const x = e.pageX - middleBarRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    if (Math.abs(walk) > 4) {
+      hasDraggedRef.current = true;
+    }
+    middleBarRef.current.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleBarMouseUpOrLeave = () => {
+    isDraggingBarRef.current = false;
+  };
 
   // Handle Custom Background Upload
   const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -483,7 +511,6 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           ) : bgTheme === 'starfield' ? (
             <div className="w-full h-full bg-[#030611] relative">
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-indigo-600/15 rounded-full blur-[200px]" />
-              {/* Star Dust */}
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
             </div>
           ) : bgTheme === 'sunset' ? (
@@ -493,7 +520,6 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           ) : bgTheme === 'retroGrid' ? (
             <div className="w-full h-full bg-[#060412] relative overflow-hidden flex flex-col justify-end">
               <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-pink-500/20 rounded-full blur-[180px]" />
-              {/* Grid Floor */}
               <div className="w-full h-[45%] bg-[linear-gradient(to_right,rgba(236,72,153,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(236,72,153,0.15)_1px,transparent_1px)] [background-size:40px_40px] [transform:perspective(500px)_rotateX(60deg)] origin-bottom" />
             </div>
           ) : bgTheme === 'flame' ? (
@@ -524,7 +550,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           className={`flex flex-col xl:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
         >
           {/* Left Title & Status */}
-          <div className="flex items-center gap-3 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-3 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-mono text-sm font-bold shadow-lg">
               📺
             </div>
@@ -555,12 +581,18 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             </div>
           </div>
 
-          {/* Center: 14 Entrance Animation Effects + Background Styles Bar */}
-          <div className="flex flex-col sm:flex-row items-center gap-2 max-w-full overflow-x-auto">
-            
+          {/* Center: Mouse Drag-to-Scroll Bar (Zero Scrollbars, Pure Mouse Drag Navigation) */}
+          <div 
+            ref={middleBarRef}
+            onMouseDown={handleBarMouseDown}
+            onMouseMove={handleBarMouseMove}
+            onMouseUp={handleBarMouseUpOrLeave}
+            onMouseLeave={handleBarMouseUpOrLeave}
+            className="flex items-center gap-2 max-w-full overflow-x-auto select-none cursor-grab active:cursor-grabbing scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1 py-0.5"
+          >
             {/* 14 Transitions Bar */}
-            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl">
-              <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1 mr-1">
+            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
+              <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1 mr-1 pointer-events-none">
                 <Wand2 className="w-3.5 h-3.5" />
                 <span>{t.theatreFxTitle}:</span>
               </span>
@@ -570,8 +602,10 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                   <button
                     key={fx.id}
                     onClick={() => {
-                      setSelectedFx(fx.id);
-                      setActiveFx(fx.id === 'random' ? pickRandomFx() : fx.id);
+                      if (!hasDraggedRef.current) {
+                        setSelectedFx(fx.id);
+                        setActiveFx(fx.id === 'random' ? pickRandomFx() : fx.id);
+                      }
                     }}
                     className={clsx(
                       'px-2 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95 flex items-center gap-0.5',
@@ -588,8 +622,8 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             </div>
 
             {/* Background Style Presets + Upload */}
-            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl">
-              <span className="text-[11px] font-mono font-bold text-purple-400/90 whitespace-nowrap flex items-center gap-1 mr-1">
+            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
+              <span className="text-[11px] font-mono font-bold text-purple-400/90 whitespace-nowrap flex items-center gap-1 mr-1 pointer-events-none">
                 <Palette className="w-3.5 h-3.5" />
                 <span>{t.theatreBgTitle}:</span>
               </span>
@@ -599,8 +633,10 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                   <button
                     key={bg.id}
                     onClick={() => {
-                      setBgTheme(bg.id);
-                      setCustomBgImage(null);
+                      if (!hasDraggedRef.current) {
+                        setBgTheme(bg.id);
+                        setCustomBgImage(null);
+                      }
                     }}
                     className={clsx(
                       'px-2 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95 flex items-center gap-0.5',
@@ -616,7 +652,11 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
 
                 {/* Upload Custom Wallpaper Button */}
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (!hasDraggedRef.current) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
                   className={clsx(
                     'px-2.5 py-1 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap active:scale-95 flex items-center gap-1 border',
                     customBgImage
@@ -632,8 +672,10 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                 {customBgImage && (
                   <button
                     onClick={() => {
-                      setCustomBgImage(null);
-                      setBgTheme('void');
+                      if (!hasDraggedRef.current) {
+                        setCustomBgImage(null);
+                        setBgTheme('void');
+                      }
                     }}
                     className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300"
                     title="清除壁纸"
@@ -647,7 +689,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           </div>
 
           {/* Right Action Controls with Dedicated Speed Selector */}
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
             
             {/* Speed Selector Group */}
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
