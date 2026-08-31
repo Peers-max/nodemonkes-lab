@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -14,7 +14,12 @@ import {
   Wand2,
   Clock,
   Palette,
-  Upload
+  Upload,
+  ArrowRight,
+  ArrowLeft,
+  Shuffle,
+  Filter,
+  Layers
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
@@ -47,6 +52,18 @@ export type ScreensaverBg =
   | 'retroGrid' 
   | 'flame' 
   | 'custom';
+
+export type PlaybackOrder = 'forward' | 'reverse' | 'shuffle';
+
+export type CategoryFilter = 
+  | 'all' 
+  | 'top100' 
+  | 'alien' 
+  | 'gold' 
+  | 'crown' 
+  | 'asics9' 
+  | 'deathbot' 
+  | 'hoodie';
 
 interface TheatreModalProps {
   isOpen: boolean;
@@ -93,6 +110,23 @@ const SPEED_OPTIONS = [
   { label: '6.0s', val: 6000 },
 ];
 
+const ORDER_OPTIONS: { id: PlaybackOrder; icon: string }[] = [
+  { id: 'forward', icon: '➡️' },
+  { id: 'reverse', icon: '⬅️' },
+  { id: 'shuffle', icon: '🔀' },
+];
+
+const CATEGORY_OPTIONS: { id: CategoryFilter; icon: string }[] = [
+  { id: 'all', icon: '🌐' },
+  { id: 'top100', icon: '👑' },
+  { id: 'alien', icon: '👽' },
+  { id: 'gold', icon: '🥇' },
+  { id: 'crown', icon: '👑' },
+  { id: 'asics9', icon: '⚡' },
+  { id: 'deathbot', icon: '🤖' },
+  { id: 'hoodie', icon: '🧥' },
+];
+
 export const TheatreModal: React.FC<TheatreModalProps> = ({
   isOpen,
   monkes,
@@ -103,11 +137,42 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   onOpenInPoster,
 }) => {
   const { lang, t } = useLanguage();
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  
+  // Category Filter State
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+
+  // Filter Active Pool
+  const activeMonkes = useMemo(() => {
+    if (!monkes.length) return [];
+    switch (categoryFilter) {
+      case 'top100':
+        return monkes.filter((m) => m.rank && m.rank <= 100);
+      case 'alien':
+        return monkes.filter((m) => m.attributes?.Body === 'Alien');
+      case 'gold':
+        return monkes.filter((m) => m.attributes?.Body === 'Gold');
+      case 'crown':
+        return monkes.filter((m) => m.attributes?.Head === 'Crown');
+      case 'asics9':
+        return monkes.filter((m) => m.attributes?.Head === 'ASICS9');
+      case 'deathbot':
+        return monkes.filter((m) => m.attributes?.Eyes === 'Deathbot');
+      case 'hoodie':
+        return monkes.filter((m) => m.attributes?.Head === 'Hoodie');
+      case 'all':
+      default:
+        return monkes;
+    }
+  }, [monkes, categoryFilter]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHud, setShowHud] = useState(true);
   
+  // Playback Order State
+  const [orderMode, setOrderMode] = useState<PlaybackOrder>('forward');
+
   // Transition FX & Speed State
   const [selectedFx, setSelectedFx] = useState<EntranceFx>('random');
   const [activeFx, setActiveFx] = useState<Exclude<EntranceFx, 'random'>>('zoom');
@@ -214,12 +279,13 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   // Handle Modal Open / Close Lifecycle
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(initialIndex);
+      // Find index in activeMonkes
+      const foundIdx = activeMonkes.findIndex((m) => m.id === (monkes[initialIndex]?.id || initialIndex));
+      setCurrentIndex(foundIdx >= 0 ? foundIdx : 0);
       setIsPlaying(true);
       setShowHud(true);
       setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
 
-      // Auto browser fullscreen
       try {
         const doc = document as any;
         const el = document.documentElement as any;
@@ -238,7 +304,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         timerRef.current = null;
       }
     }
-  }, [isOpen, initialIndex, selectedFx, pickRandomFx]);
+  }, [isOpen, initialIndex, selectedFx, pickRandomFx, monkes, activeMonkes]);
 
   // Listen to browser fullscreen change
   useEffect(() => {
@@ -258,18 +324,34 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   }, []);
 
   const handlePrev = useCallback(() => {
-    if (!monkes.length) return;
+    if (!activeMonkes.length) return;
     setDirection(-1);
     setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : monkes.length - 1));
-  }, [monkes.length, selectedFx, pickRandomFx]);
+
+    if (orderMode === 'shuffle') {
+      const rand = Math.floor(Math.random() * activeMonkes.length);
+      setCurrentIndex(rand);
+    } else if (orderMode === 'reverse') {
+      setCurrentIndex((prev) => (prev < activeMonkes.length - 1 ? prev + 1 : 0));
+    } else {
+      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : activeMonkes.length - 1));
+    }
+  }, [activeMonkes.length, selectedFx, orderMode, pickRandomFx]);
 
   const handleNext = useCallback(() => {
-    if (!monkes.length) return;
+    if (!activeMonkes.length) return;
     setDirection(1);
     setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
-    setCurrentIndex((prev) => (prev < monkes.length - 1 ? prev + 1 : 0));
-  }, [monkes.length, selectedFx, pickRandomFx]);
+
+    if (orderMode === 'shuffle') {
+      const rand = Math.floor(Math.random() * activeMonkes.length);
+      setCurrentIndex(rand);
+    } else if (orderMode === 'reverse') {
+      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : activeMonkes.length - 1));
+    } else {
+      setCurrentIndex((prev) => (prev < activeMonkes.length - 1 ? prev + 1 : 0));
+    }
+  }, [activeMonkes.length, selectedFx, orderMode, pickRandomFx]);
 
   // Autoplay Screensaver Timer
   useEffect(() => {
@@ -278,7 +360,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       timerRef.current = null;
     }
 
-    if (isOpen && isPlaying && monkes.length > 1) {
+    if (isOpen && isPlaying && activeMonkes.length > 1) {
       timerRef.current = setInterval(() => {
         handleNext();
       }, intervalSpeed);
@@ -290,7 +372,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         timerRef.current = null;
       }
     };
-  }, [isOpen, isPlaying, monkes.length, intervalSpeed, handleNext]);
+  }, [isOpen, isPlaying, activeMonkes.length, intervalSpeed, handleNext]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -335,9 +417,9 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
     };
   }, [isOpen, isPlaying]);
 
-  if (!isOpen || !monkes.length) return null;
+  if (!isOpen || !activeMonkes.length) return null;
 
-  const currentMonke = monkes[currentIndex] || monkes[0];
+  const currentMonke = activeMonkes[currentIndex] || activeMonkes[0];
   const attrs = currentMonke.attributes;
 
   // 14 Entrance Animation Variants Generator
@@ -473,6 +555,27 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
     }
   };
 
+  const getCatLabel = (id: CategoryFilter) => {
+    switch (id) {
+      case 'all': return t.theatreCatAll;
+      case 'top100': return t.theatreCatTop100;
+      case 'alien': return t.theatreCatAlien;
+      case 'gold': return t.theatreCatGold;
+      case 'crown': return t.theatreCatCrown;
+      case 'asics9': return t.theatreCatAsics9;
+      case 'deathbot': return t.theatreCatDeathbot;
+      case 'hoodie': return t.theatreCatHoodie;
+    }
+  };
+
+  const getOrderLabel = (id: PlaybackOrder) => {
+    switch (id) {
+      case 'forward': return t.theatreOrderForward;
+      case 'reverse': return t.theatreOrderReverse;
+      case 'shuffle': return t.theatreOrderShuffle;
+    }
+  };
+
   const content = (
     <AnimatePresence>
       <motion.div
@@ -576,7 +679,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                 )}
               </div>
               <span className="text-[11px] text-slate-400 font-mono hidden sm:inline-block">
-                Inscription #{currentMonke.inscription} • Block #{currentMonke.block}
+                Inscription #{currentMonke.inscription} • Block #{currentMonke.block} • {currentIndex + 1} / {activeMonkes.length}
               </span>
             </div>
           </div>
@@ -590,6 +693,69 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             onMouseLeave={handleBarMouseUpOrLeave}
             className="flex items-center gap-2 max-w-full overflow-x-auto select-none cursor-grab active:cursor-grabbing scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1 py-0.5"
           >
+            {/* Playback Category Filter */}
+            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
+              <span className="text-[11px] font-mono font-bold text-sky-400/90 whitespace-nowrap flex items-center gap-1 mr-1 pointer-events-none">
+                <Filter className="w-3.5 h-3.5" />
+                <span>{t.theatreCatTitle}:</span>
+              </span>
+
+              <div className="flex items-center gap-1">
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      if (!hasDraggedRef.current) {
+                        setCategoryFilter(cat.id);
+                        setCurrentIndex(0);
+                      }
+                    }}
+                    className={clsx(
+                      'px-2 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95 flex items-center gap-0.5',
+                      categoryFilter === cat.id
+                        ? 'bg-sky-500/25 border border-sky-400 text-sky-300 font-bold shadow-sm'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                    )}
+                    title={getCatLabel(cat.id)}
+                  >
+                    <span>{cat.icon}</span>
+                    <span className="hidden 2xl:inline text-[10px] ml-0.5">{getCatLabel(cat.id).split(' ')[1] || getCatLabel(cat.id)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Playback Order Selector */}
+            <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
+              <span className="text-[11px] font-mono font-bold text-emerald-400/90 whitespace-nowrap flex items-center gap-1 mr-1 pointer-events-none">
+                <Layers className="w-3.5 h-3.5" />
+                <span>{t.theatreOrderTitle}:</span>
+              </span>
+
+              <div className="flex items-center gap-1">
+                {ORDER_OPTIONS.map((ord) => (
+                  <button
+                    key={ord.id}
+                    onClick={() => {
+                      if (!hasDraggedRef.current) {
+                        setOrderMode(ord.id);
+                      }
+                    }}
+                    className={clsx(
+                      'px-2.5 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95 flex items-center gap-1',
+                      orderMode === ord.id
+                        ? 'bg-emerald-500/25 border border-emerald-400 text-emerald-300 font-bold shadow-sm'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                    )}
+                    title={getOrderLabel(ord.id)}
+                  >
+                    <span>{ord.icon}</span>
+                    <span className="text-[11px]">{getOrderLabel(ord.id).split(' ')[1]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* 14 Transitions Bar */}
             <div className="flex items-center gap-1 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
               <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1 mr-1 pointer-events-none">

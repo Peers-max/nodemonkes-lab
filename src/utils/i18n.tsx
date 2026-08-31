@@ -257,6 +257,19 @@ export interface Translations {
   theatreBgUpload: string;
   theatreBgCustom: string;
   theatreBgDim: string;
+  theatreOrderTitle: string;
+  theatreOrderForward: string;
+  theatreOrderReverse: string;
+  theatreOrderShuffle: string;
+  theatreCatTitle: string;
+  theatreCatAll: string;
+  theatreCatTop100: string;
+  theatreCatAlien: string;
+  theatreCatGold: string;
+  theatreCatCrown: string;
+  theatreCatAsics9: string;
+  theatreCatDeathbot: string;
+  theatreCatHoodie: string;
 
   // Toast Messages
   toastGifLoaded: string;
@@ -527,6 +540,19 @@ export const translations: Record<Language, Translations> = {
     theatreBgUpload: '📁 上传自定义背景',
     theatreBgCustom: '🖼️ 自定义壁纸',
     theatreBgDim: '背景压暗',
+    theatreOrderTitle: '播放顺序',
+    theatreOrderForward: '➡️ 正序',
+    theatreOrderReverse: '⬅️ 倒序',
+    theatreOrderShuffle: '🔀 随机',
+    theatreCatTitle: '播放种类',
+    theatreCatAll: '🌐 全部 10,000',
+    theatreCatTop100: '👑 神兽榜 Top 100',
+    theatreCatAlien: '👽 纯种外星人',
+    theatreCatGold: '🥇 纯金至尊',
+    theatreCatCrown: '👑 皇冠家族',
+    theatreCatAsics9: '⚡ 矿机神兽',
+    theatreCatDeathbot: '🤖 死亡机器人',
+    theatreCatHoodie: '🧥 连帽卫衣',
 
     // Toast Messages
     toastGifLoaded: '已载入动图工坊',
@@ -795,6 +821,19 @@ export const translations: Record<Language, Translations> = {
     theatreBgUpload: '📁 Upload Custom BG',
     theatreBgCustom: '🖼️ Custom Wallpaper',
     theatreBgDim: 'Dimming',
+    theatreOrderTitle: 'Playback Order',
+    theatreOrderForward: '➡️ Forward',
+    theatreOrderReverse: '⬅️ Reverse',
+    theatreOrderShuffle: '🔀 Shuffle',
+    theatreCatTitle: 'Playlist Category',
+    theatreCatAll: '🌐 All 10,000',
+    theatreCatTop100: '👑 Top 100',
+    theatreCatAlien: '👽 Aliens',
+    theatreCatGold: '🥇 Gold Body',
+    theatreCatCrown: '👑 Crown',
+    theatreCatAsics9: '⚡ ASICS9',
+    theatreCatDeathbot: '🤖 Deathbot',
+    theatreCatHoodie: '🧥 Hoodie',
 
     // Toast Messages
     toastGifLoaded: 'Loaded in GIF Studio',
