@@ -306,7 +306,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
               )}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>筛选</span>
+              <span>{t.filterBtn}</span>
               {activeFilterCount > 0 && (
                 <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold flex items-center justify-center">
                   {activeFilterCount}
@@ -319,10 +319,10 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
               whileTap={{ scale: 0.95 }}
               onClick={() => handleLaunchScreensaver(0)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-mono font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-300 transition-all shadow-sm"
-              title="启动电脑全屏自动屏保"
+              title={t.theatreMode}
             >
               <Play className="w-3.5 h-3.5 text-amber-400" />
-              <span>📺 启动屏保 (全屏)</span>
+              <span>{t.theatreMode}</span>
             </motion.button>
 
             {/* Sort Selector */}
@@ -391,7 +391,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
                 
                 {/* 1. Body Selector */}
                 <div>
-                  <label className="text-[10px] font-mono text-slate-400 block mb-1">身体 (Body)</label>
+                  <label className="text-[10px] font-mono text-slate-400 block mb-1">{t.filterBody}</label>
                   <select
                     value={selectedBody}
                     onChange={(e) => setSelectedBody(e.target.value)}
@@ -405,7 +405,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
 
                 {/* 2. Head Selector */}
                 <div>
-                  <label className="text-[10px] font-mono text-slate-400 block mb-1">头部 (Head)</label>
+                  <label className="text-[10px] font-mono text-slate-400 block mb-1">{t.filterHead}</label>
                   <select
                     value={selectedHead}
                     onChange={(e) => setSelectedHead(e.target.value)}
@@ -420,7 +420,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
 
                 {/* 3. Eyes Selector */}
                 <div>
-                  <label className="text-[10px] font-mono text-slate-400 block mb-1">眼睛 (Eyes)</label>
+                  <label className="text-[10px] font-mono text-slate-400 block mb-1">{t.filterEyes}</label>
                   <select
                     value={selectedEyes}
                     onChange={(e) => setSelectedEyes(e.target.value)}
@@ -435,7 +435,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
 
                 {/* 4. Earring Selector */}
                 <div>
-                  <label className="text-[10px] font-mono text-slate-400 block mb-1">耳环 (Earring)</label>
+                  <label className="text-[10px] font-mono text-slate-400 block mb-1">{t.filterEarring}</label>
                   <select
                     value={selectedEarring}
                     onChange={(e) => setSelectedEarring(e.target.value)}
@@ -457,7 +457,7 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
                     className="text-xs font-mono text-rose-400 hover:text-rose-300 flex items-center gap-1"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span>重置所有筛选</span>
+                    <span>{t.resetFilters}</span>
                   </button>
                 </div>
               )}

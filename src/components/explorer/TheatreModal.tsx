@@ -224,11 +224,11 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
                 {isPlaying ? (
                   <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span>自动屏保中</span>
+                    <span>{t.screensaverActive}</span>
                   </span>
                 ) : (
                   <span className="text-[11px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
-                    已暂停
+                    {t.screensaverPaused}
                   </span>
                 )}
               </div>
@@ -240,7 +240,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
 
           {/* Center Hint Prompt Badge */}
           <div className="hidden lg:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300/90 text-xs font-mono shadow-xl">
-            <span>💡 提示：按 <strong>ESC</strong> 退出屏保 • <strong>F11</strong> 切换全屏 • <strong>空格键</strong> 暂停/播放 • <strong>← / →</strong> 切猴</span>
+            <span>{t.screensaverHint}</span>
           </div>
 
           {/* Right Action Controls */}
@@ -251,14 +251,14 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold transition-all active:scale-95"
             >
               {isPlaying ? <Pause className="w-4 h-4 text-amber-400" /> : <Play className="w-4 h-4 text-amber-400" />}
-              <span>{isPlaying ? '暂停屏保' : '启动屏保'}</span>
+              <span>{isPlaying ? t.screensaverPause : t.screensaverPlay}</span>
             </button>
 
             {/* Fullscreen Toggle */}
             <button
               onClick={toggleFullscreen}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all active:scale-95"
-              title={isFullscreen ? '退出全屏 (F11)' : '进入全屏 (F11)'}
+              title={isFullscreen ? 'F11' : 'F11'}
             >
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
@@ -267,10 +267,10 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             <button
               onClick={handleExit}
               className="p-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-mono font-bold"
-              title="退出全屏屏保 (ESC)"
+              title="ESC"
             >
               <X className="w-4 h-4" />
-              <span>退出 (ESC)</span>
+              <span>{t.screensaverExit}</span>
             </button>
           </div>
         </motion.div>

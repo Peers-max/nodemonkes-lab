@@ -34,9 +34,21 @@ export interface Translations {
   allHeads: string;
   allEyes: string;
   allEarrings: string;
+  filterBtn: string;
+  filterBody: string;
+  filterHead: string;
+  filterEyes: string;
+  filterEarring: string;
+  resetFilters: string;
   hallOfFame: string;
   hallOfFameAll: string;
   theatreMode: string;
+  screensaverActive: string;
+  screensaverPaused: string;
+  screensaverPause: string;
+  screensaverPlay: string;
+  screensaverExit: string;
+  screensaverHint: string;
   sortBy: string;
   sortRank: string;
   sortId: string;
@@ -236,9 +248,21 @@ export const translations: Record<Language, Translations> = {
     allHeads: '全部头部',
     allEyes: '全部眼睛',
     allEarrings: '全部耳环',
+    filterBtn: '筛选',
+    filterBody: '身体 (Body)',
+    filterHead: '头部 (Head)',
+    filterEyes: '眼睛 (Eyes)',
+    filterEarring: '耳环 (Earring)',
+    resetFilters: '重置所有筛选',
     hallOfFame: '👑 神兽榜 (Top 100)',
     hallOfFameAll: '全部图库',
-    theatreMode: '🎬 沉浸漫游',
+    theatreMode: '📺 启动屏保 (全屏)',
+    screensaverActive: '自动屏保中',
+    screensaverPaused: '已暂停',
+    screensaverPause: '暂停屏保',
+    screensaverPlay: '启动屏保',
+    screensaverExit: '退出 (ESC)',
+    screensaverHint: '💡 提示：按 ESC 退出屏保 • F11 切换全屏 • 空格键 暂停/播放 • ← / → 切猴',
     sortBy: '排序方式',
     sortRank: '按稀有度排序',
     sortId: '按编号排序',
@@ -436,9 +460,21 @@ export const translations: Record<Language, Translations> = {
     allHeads: 'All Heads',
     allEyes: 'All Eyes',
     allEarrings: 'All Earrings',
+    filterBtn: 'Filters',
+    filterBody: 'Body',
+    filterHead: 'Head',
+    filterEyes: 'Eyes',
+    filterEarring: 'Earring',
+    resetFilters: 'Reset All Filters',
     hallOfFame: '👑 Hall of Fame (Top 100)',
     hallOfFameAll: 'All Monkes',
-    theatreMode: '🎬 Theatre Mode',
+    theatreMode: '📺 Screensaver (Fullscreen)',
+    screensaverActive: 'Screensaver Active',
+    screensaverPaused: 'Paused',
+    screensaverPause: 'Pause',
+    screensaverPlay: 'Play',
+    screensaverExit: 'Exit (ESC)',
+    screensaverHint: '💡 Hint: Press ESC to exit • F11 to toggle fullscreen • Space to pause/play • ← / → to navigate',
     sortBy: 'Sort By',
     sortRank: 'Sort by Rank',
     sortId: 'Sort by ID',
