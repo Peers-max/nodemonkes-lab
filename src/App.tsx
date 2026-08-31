@@ -8,6 +8,7 @@ import { MonkesExplorer } from './components/explorer/MonkesExplorer';
 import { GifStudio } from './components/gif/GifStudio';
 import { DiyStudio } from './components/diy/DiyStudio';
 import { SantaStudio } from './components/santa/SantaStudio';
+import { PosterStudio } from './components/poster/PosterStudio';
 import { ToastContainer } from './components/ui/Toast';
 import { LanguageProvider, useLanguage } from './utils/i18n';
 
@@ -23,7 +24,7 @@ const AppContent: React.FC = () => {
   const getInitialTab = (): TabType => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') as TabType;
-    if (['explorer', 'gif', 'diy', 'santa'].includes(tab)) {
+    if (['explorer', 'gif', 'diy', 'santa', 'poster'].includes(tab)) {
       return tab;
     }
     return 'explorer';
@@ -100,6 +101,11 @@ const AppContent: React.FC = () => {
     addToast(t.toastSantaLoaded, `${t.toastSantaLoadedDesc} (#${id})`, 'info');
   };
 
+  const handleOpenInPoster = (id: number) => {
+    handleTabChange('poster', id);
+    addToast(t.toastPosterLoaded, `${t.toastPosterLoadedDesc} (#${id})`, 'info');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-ambient-mesh text-slate-100 selection:bg-amber-500/30 selection:text-amber-200 relative">
       
@@ -144,6 +150,7 @@ const AppContent: React.FC = () => {
                 loading={loading}
                 onOpenInGif={handleOpenInGif}
                 onOpenInSanta={handleOpenInSanta}
+                onOpenInPoster={handleOpenInPoster}
                 onToast={addToast}
               />
             </motion.div>
@@ -192,6 +199,23 @@ const AppContent: React.FC = () => {
                 initialMonkeId={targetMonkeId}
                 monkes={monkes}
                 onOpenInGif={handleOpenInGif}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
+
+          {/* Tab 5: Poster & Banner Studio */}
+          {activeTab === 'poster' && (
+            <motion.div
+              key="poster"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <PosterStudio
+                initialMonkeId={targetMonkeId}
+                monkes={monkes}
                 onToast={addToast}
               />
             </motion.div>

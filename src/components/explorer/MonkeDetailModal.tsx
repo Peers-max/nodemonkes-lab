@@ -11,6 +11,7 @@ interface MonkeDetailModalProps {
   onClose: () => void;
   onOpenInGif: (monkeId: number) => void;
   onOpenInSanta: (monkeId: number) => void;
+  onOpenInPoster?: (monkeId: number) => void;
   onCopyPubkey: (text: string) => void;
 }
 
@@ -19,6 +20,7 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
   onClose,
   onOpenInGif,
   onOpenInSanta,
+  onOpenInPoster = () => {},
   onCopyPubkey,
 }) => {
   const { t } = useLanguage();
@@ -131,7 +133,7 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-2 flex flex-col gap-2.5">
+                  <div className="pt-2 flex flex-col gap-2">
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -139,23 +141,39 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
                         onOpenInGif(monke.id);
                         onClose();
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-500/20 transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-bold bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-md shadow-amber-500/20 transition-all"
                     >
                       <Sparkles className="w-4 h-4" />
                       <span>{t.modalMakeGif}</span>
                     </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        onOpenInSanta(monke.id);
-                        onClose();
-                      }}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-all"
-                    >
-                      <Gift className="w-3.5 h-3.5 text-rose-400" />
-                      <span>{t.modalSanta}</span>
-                    </motion.button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          onOpenInSanta(monke.id);
+                          onClose();
+                        }}
+                        className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-all"
+                      >
+                        <Gift className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{t.modalSanta}</span>
+                      </motion.button>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          onOpenInPoster(monke.id);
+                          onClose();
+                        }}
+                        className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all"
+                      >
+                        <span>🖼️</span>
+                        <span>{t.modalMakePoster}</span>
+                      </motion.button>
+                    </div>
                   </div>
 
                 </div>

@@ -23,6 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'gif' as TabType, label: t.tabGif, icon: Sparkles, badge: t.badgeStudio },
     { id: 'diy' as TabType, label: t.tabDiy, icon: Paintbrush, badge: t.badgeCreator },
     { id: 'santa' as TabType, label: t.tabSanta, icon: Gift, badge: t.badgeSpecial },
+    { id: 'poster' as TabType, label: t.tabPoster, icon: Sparkles, badge: t.badgePoster },
   ];
 
   const toggleLanguage = () => {
