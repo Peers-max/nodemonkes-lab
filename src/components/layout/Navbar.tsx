@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Sparkles, Paintbrush, Gift, Globe } from 'lucide-react';
+import { Search, Sparkles, Paintbrush, Gift, Globe, CreditCard, Gamepad2, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import type { TabType } from '../../types';
@@ -23,7 +23,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'gif' as TabType, label: t.tabGif, icon: Sparkles, badge: t.badgeStudio },
     { id: 'diy' as TabType, label: t.tabDiy, icon: Paintbrush, badge: t.badgeCreator },
     { id: 'santa' as TabType, label: t.tabSanta, icon: Gift, badge: t.badgeSpecial },
-    { id: 'poster' as TabType, label: t.tabPoster, icon: Sparkles, badge: t.badgePoster },
+    { id: 'poster' as TabType, label: t.tabPoster, icon: ImageIcon, badge: t.badgePoster },
+    { id: 'passport' as TabType, label: t.tabPassport, icon: CreditCard, badge: '3D' },
+    { id: 'arcade' as TabType, label: t.tabArcade, icon: Gamepad2, badge: '8Bit' },
   ];
 
   const toggleLanguage = () => {

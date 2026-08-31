@@ -15,16 +15,18 @@ import {
   Clock,
   Palette,
   Upload,
-  ArrowRight,
-  ArrowLeft,
-  Shuffle,
+  Layers,
   Filter,
-  Layers
+  Volume2,
+  VolumeX,
+  SkipForward,
+  Activity
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
 import { getMonkeImageUrl } from '../../utils/api';
 import { useLanguage } from '../../utils/i18n';
+import { audioSynth } from '../../utils/audioSynth';
 
 export type EntranceFx = 
   | 'random' 
@@ -64,6 +66,8 @@ export type CategoryFilter =
   | 'asics9' 
   | 'deathbot' 
   | 'hoodie';
+
+export type VisualizerMode = 'bars' | 'wave' | 'off';
 
 interface TheatreModalProps {
   isOpen: boolean;
@@ -185,6 +189,12 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const [bgDim, setBgDim] = useState<number>(35);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Music & Audio Visualizer State
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('bars');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const visualizerRafRef = useRef<number | null>(null);
+
   // Smooth Mouse Drag-to-Scroll for HUD Middle Bar
   const middleBarRef = useRef<HTMLDivElement>(null);
   const isDraggingBarRef = useRef(false);
@@ -215,6 +225,100 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const handleBarMouseUpOrLeave = () => {
     isDraggingBarRef.current = false;
   };
+
+  // Toggle Lo-Fi Radio
+  const handleToggleMusic = useCallback(() => {
+    const active = audioSynth.toggle();
+    setIsMusicPlaying(active);
+  }, []);
+
+  const handleNextTrack = useCallback(() => {
+    audioSynth.nextTrack();
+    if (!isMusicPlaying) {
+      audioSynth.play();
+      setIsMusicPlaying(true);
+    }
+  }, [isMusicPlaying]);
+
+  // Audio Visualizer Canvas Renderer Loop
+  useEffect(() => {
+    if (!isOpen || visualizerMode === 'off') {
+      if (visualizerRafRef.current) {
+        cancelAnimationFrame(visualizerRafRef.current);
+        visualizerRafRef.current = null;
+      }
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const render = () => {
+      const width = canvas.width = window.innerWidth;
+      const height = canvas.height = window.innerHeight;
+      ctx.clearRect(0, 0, width, height);
+
+      const freqData = audioSynth.getFrequencyData();
+      const numBars = 32;
+
+      if (visualizerMode === 'bars') {
+        const barWidth = width / numBars;
+        for (let i = 0; i < numBars; i++) {
+          const val = isMusicPlaying ? freqData[i] || 0 : Math.sin(Date.now() * 0.003 + i * 0.3) * 15 + 15;
+          const barHeight = (val / 255) * (height * 0.22) + 4;
+          const x = i * barWidth;
+          const y = height - barHeight;
+
+          // Glowing Cyber Gradient
+          const grad = ctx.createLinearGradient(0, y, 0, height);
+          grad.addColorStop(0, 'rgba(234, 88, 12, 0.7)'); // Amber / Orange
+          grad.addColorStop(0.5, 'rgba(168, 85, 247, 0.4)'); // Purple
+          grad.addColorStop(1, 'rgba(14, 165, 233, 0.1)'); // Cyan
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.roundRect(x + 2, y, barWidth - 4, barHeight, [6, 6, 0, 0]);
+          ctx.fill();
+        }
+      } else if (visualizerMode === 'wave') {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#F59E0B';
+
+        const sliceWidth = width / numBars;
+        let x = 0;
+
+        for (let i = 0; i < numBars; i++) {
+          const val = isMusicPlaying ? (freqData[i] / 128.0) : 1 + Math.sin(Date.now() * 0.004 + i * 0.4) * 0.15;
+          const y = height - 60 - (val * 40);
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+          x += sliceWidth;
+        }
+
+        ctx.stroke();
+      }
+
+      visualizerRafRef.current = requestAnimationFrame(render);
+    };
+
+    visualizerRafRef.current = requestAnimationFrame(render);
+
+    return () => {
+      if (visualizerRafRef.current) {
+        cancelAnimationFrame(visualizerRafRef.current);
+        visualizerRafRef.current = null;
+      }
+    };
+  }, [isOpen, visualizerMode, isMusicPlaying]);
 
   // Handle Custom Background Upload
   const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,6 +365,8 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   // Cleanup & Exit Handler
   const handleExit = useCallback(() => {
     setIsPlaying(false);
+    audioSynth.stop();
+    setIsMusicPlaying(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -279,7 +385,6 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   // Handle Modal Open / Close Lifecycle
   useEffect(() => {
     if (isOpen) {
-      // Find index in activeMonkes
       const foundIdx = activeMonkes.findIndex((m) => m.id === (monkes[initialIndex]?.id || initialIndex));
       setCurrentIndex(foundIdx >= 0 ? foundIdx : 0);
       setIsPlaying(true);
@@ -299,6 +404,8 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       }
     } else {
       setIsPlaying(false);
+      audioSynth.stop();
+      setIsMusicPlaying(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -391,12 +498,14 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       } else if (e.key === ' ') {
         e.preventDefault();
         setIsPlaying((p) => !p);
+      } else if (e.key === 'm' || e.key === 'M') {
+        handleToggleMusic();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleExit, handlePrev, handleNext]);
+  }, [isOpen, handleExit, handlePrev, handleNext, handleToggleMusic]);
 
   // Auto-hide HUD on idle
   useEffect(() => {
@@ -637,6 +746,12 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           )}
         </div>
 
+        {/* Live Audio Visualizer Canvas */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 pointer-events-none z-[5] w-full h-full"
+        />
+
         {/* Hidden File Input for Custom BG */}
         <input
           type="file"
@@ -854,9 +969,52 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
 
           </div>
 
-          {/* Right Action Controls with Dedicated Speed Selector */}
+          {/* Right Action Controls with Lo-Fi Radio + Speed + Fullscreen */}
           <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-2.5 rounded-2xl border border-white/10 shadow-2xl flex-shrink-0">
             
+            {/* Lo-Fi Cyber Radio & Visualizer Controls */}
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+              <button
+                onClick={handleToggleMusic}
+                className={clsx(
+                  'px-2 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 active:scale-95',
+                  isMusicPlaying
+                    ? 'bg-amber-500/30 text-amber-300 border border-amber-400/50 shadow-sm animate-pulse'
+                    : 'text-slate-400 hover:text-white'
+                )}
+                title={isMusicPlaying ? t.theatreMusicMute : t.theatreMusicPlay}
+              >
+                {isMusicPlaying ? <Volume2 className="w-3.5 h-3.5 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5" />}
+                <span className="text-[11px] hidden sm:inline">{isMusicPlaying ? 'Radio ON' : 'Radio'}</span>
+              </button>
+
+              {isMusicPlaying && (
+                <button
+                  onClick={handleNextTrack}
+                  className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                  title={t.theatreMusicTrack}
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Visualizer Mode Toggle */}
+              <button
+                onClick={() => {
+                  setVisualizerMode((prev) => (prev === 'bars' ? 'wave' : prev === 'wave' ? 'off' : 'bars'));
+                }}
+                className={clsx(
+                  'p-1 rounded-lg text-[11px] font-mono transition-all',
+                  visualizerMode !== 'off' ? 'text-amber-300 bg-amber-500/20' : 'text-slate-400 hover:text-white'
+                )}
+                title={`${t.theatreVisTitle}: ${visualizerMode}`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="w-[1px] h-4 bg-white/15" />
+
             {/* Speed Selector Group */}
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
               <Clock className="w-3.5 h-3.5 text-purple-400 ml-1" />
