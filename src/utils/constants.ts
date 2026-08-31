@@ -1,0 +1,95 @@
+export const CDN_BASE_URL = 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/';
+export const SANTA_CDN_BASE_URL = 'https://raw.githubusercontent.com/supercrypto1984/santa-nodemonkes/main/public/assets/merged/';
+export const METADATA_URL = 'https://pub-ce8a03b190984a3d99332e13b7d5e3cb.r2.dev/transformed_metadata.json';
+
+export const BODY_COLORS: Record<string, string> = {
+  albino: "#BDADAD",
+  alien: "#04CFE7",
+  beak: "#F8AC00",
+  binary: "#010101",
+  boned: "#000000",
+  bot: "#484848",
+  brown: "#310000",
+  dark: "#482510",
+  deathbot: "#282831",
+  dos: "#0002A5",
+  gold: "#FFAA01",
+  green: "#002205",
+  grey: "#232A30",
+  hyena: "#BA8837",
+  ion: "#060F26",
+  light: "#B7844F",
+  medium: "#945321",
+  mempool: "#BE0B3A",
+  moon: "#3501BB",
+  patriot: "#0D0060",
+  pepe: "#127602",
+  pink: "#E944CE",
+  purple: "#38034A",
+  rainbow: "#009DFF",
+  red: "#630001",
+  safemode: "#000DFF",
+  striped: "#110654",
+  underlord: "#9C0901",
+  vhs: "#0600FF",
+  white: "#c7bcb6",
+  wrapped: "#FFFFFF",
+  zombie: "#104119"
+};
+
+export const ALL_BODY_TYPES = [
+  "all",
+  "Albino",
+  "Alien",
+  "Beak",
+  "Binary",
+  "Boned",
+  "Bot",
+  "Brown",
+  "DOS",
+  "Dark",
+  "Deathbot",
+  "Gold",
+  "Green",
+  "Grey",
+  "Hyena",
+  "Ion",
+  "Light",
+  "Medium",
+  "Mempool",
+  "Moon",
+  "Patriot",
+  "Pepe",
+  "Pink",
+  "Purple",
+  "Rainbow",
+  "Red",
+  "Safemode",
+  "Striped",
+  "Underlord",
+  "VHS",
+  "White",
+  "Wrapped",
+  "Zombie"
+];
+
+export const GIF_PARAMS = {
+  frameCount: 24,
+  frameDelay: 50,
+  rotationRange: 0.045,
+  pressDownStrength: 50,
+  insertionStrength: 30,
+  insertionAngle: 0.045,
+  squashStrength: 0.12
+};
+
+export const PRESET_COLORS = [
+  { name: 'Pure Dark', value: '#0A0D14' },
+  { name: 'Bitcoin Gold', value: '#F7931A' },
+  { name: 'Cyber Orange', value: '#FF5C00' },
+  { name: 'Neon Purple', value: '#A855F7' },
+  { name: 'Matrix Green', value: '#10B981' },
+  { name: 'Electric Cyan', value: '#06B6D4' },
+  { name: 'Deep Navy', value: '#0F172A' },
+  { name: 'Snow White', value: '#FFFFFF' },
+];
