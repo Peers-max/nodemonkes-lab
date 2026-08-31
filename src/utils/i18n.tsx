@@ -213,6 +213,11 @@ export interface Translations {
   posterTextFontSize: string;
   posterTextColor: string;
   posterLayerList: string;
+  posterSelectAll: string;
+  posterDeselectAll: string;
+  posterMultiSelected: string;
+  posterBatchFlip: string;
+  posterBatchDelete: string;
   posterExportBtn: string;
   posterExporting: string;
   posterSuccess: string;
@@ -450,6 +455,11 @@ export const translations: Record<Language, Translations> = {
     posterTextFontSize: '文字大小',
     posterTextColor: '文字颜色',
     posterLayerList: '图层列表 (点击精准选中)',
+    posterSelectAll: '☑️ 全选猴子',
+    posterDeselectAll: '取消全选',
+    posterMultiSelected: '已框选 {n} 只猴子',
+    posterBatchFlip: '↔️ 批量翻转',
+    posterBatchDelete: '🗑️ 批量删除',
     posterExportBtn: '导出高清海报 PNG',
     posterExporting: '正在渲染海报...',
     posterSuccess: '海报导出成功！',
@@ -685,6 +695,11 @@ export const translations: Record<Language, Translations> = {
     posterTextFontSize: 'Font Size',
     posterTextColor: 'Text Color',
     posterLayerList: 'Layers List (Click to Select)',
+    posterSelectAll: '☑️ Select All',
+    posterDeselectAll: 'Deselect All',
+    posterMultiSelected: '{n} Monkes Selected',
+    posterBatchFlip: '↔️ Flip All',
+    posterBatchDelete: '🗑️ Delete Selected',
     posterExportBtn: 'Export HD Poster PNG',
     posterExporting: 'Rendering Poster...',
     posterSuccess: 'Poster Exported Successfully!',
