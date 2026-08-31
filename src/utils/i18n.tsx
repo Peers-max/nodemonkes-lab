@@ -190,6 +190,24 @@ export interface Translations {
   posterThemeEmerald: string;
   posterThemeMinimal: string;
   posterMonkeIds: string;
+  posterAddMonke: string;
+  posterDeleteMonke: string;
+  posterDuplicateMonke: string;
+  posterBringFront: string;
+  posterSendBack: string;
+  posterMoveUp: string;
+  posterMoveDown: string;
+  posterFlipH: string;
+  posterRotate: string;
+  posterSize: string;
+  posterTemplates: string;
+  posterTemplateSquad: string;
+  posterTemplateDuo: string;
+  posterTemplatePyramid: string;
+  posterTemplateSolo: string;
+  posterTemplateScatter: string;
+  posterLayers: string;
+  posterCanvasHint: string;
   posterExportBtn: string;
   posterExporting: string;
   posterSuccess: string;
@@ -404,6 +422,24 @@ export const translations: Record<Language, Translations> = {
     posterThemeEmerald: '矩阵祖母绿 (Matrix)',
     posterThemeMinimal: '极简灰白 (Editorial)',
     posterMonkeIds: '猴子编号 (用逗号分隔)',
+    posterAddMonke: '+ 添加猴子',
+    posterDeleteMonke: '删除图层',
+    posterDuplicateMonke: '复制图层',
+    posterBringFront: '置于顶层',
+    posterSendBack: '置于底层',
+    posterMoveUp: '上移一层',
+    posterMoveDown: '下移一层',
+    posterFlipH: '水平翻转',
+    posterRotate: '旋转角度',
+    posterSize: '尺寸缩放',
+    posterTemplates: '排版模板',
+    posterTemplateSquad: '五猴横排',
+    posterTemplateDuo: '双猴对决',
+    posterTemplatePyramid: '金字塔阵',
+    posterTemplateSolo: '单猴特写',
+    posterTemplateScatter: '自由散落',
+    posterLayers: '猴子图层 (支持画布拖拽/缩放/旋转)',
+    posterCanvasHint: '💡 提示：点击画布上的猴子可直接拖拽移动、拉伸四角缩放或旋转，滚轮可快速缩放',
     posterExportBtn: '导出高清海报 PNG',
     posterExporting: '正在渲染海报...',
     posterSuccess: '海报导出成功！',
@@ -616,6 +652,24 @@ export const translations: Record<Language, Translations> = {
     posterThemeEmerald: 'Emerald Matrix',
     posterThemeMinimal: 'Editorial Minimal',
     posterMonkeIds: 'Monke IDs (comma-separated)',
+    posterAddMonke: '+ Add Monke',
+    posterDeleteMonke: 'Delete Layer',
+    posterDuplicateMonke: 'Duplicate Layer',
+    posterBringFront: 'Bring to Front',
+    posterSendBack: 'Send to Back',
+    posterMoveUp: 'Move Up',
+    posterMoveDown: 'Move Down',
+    posterFlipH: 'Flip Horizontal',
+    posterRotate: 'Rotation',
+    posterSize: 'Scale Size',
+    posterTemplates: 'Presets',
+    posterTemplateSquad: '5-Squad Row',
+    posterTemplateDuo: 'Duo Battle',
+    posterTemplatePyramid: 'Pyramid',
+    posterTemplateSolo: 'Solo Hero',
+    posterTemplateScatter: 'Scattered Art',
+    posterLayers: 'Monke Layers (Drag, Scale & Rotate on Canvas)',
+    posterCanvasHint: '💡 Hint: Click on canvas to drag, scale via handles/wheel, or rotate freely',
     posterExportBtn: 'Export HD Poster PNG',
     posterExporting: 'Rendering Poster...',
     posterSuccess: 'Poster Exported Successfully!',
