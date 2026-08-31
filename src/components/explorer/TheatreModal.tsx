@@ -31,16 +31,21 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const [showHud, setShowHud] = useState(true);
   const timerRef = useRef<any>(null);
 
-  // Toggle Fullscreen helper
+  // Toggle Fullscreen helper with vendor prefix support
   const toggleFullscreen = useCallback(async () => {
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+      const doc = document as any;
+      const el = document.documentElement as any;
+      const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      if (!isFs) {
+        const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (rfs) await rfs.call(el);
       } else {
-        await document.exitFullscreen();
+        const efs = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        if (efs) await efs.call(doc);
       }
     } catch (e) {
-      console.warn('Fullscreen toggle not permitted:', e);
+      console.warn('Fullscreen toggle notice:', e);
     }
   }, []);
 
@@ -51,9 +56,14 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    }
+    try {
+      const doc = document as any;
+      const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      if (isFs) {
+        const efs = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        if (efs) efs.call(doc).catch(() => {});
+      }
+    } catch (e) {}
     onClose();
   }, [onClose]);
 

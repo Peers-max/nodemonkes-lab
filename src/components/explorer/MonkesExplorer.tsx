@@ -220,6 +220,19 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
     (selectedEyes !== 'all' ? 1 : 0) + 
     (selectedEarring !== 'all' ? 1 : 0);
 
+  const handleLaunchScreensaver = (startIndex: number = 0) => {
+    try {
+      const el = document.documentElement as any;
+      const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || el.mozRequestFullScreen;
+      if (rfs && !document.fullscreenElement) {
+        rfs.call(el).catch((err: any) => console.log('Fullscreen request notice:', err));
+      }
+    } catch (e) {
+      console.warn('Fullscreen call error:', e);
+    }
+    setTheatreIndex(startIndex);
+  };
+
   const resetAllFilters = () => {
     setSelectedBody('all');
     setSelectedHead('all');
@@ -294,15 +307,15 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
               )}
             </motion.button>
 
-            {/* Theatre Mode Button */}
+            {/* Screensaver Fullscreen Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => setTheatreIndex(0)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-mono font-bold bg-slate-900 border border-white/10 hover:border-amber-500/50 text-slate-200 hover:text-amber-300 transition-all shadow-sm"
-              title={t.theatreMode}
+              onClick={() => handleLaunchScreensaver(0)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-mono font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-300 transition-all shadow-sm"
+              title="启动电脑全屏自动屏保"
             >
               <Play className="w-3.5 h-3.5 text-amber-400" />
-              <span>{t.theatreMode}</span>
+              <span>📺 启动屏保 (全屏)</span>
             </motion.button>
 
             {/* Sort Selector */}
