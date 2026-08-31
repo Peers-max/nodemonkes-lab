@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CreditCard, 
@@ -15,7 +15,14 @@ import {
   Palette,
   User,
   Quote,
-  Share2
+  Share2,
+  Globe,
+  Sliders,
+  Maximize2,
+  Minimize2,
+  Eye,
+  Type,
+  FileCode
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
@@ -26,17 +33,74 @@ import confetti from 'canvas-confetti';
 interface PassportStudioProps {
   initialMonkeId?: number;
   monkes: Monke[];
+  customAvatarUrl?: string;
+  customTraits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number };
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
 }
 
-export type CardTheme = 'obsidian' | 'gold' | 'cyber' | 'matrix' | 'sunset';
+export type CardTheme = 'obsidian' | 'gold' | 'cyber' | 'matrix' | 'sunset' | 'ruby';
 
-const THEMES: { id: CardTheme; nameZh: string; nameEn: string; icon: string; border: string; bg: string }[] = [
-  { id: 'obsidian', nameZh: '👑 曜石黑金', nameEn: '👑 Obsidian Gold', icon: '👑', border: 'from-amber-400 via-amber-600 to-amber-200', bg: 'bg-gradient-to-br from-[#0c0a09] via-[#1c1917] to-[#0a0a0a]' },
-  { id: 'gold', nameZh: '🥇 纯金至尊', nameEn: '🥇 Pure Gold', icon: '🥇', border: 'from-yellow-300 via-amber-500 to-yellow-100', bg: 'bg-gradient-to-br from-[#1e1503] via-[#332205] to-[#120c02]' },
-  { id: 'cyber', nameZh: '🟣 赛博全息', nameEn: '🟣 Cyber Holo', icon: '🟣', border: 'from-purple-400 via-cyan-400 to-pink-500', bg: 'bg-gradient-to-br from-[#0f0728] via-[#1a0b3b] to-[#080318]' },
-  { id: 'matrix', nameZh: '🟢 矩阵终端', nameEn: '🟢 Matrix Green', icon: '🟢', border: 'from-emerald-400 via-green-500 to-teal-300', bg: 'bg-gradient-to-br from-[#02180c] via-[#042815] to-[#010e07]' },
-  { id: 'sunset', nameZh: '🌅 暮光霞光', nameEn: '🌅 Twilight Glow', icon: '🌅', border: 'from-rose-400 via-amber-500 to-indigo-500', bg: 'bg-gradient-to-br from-[#1a081e] via-[#2c0d23] to-[#120417]' },
+const THEMES: { id: CardTheme; nameZh: string; nameEn: string; icon: string; border: string; bg: string; gradCss: string; borderCss: string }[] = [
+  { 
+    id: 'obsidian', 
+    nameZh: '👑 曜石黑金', 
+    nameEn: '👑 Obsidian Gold', 
+    icon: '👑', 
+    border: 'from-amber-400 via-amber-600 to-amber-200', 
+    bg: 'bg-gradient-to-br from-[#0c0a09] via-[#1c1917] to-[#0a0a0a]',
+    gradCss: 'linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, #0a0a0a 100%)',
+    borderCss: 'linear-gradient(135deg, #FBBF24 0%, #D97706 50%, #FDE68A 100%)'
+  },
+  { 
+    id: 'gold', 
+    nameZh: '🥇 纯金至尊', 
+    nameEn: '🥇 Pure Gold', 
+    icon: '🥇', 
+    border: 'from-yellow-300 via-amber-500 to-yellow-100', 
+    bg: 'bg-gradient-to-br from-[#1e1503] via-[#332205] to-[#120c02]',
+    gradCss: 'linear-gradient(135deg, #1e1503 0%, #332205 50%, #120c02 100%)',
+    borderCss: 'linear-gradient(135deg, #FDE047 0%, #F59E0B 50%, #FEF08A 100%)'
+  },
+  { 
+    id: 'cyber', 
+    nameZh: '🟣 赛博全息', 
+    nameEn: '🟣 Cyber Holo', 
+    icon: '🟣', 
+    border: 'from-purple-400 via-cyan-400 to-pink-500', 
+    bg: 'bg-gradient-to-br from-[#0f0728] via-[#1a0b3b] to-[#080318]',
+    gradCss: 'linear-gradient(135deg, #0f0728 0%, #1a0b3b 50%, #080318 100%)',
+    borderCss: 'linear-gradient(135deg, #C084FC 0%, #22D3EE 50%, #EC4899 100%)'
+  },
+  { 
+    id: 'matrix', 
+    nameZh: '🟢 矩阵终端', 
+    nameEn: '🟢 Matrix Green', 
+    icon: '🟢', 
+    border: 'from-emerald-400 via-green-500 to-teal-300', 
+    bg: 'bg-gradient-to-br from-[#02180c] via-[#042815] to-[#010e07]',
+    gradCss: 'linear-gradient(135deg, #02180c 0%, #042815 50%, #010e07 100%)',
+    borderCss: 'linear-gradient(135deg, #34D399 0%, #22C55E 50%, #5EEAD4 100%)'
+  },
+  { 
+    id: 'sunset', 
+    nameZh: '🌅 暮光霞光', 
+    nameEn: '🌅 Twilight Glow', 
+    icon: '🌅', 
+    border: 'from-rose-400 via-amber-500 to-indigo-500', 
+    bg: 'bg-gradient-to-br from-[#1a081e] via-[#2c0d23] to-[#120417]',
+    gradCss: 'linear-gradient(135deg, #1a081e 0%, #2c0d23 50%, #120417 100%)',
+    borderCss: 'linear-gradient(135deg, #FB7185 0%, #F59E0B 50%, #6366F1 100%)'
+  },
+  { 
+    id: 'ruby', 
+    nameZh: '💎 绝版红宝', 
+    nameEn: '💎 Crimson Ruby', 
+    icon: '💎', 
+    border: 'from-rose-500 via-red-600 to-amber-400', 
+    bg: 'bg-gradient-to-br from-[#1a0404] via-[#2d0808] to-[#0f0202]',
+    gradCss: 'linear-gradient(135deg, #1a0404 0%, #2d0808 50%, #0f0202 100%)',
+    borderCss: 'linear-gradient(135deg, #F43F5E 0%, #DC2626 50%, #F59E0B 100%)'
+  },
 ];
 
 const PRESET_BADGES = [
@@ -44,30 +108,40 @@ const PRESET_BADGES = [
   'DIAMOND HANDS',
   'ORDINALS OG',
   'TOP 100 ELITE',
-  'CYBER MONKE',
+  'CUSTOM CREATOR',
   'HODL FOREVER',
 ];
 
 export const PassportStudio: React.FC<PassportStudioProps> = ({
   initialMonkeId = 209,
   monkes,
+  customAvatarUrl,
+  customTraits,
   onToast,
 }) => {
   const { lang } = useLanguage();
   const [selectedId, setSelectedId] = useState<number>(initialMonkeId);
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [cardTheme, setCardTheme] = useState<CardTheme>('obsidian');
+
+  // Deep Custom Content Fields (Fully Editable like Poster Studio)
+  const [cardTitle, setCardTitle] = useState<string>('NODEMONKES PASSPORT');
   const [ownerHandle, setOwnerHandle] = useState<string>('@satoshi_monke');
+  const [showVerified, setShowVerified] = useState<boolean>(true);
   const [customTitle, setCustomTitle] = useState<string>('GENESIS COLLECTOR');
   const [customMotto, setCustomMotto] = useState<string>('In Monkes We Trust • Bitcoin Ordinals');
-  const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  const [avatarScale, setAvatarScale] = useState<number>(100);
+  const [sheenIntensity, setSheenIntensity] = useState<number>(50);
+
+  // 360-Degree Free 3D Orbit / Drag-to-Rotate State
+  const [rotX, setRotX] = useState<number>(0);
+  const [rotY, setRotY] = useState<number>(0);
+  const [isAutoSpin, setIsAutoSpin] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number; startRotX: number; startRotY: number }>({ x: 0, y: 0, startRotX: 0, startRotY: 0 });
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // 3D Perspective Tilt State
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [rotateX, setRotateX] = useState<number>(0);
-  const [rotateY, setRotateY] = useState<number>(0);
-  const [sheen, setSheen] = useState<{ x: number; y: number; opacity: number }>({ x: 50, y: 50, opacity: 0 });
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+  const autoSpinRafRef = useRef<number | null>(null);
 
   const currentMonke = useMemo(() => {
     return monkes.find((m) => m.id === selectedId) || monkes[0] || {
@@ -80,6 +154,15 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     };
   }, [monkes, selectedId]);
 
+  const activeAvatarSrc = customAvatarUrl || getMonkeImageUrl(currentMonke.id);
+  const activeTraits = customTraits || {
+    Body: String(currentMonke.attributes.Body || 'Alien'),
+    Head: String(currentMonke.attributes.Head || 'None'),
+    Eyes: String(currentMonke.attributes.Eyes || 'None'),
+    Earring: String(currentMonke.attributes.Earring || 'None'),
+    Count: Number(currentMonke.attributes.Count || 4),
+  };
+
   // Tier Rating
   const tier = useMemo(() => {
     const r = currentMonke.rank || 5000;
@@ -89,34 +172,78 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     return { label: 'A TIER', color: 'text-emerald-300 bg-emerald-500/20 border-emerald-400' };
   }, [currentMonke.rank]);
 
-  // Mouse Move Tilt Handler
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const rX = ((y - centerY) / centerY) * -12;
-    const rY = ((x - centerX) / centerX) * 12;
-
-    setRotateX(rX);
-    setRotateY(rY);
-    setSheen({
-      x: (x / rect.width) * 100,
-      y: (y / rect.height) * 100,
-      opacity: 0.35,
-    });
+  // 360° Free Drag-to-Rotate Handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setIsAutoSpin(false);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startRotX: rotX,
+      startRotY: rotY,
+    };
   };
 
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-    setSheen((s) => ({ ...s, opacity: 0 }));
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+    
+    setRotY(dragStartRef.current.startRotY + deltaX * 0.6);
+    setRotX(dragStartRef.current.startRotX - deltaY * 0.6);
   };
 
-  // Helper to draw rounded rectangle
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Touch handlers for mobile free rotation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    setIsDragging(true);
+    setIsAutoSpin(false);
+    dragStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      startRotX: rotX,
+      startRotY: rotY,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    const deltaX = e.touches[0].clientX - dragStartRef.current.x;
+    const deltaY = e.touches[0].clientY - dragStartRef.current.y;
+    setRotY(dragStartRef.current.startRotY + deltaX * 0.6);
+    setRotX(dragStartRef.current.startRotX - deltaY * 0.6);
+  };
+
+  // Auto Spin 360 Loop
+  useEffect(() => {
+    if (!isAutoSpin) {
+      if (autoSpinRafRef.current) {
+        cancelAnimationFrame(autoSpinRafRef.current);
+        autoSpinRafRef.current = null;
+      }
+      return;
+    }
+
+    const spin = () => {
+      setRotY((prev) => (prev + 0.75) % 360);
+      autoSpinRafRef.current = requestAnimationFrame(spin);
+    };
+
+    autoSpinRafRef.current = requestAnimationFrame(spin);
+
+    return () => {
+      if (autoSpinRafRef.current) {
+        cancelAnimationFrame(autoSpinRafRef.current);
+        autoSpinRafRef.current = null;
+      }
+    };
+  }, [isAutoSpin]);
+
+  // Helper to draw rounded rectangle in Canvas
   const drawRoundRect = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -138,7 +265,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     ctx.closePath();
   };
 
-  // Helper to draw Twitter/Web3 Verified Badge
+  // Helper to draw Verified Badge
   const drawVerifiedBadge = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -151,7 +278,6 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
     ctx.fill();
 
-    // White Checkmark
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = size * 0.16;
     ctx.lineCap = 'round';
@@ -164,15 +290,14 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     ctx.restore();
   };
 
-  // 1:1 Pixel-Perfect High-Res 2D Canvas Export
-  const handleExport = useCallback(async () => {
+  // EXPORT 1: 1:1 Pixel-Perfect 2K PNG Card Export
+  const handleExportPng = useCallback(async () => {
     try {
       setIsExporting(true);
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // 2K Ultra HD Dimensions (Aspect 1.58 : 1)
       const w = 1264;
       const h = 800;
       canvas.width = w;
@@ -187,7 +312,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       const innerRadius = 32;
       const borderWidth = 10;
 
-      // 1. Draw Outer Glowing Metallic Border
+      // 1. Draw Outer Border Gradient
       const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
       if (cardTheme === 'gold') {
         borderGrad.addColorStop(0, '#FDE047');
@@ -205,8 +330,11 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
         borderGrad.addColorStop(0, '#FB7185');
         borderGrad.addColorStop(0.5, '#F59E0B');
         borderGrad.addColorStop(1, '#6366F1');
+      } else if (cardTheme === 'ruby') {
+        borderGrad.addColorStop(0, '#F43F5E');
+        borderGrad.addColorStop(0.5, '#DC2626');
+        borderGrad.addColorStop(1, '#F59E0B');
       } else {
-        // obsidian
         borderGrad.addColorStop(0, '#FBBF24');
         borderGrad.addColorStop(0.5, '#D97706');
         borderGrad.addColorStop(1, '#FDE68A');
@@ -218,7 +346,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       ctx.fill();
       ctx.restore();
 
-      // 2. Draw Card Inner Background
+      // 2. Draw Inner Background
       const innerX = cardX + borderWidth;
       const innerY = cardY + borderWidth;
       const innerW = cardW - borderWidth * 2;
@@ -241,8 +369,11 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
         innerGrad.addColorStop(0, '#1A081E');
         innerGrad.addColorStop(0.5, '#2C0D23');
         innerGrad.addColorStop(1, '#120417');
+      } else if (cardTheme === 'ruby') {
+        innerGrad.addColorStop(0, '#1A0404');
+        innerGrad.addColorStop(0.5, '#2D0808');
+        innerGrad.addColorStop(1, '#0F0202');
       } else {
-        // obsidian
         innerGrad.addColorStop(0, '#0C0A09');
         innerGrad.addColorStop(0.5, '#1C1917');
         innerGrad.addColorStop(1, '#0A0A0A');
@@ -252,344 +383,701 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       drawRoundRect(ctx, innerX, innerY, innerW, innerH, innerRadius);
       ctx.fillStyle = innerGrad;
       ctx.fill();
-      ctx.clip(); // Clip everything strictly inside inner surface
+      ctx.clip();
 
-      if (!isFlipped) {
-        // ================= FRONT FACE (1:1 UI MATCH) =================
+      // Header
+      const headerY = innerY + 45;
 
-        // A. Header (Top y: 55 ~ 115)
-        const headerY = innerY + 45;
+      drawRoundRect(ctx, innerX + 45, headerY, 44, 44, 12);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-        // Lightning Badge Box
-        drawRoundRect(ctx, innerX + 45, headerY, 44, 44, 12);
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 22px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', innerX + 67, headerY + 31);
 
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = 'bold 22px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('⚡', innerX + 67, headerY + 31);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 26px "Space Mono", ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(cardTitle.toUpperCase(), innerX + 104, headerY + 32);
 
-        // Header Title
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 26px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('NODEMONKES PASSPORT', innerX + 104, headerY + 32);
+      // Right Badges
+      const tierBadgeW = 120;
+      const tierBadgeH = 34;
+      const tierBadgeX = innerX + innerW - 45 - tierBadgeW;
+      const tierBadgeY = headerY + 5;
 
-        // Header Right Badges (Tier & Rank)
-        const tierBadgeW = 120;
-        const tierBadgeH = 34;
-        const tierBadgeX = innerX + innerW - 45 - tierBadgeW;
-        const tierBadgeY = headerY + 5;
+      const rankBadgeW = 125;
+      const rankBadgeH = 34;
+      const rankBadgeX = tierBadgeX - 12 - rankBadgeW;
+      const rankBadgeY = tierBadgeY;
 
-        const rankBadgeW = 125;
-        const rankBadgeH = 34;
-        const rankBadgeX = tierBadgeX - 12 - rankBadgeW;
-        const rankBadgeY = tierBadgeY;
+      drawRoundRect(ctx, rankBadgeX, rankBadgeY, rankBadgeW, rankBadgeH, 8);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-        // Rank Badge
-        drawRoundRect(ctx, rankBadgeX, rankBadgeY, rankBadgeW, rankBadgeH, 8);
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 15px "Space Mono", ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Rank #${currentMonke.rank || 'N/A'}`, rankBadgeX + rankBadgeW / 2, rankBadgeY + 23);
 
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = 'bold 15px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`Rank #${currentMonke.rank || 'N/A'}`, rankBadgeX + rankBadgeW / 2, rankBadgeY + 23);
+      drawRoundRect(ctx, tierBadgeX, tierBadgeY, tierBadgeW, tierBadgeH, 17);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.strokeStyle = '#FBBF24';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-        // Tier Badge
-        drawRoundRect(ctx, tierBadgeX, tierBadgeY, tierBadgeW, tierBadgeH, 17);
-        if (tier.label.includes('SSS')) {
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-          ctx.strokeStyle = '#FBBF24';
-        } else if (tier.label.includes('SS')) {
-          ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
-          ctx.strokeStyle = '#C084FC';
-        } else if (tier.label.includes('S')) {
-          ctx.fillStyle = 'rgba(6, 182, 212, 0.2)';
-          ctx.strokeStyle = '#22D3EE';
-        } else {
-          ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-          ctx.strokeStyle = '#34D399';
-        }
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 14px "Space Mono", ui-monospace, monospace';
+      ctx.fillText(tier.label, tierBadgeX + tierBadgeW / 2, tierBadgeY + 23);
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 14px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(tier.label, tierBadgeX + tierBadgeW / 2, tierBadgeY + 23);
+      // Header Divider
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(innerX + 45, headerY + 62);
+      ctx.lineTo(innerX + innerW - 45, headerY + 62);
+      ctx.stroke();
 
-        // Header Divider Line
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(innerX + 45, headerY + 62);
-        ctx.lineTo(innerX + innerW - 45, headerY + 62);
-        ctx.stroke();
+      // Body (5:7 Grid)
+      const bodyTopY = headerY + 62;
+      const bodyBottomY = innerY + innerH - 65;
+      const bodyH = bodyBottomY - bodyTopY;
+      const bodyCenterY = bodyTopY + bodyH / 2;
 
-        // B. Center Body (Proportional 5:7 Grid Match with CSS layout)
-        const bodyTopY = headerY + 62; // 107
-        const bodyBottomY = innerY + innerH - 65; // 709
-        const bodyH = bodyBottomY - bodyTopY; // 602
-        const bodyCenterY = bodyTopY + bodyH / 2; // 408
+      const leftColW = innerW * 0.416;
+      const leftColCenterX = innerX + leftColW / 2;
 
-        // Left Column (5/12 = 41.6% width)
-        const leftColW = innerW * 0.416; // ~504px
-        const leftColCenterX = innerX + leftColW / 2; // 26 + 252 = 278
+      const baseAvatarBoxSize = 340;
+      const avatarBoxSize = Math.round(baseAvatarBoxSize * (avatarScale / 100));
+      const avatarX = Math.round(leftColCenterX - avatarBoxSize / 2);
+      const avatarY = Math.round(bodyCenterY - avatarBoxSize / 2);
 
-        // Avatar Frame Box (340 x 340, centered in left column)
-        const avatarBoxSize = 340;
-        const avatarX = Math.round(leftColCenterX - avatarBoxSize / 2); // 108
-        const avatarY = Math.round(bodyCenterY - avatarBoxSize / 2); // 238
+      drawRoundRect(ctx, avatarX, avatarY, avatarBoxSize, avatarBoxSize, 26);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-        drawRoundRect(ctx, avatarX, avatarY, avatarBoxSize, avatarBoxSize, 26);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      // Draw Avatar
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = activeAvatarSrc;
+      await new Promise((res) => {
+        img.onload = res;
+        img.onerror = res;
+      });
 
-        // Load & Draw Monke
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = getMonkeImageUrl(currentMonke.id);
-        await new Promise((res) => {
-          img.onload = res;
-          img.onerror = res;
-        });
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, avatarX + 18, avatarY + 18, avatarBoxSize - 36, avatarBoxSize - 36);
 
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, avatarX + 18, avatarY + 18, avatarBoxSize - 36, avatarBoxSize - 36);
+      // Top Left Tag
+      drawRoundRect(ctx, avatarX + 14, avatarY + 14, 72, 26, 6);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
-        // Avatar Top-Left ID Badge (#209)
-        drawRoundRect(ctx, avatarX + 14, avatarY + 14, 72, 26, 6);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 12px "Space Mono", ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`#${currentMonke.id}`, avatarX + 14 + 36, avatarY + 14 + 18);
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 12px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`#${currentMonke.id}`, avatarX + 14 + 36, avatarY + 14 + 18);
+      // Right Column
+      const rightColX = innerX + leftColW + 20;
+      const rightGroupH = 220;
+      const rightStartY = Math.round(bodyCenterY - rightGroupH / 2);
 
-        // Right Column (7/12 width) - Identity Content
-        const rightColX = innerX + leftColW + 20; // ~550px
-        const rightGroupH = 220;
-        const rightStartY = Math.round(bodyCenterY - rightGroupH / 2); // ~298
+      let curInfoY = rightStartY + 30;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(ownerHandle, rightColX, curInfoY);
 
-        // 1. Owner Handle & Verified Badge
-        let curInfoY = rightStartY + 30;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(ownerHandle, rightColX, curInfoY);
-
+      if (showVerified) {
         const handleTextWidth = ctx.measureText(ownerHandle).width;
         drawVerifiedBadge(ctx, rightColX + handleTextWidth + 12, curInfoY - 26, 28);
-
-        // 2. Title Badge Pill
-        curInfoY += 24;
-        ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
-        const titleText = customTitle.toUpperCase();
-        const titleTextW = ctx.measureText(titleText).width;
-        const titleBoxW = titleTextW + 24;
-        const titleBoxH = 28;
-
-        drawRoundRect(ctx, rightColX, curInfoY, titleBoxW, titleBoxH, 6);
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-
-        ctx.fillStyle = '#FDE68A';
-        ctx.textAlign = 'center';
-        ctx.fillText(titleText, rightColX + titleBoxW / 2, curInfoY + 19);
-
-        // 3. Info Metadata Rows (Clean, aligned)
-        curInfoY += 56;
-        const rowLineH = 34;
-
-        // Inscription Row
-        ctx.textAlign = 'left';
-        ctx.font = '19px "Space Mono", ui-monospace, monospace';
-        ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Inscription: ', rightColX, curInfoY);
-        const inscLabelW = ctx.measureText('Inscription: ').width;
-        ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`#${currentMonke.inscription}`, rightColX + inscLabelW, curInfoY);
-
-        // Block Height Row
-        curInfoY += rowLineH;
-        ctx.font = '19px "Space Mono", ui-monospace, monospace';
-        ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Block Height: ', rightColX, curInfoY);
-        const blockLabelW = ctx.measureText('Block Height: ').width;
-        ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`#${currentMonke.block}`, rightColX + blockLabelW, curInfoY);
-
-        // Traits Count Row
-        curInfoY += rowLineH;
-        ctx.font = '19px "Space Mono", ui-monospace, monospace';
-        ctx.fillStyle = '#94A3B8';
-        ctx.fillText('Traits: ', rightColX, curInfoY);
-        const traitsLabelW = ctx.measureText('Traits: ').width;
-        ctx.fillStyle = '#F8FAFC';
-        ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-        ctx.fillText(`${currentMonke.attributes.Count || 4} Parts`, rightColX + traitsLabelW, curInfoY);
-
-        // C. Footer (Bottom)
-        const footerDividerY = innerY + innerH - 65;
-        const footerTextY = footerDividerY + 38;
-
-        // Footer Divider Line
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(innerX + 45, footerDividerY);
-        ctx.lineTo(innerX + innerW - 45, footerDividerY);
-        ctx.stroke();
-
-        // Footer Motto
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = 'italic 17px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(`"${customMotto}"`, innerX + 45, footerTextY);
-
-        // Footer Verified Tag
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerTextY);
-
-      } else {
-        // ================= BACK FACE (1:1 UI MATCH) =================
-        const headerY = innerY + 45;
-
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = 'bold 24px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('AUTHENTICATED ORDINALS INSCRIPTION', innerX + 45, headerY + 30);
-
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(`SHA256: ${currentMonke.id.toString(16).padStart(8, '0')}...`, innerX + innerW - 45, headerY + 30);
-
-        // Divider
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(innerX + 45, headerY + 55);
-        ctx.lineTo(innerX + innerW - 45, headerY + 55);
-        ctx.stroke();
-
-        // 4 Trait Cards
-        const traitsY = headerY + 95;
-        const traitW = 680;
-        const traitH = 70;
-        const gap = 20;
-
-        const traitList = [
-          { label: 'Body', val: currentMonke.attributes.Body },
-          { label: 'Head', val: currentMonke.attributes.Head },
-          { label: 'Eyes', val: currentMonke.attributes.Eyes },
-          { label: 'Earring', val: currentMonke.attributes.Earring },
-        ];
-
-        traitList.forEach((tr, i) => {
-          const tY = traitsY + i * (traitH + gap);
-          drawRoundRect(ctx, innerX + 50, tY, traitW, traitH, 16);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          ctx.fillStyle = '#94A3B8';
-          ctx.font = '22px "Space Mono", ui-monospace, monospace';
-          ctx.textAlign = 'left';
-          ctx.fillText(`${tr.label}:`, innerX + 75, tY + 44);
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 24px "Space Mono", ui-monospace, monospace';
-          ctx.textAlign = 'right';
-          ctx.fillText(String(tr.val), innerX + 50 + traitW - 25, tY + 44);
-        });
-
-        // QR Code Box (Right)
-        const qrBoxX = innerX + 780;
-        const qrBoxY = traitsY + 30;
-        const qrBoxSize = 280;
-
-        drawRoundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 28);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 90px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('⛶', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize / 2 + 30);
-
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = '18px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Scan Ordinals Inscription', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize + 40);
-
-        // Footer
-        const footerY = innerY + innerH - 45;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(innerX + 45, footerY - 24);
-        ctx.lineTo(innerX + innerW - 45, footerY - 24);
-        ctx.stroke();
-
-        ctx.fillStyle = '#64748B';
-        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('GENESIS BLOCK #776487', innerX + 45, footerY + 8);
-
-        ctx.fillStyle = '#10B981';
-        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText('100% ON-CHAIN', innerX + innerW - 45, footerY + 8);
       }
+
+      curInfoY += 24;
+      ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
+      const titleText = customTitle.toUpperCase();
+      const titleBoxW = ctx.measureText(titleText).width + 24;
+      const titleBoxH = 28;
+
+      drawRoundRect(ctx, rightColX, curInfoY, titleBoxW, titleBoxH, 6);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#FDE68A';
+      ctx.textAlign = 'center';
+      ctx.fillText(titleText, rightColX + titleBoxW / 2, curInfoY + 19);
+
+      curInfoY += 56;
+      const rowLineH = 34;
+
+      ctx.textAlign = 'left';
+      ctx.font = '19px "Space Mono", ui-monospace, monospace';
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillText('Inscription: ', rightColX, curInfoY);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+      ctx.fillText(`#${currentMonke.inscription}`, rightColX + ctx.measureText('Inscription: ').width, curInfoY);
+
+      curInfoY += rowLineH;
+      ctx.font = '19px "Space Mono", ui-monospace, monospace';
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillText('Block Height: ', rightColX, curInfoY);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+      ctx.fillText(`#${currentMonke.block}`, rightColX + ctx.measureText('Block Height: ').width, curInfoY);
+
+      curInfoY += rowLineH;
+      ctx.font = '19px "Space Mono", ui-monospace, monospace';
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillText('Traits: ', rightColX, curInfoY);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
+      ctx.fillText(`${activeTraits.Count || 4} Parts`, rightColX + ctx.measureText('Traits: ').width, curInfoY);
+
+      // Footer
+      const footerDividerY = innerY + innerH - 65;
+      const footerTextY = footerDividerY + 38;
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(innerX + 45, footerDividerY);
+      ctx.lineTo(innerX + innerW - 45, footerDividerY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = 'italic 17px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`"${customMotto}"`, innerX + 45, footerTextY);
+
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerTextY);
 
       ctx.restore();
 
-      // Trigger Download
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `NodeMonke_${currentMonke.id}_Passport_${cardTheme}${isFlipped ? '_Back' : ''}.png`;
+      link.download = `NodeMonke_${currentMonke.id}_Passport_${cardTheme}.png`;
       link.href = url;
       link.click();
 
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
-      onToast('通行证导出成功！', `NodeMonke #${currentMonke.id} 3D 通行证已保存为 1:1 高清卡片`, 'success');
+      confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
+      onToast('通行证正面 PNG 导出成功！', `NodeMonke #${currentMonke.id} 高清 1:1 卡片已保存`, 'success');
     } catch (e: any) {
-      console.error('Export passport error:', e);
+      console.error('Export PNG error:', e);
       onToast('导出失败', e?.message || '请重试', 'error');
     } finally {
       setIsExporting(false);
     }
-  }, [cardTheme, currentMonke, tier, ownerHandle, customTitle, customMotto, isFlipped, onToast]);
+  }, [cardTheme, cardTitle, currentMonke, tier, ownerHandle, showVerified, customTitle, customMotto, activeAvatarSrc, activeTraits, avatarScale, onToast]);
+
+  // EXPORT 2: Standalone Interactive 3D HTML File Generator (任意角度自由翻转交互网页)
+  const handleExport3DHtml = useCallback(async () => {
+    try {
+      setIsExporting(true);
+
+      const activeThemeObj = THEMES.find((t) => t.id === cardTheme) || THEMES[0];
+
+      // Convert Avatar to Base64 Data URL for 100% offline standalone usage
+      let avatarBase64 = activeAvatarSrc;
+      try {
+        const c = document.createElement('canvas');
+        c.width = 300;
+        c.height = 300;
+        const cx = c.getContext('2d');
+        if (cx) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = activeAvatarSrc;
+          await new Promise((res) => {
+            img.onload = res;
+            img.onerror = res;
+          });
+          cx.imageSmoothingEnabled = false;
+          cx.drawImage(img, 0, 0, 300, 300);
+          avatarBase64 = c.toDataURL('image/png');
+        }
+      } catch (e) {
+        console.warn('Avatar base64 conversion notice:', e);
+      }
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NodeMonke #${currentMonke.id} • 3D Holographic Web3 Passport</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: radial-gradient(circle at 50% 50%, #111827 0%, #030712 100%);
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      perspective: 1200px;
+      user-select: none;
+      touch-action: none;
+    }
+    .hint {
+      position: absolute;
+      top: 24px;
+      font-size: 13px;
+      color: #94A3B8;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 18px;
+      border-radius: 99px;
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      text-align: center;
+    }
+    .stage {
+      width: 100%;
+      max-width: 620px;
+      aspect-ratio: 1.58 / 1;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+    }
+    .stage:active { cursor: grabbing; }
+    .card-wrap {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: box-shadow 0.3s ease;
+    }
+    .card-border {
+      position: absolute;
+      inset: 0;
+      border-radius: 28px;
+      background: ${activeThemeObj.borderCss};
+      padding: 6px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.85);
+      transform-style: preserve-3d;
+    }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      background: ${activeThemeObj.gradCss};
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      overflow: hidden;
+    }
+    .card-back {
+      transform: rotateY(180deg);
+    }
+    .sheen {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: color-dodge;
+      opacity: 0.45;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, rgba(236,72,153,0.4) 30%, rgba(59,130,246,0.4) 60%, transparent 80%);
+      z-index: 30;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      padding-bottom: 12px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 1px;
+    }
+    .header-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(245,158,11,0.2);
+      border: 1px solid rgba(245,158,11,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FBBF24;
+      font-size: 14px;
+    }
+    .badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tier-badge {
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 900;
+      background: rgba(245,158,11,0.2);
+      border: 1px solid #FBBF24;
+      color: #FDE68A;
+    }
+    .rank-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #CBD5E1;
+    }
+    .body {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin: auto 0;
+    }
+    .avatar-box {
+      width: 150px;
+      height: 150px;
+      border-radius: 18px;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(255,255,255,0.15);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .avatar-img {
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .avatar-tag {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(0,0,0,0.85);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .handle {
+      font-size: 22px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .verified {
+      color: #38BDF8;
+      font-size: 16px;
+    }
+    .title-pill {
+      display: inline-block;
+      width: max-content;
+      padding: 2px 10px;
+      border-radius: 6px;
+      background: rgba(245,158,11,0.2);
+      border: 1px solid rgba(245,158,11,0.35);
+      color: #FDE68A;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .meta-rows {
+      font-size: 12px;
+      color: #94A3B8;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 4px;
+    }
+    .meta-rows strong { color: #F1F5F9; }
+    .footer {
+      border-top: 1px solid rgba(255,255,255,0.12);
+      padding-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #94A3B8;
+    }
+    .verified-stamp {
+      color: #FBBF24;
+      font-weight: 800;
+    }
+    .back-traits {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+      margin: 10px 0;
+    }
+    .trait-chip {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .controls {
+      position: absolute;
+      bottom: 24px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #FFFFFF;
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+  </style>
+</head>
+<body>
+  <div class="hint">🖱️ 拖拽鼠标 / 触屏任意角度 360° 翻转旋转卡片 • 手机端支持重力感应</div>
+
+  <div class="stage" id="stage">
+    <div class="card-wrap" id="cardWrap">
+      <div class="card-border">
+        
+        <!-- FRONT FACE -->
+        <div class="card-face card-front">
+          <div class="sheen" id="sheenFront"></div>
+          <div class="header">
+            <div class="header-left">
+              <div class="header-icon">⚡</div>
+              <span>${cardTitle}</span>
+            </div>
+            <div class="badges">
+              <div class="rank-badge">Rank #${currentMonke.rank || 'N/A'}</div>
+              <div class="tier-badge">${tier.label}</div>
+            </div>
+          </div>
+
+          <div class="body">
+            <div class="avatar-box">
+              <div class="avatar-tag">#${currentMonke.id}</div>
+              <img src="${avatarBase64}" alt="NodeMonke" class="avatar-img">
+            </div>
+            <div class="info">
+              <div class="handle">
+                <span>${ownerHandle}</span>
+                ${showVerified ? '<span class="verified">✓</span>' : ''}
+              </div>
+              <div class="title-pill">${customTitle}</div>
+              <div class="meta-rows">
+                <div>Inscription: <strong>#${currentMonke.inscription}</strong></div>
+                <div>Block Height: <strong>#${currentMonke.block}</strong></div>
+                <div>Traits: <strong>${activeTraits.Count || 4} Parts</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div>"${customMotto}"</div>
+            <div class="verified-stamp">ORDINALS VERIFIED</div>
+          </div>
+        </div>
+
+        <!-- BACK FACE -->
+        <div class="card-face card-back">
+          <div class="sheen" id="sheenBack"></div>
+          <div class="header">
+            <div class="header-left">
+              <span style="color: #FBBF24;">AUTHENTICATED ORDINALS INSCRIPTION</span>
+            </div>
+            <div style="font-size: 11px; color: #94A3B8;">SHA256: ${currentMonke.id.toString(16).padStart(8, '0')}...</div>
+          </div>
+
+          <div class="back-traits">
+            <div class="trait-chip"><span>Body:</span> <strong>${activeTraits.Body}</strong></div>
+            <div class="trait-chip"><span>Head:</span> <strong>${activeTraits.Head}</strong></div>
+            <div class="trait-chip"><span>Eyes:</span> <strong>${activeTraits.Eyes}</strong></div>
+            <div class="trait-chip"><span>Earring:</span> <strong>${activeTraits.Earring}</strong></div>
+          </div>
+
+          <div class="footer">
+            <div>GENESIS BLOCK #776487</div>
+            <div style="color: #34D399; font-weight: 800;">100% ON-CHAIN</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="setAngle(0, 0)">🎯 正面</button>
+    <button class="btn" onclick="setAngle(0, 180)">🔄 背面</button>
+    <button class="btn" onclick="setAngle(15, 35)">📐 3D 立体</button>
+    <button class="btn" onclick="toggleAutoSpin()">🌀 360° 自动巡航</button>
+  </div>
+
+  <script>
+    let rotX = 0;
+    let rotY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startRotX = 0;
+    let startRotY = 0;
+    let isAutoSpin = false;
+
+    const card = document.getElementById('cardWrap');
+    const stage = document.getElementById('stage');
+    const sheenFront = document.getElementById('sheenFront');
+    const sheenBack = document.getElementById('sheenBack');
+
+    function updateCard() {
+      card.style.transform = \`rotateX(\${rotX}deg) rotateY(\${rotY}deg)\`;
+      const normY = ((rotY % 360) + 360) % 360;
+      const sheenX = (normY / 360) * 100;
+      sheenFront.style.background = \`radial-gradient(circle at \${sheenX}% 50%, rgba(255,255,255,0.7) 0%, rgba(236,72,153,0.35) 30%, rgba(59,130,246,0.35) 60%, transparent 80%)\`;
+      sheenBack.style.background = \`radial-gradient(circle at \${100 - sheenX}% 50%, rgba(255,255,255,0.7) 0%, rgba(236,72,153,0.35) 30%, rgba(59,130,246,0.35) 60%, transparent 80%)\`;
+    }
+
+    stage.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      isAutoSpin = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      startRotX = rotX;
+      startRotY = rotY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      rotY = startRotY + (e.clientX - startX) * 0.6;
+      rotX = startRotX - (e.clientY - startY) * 0.6;
+      updateCard();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    // Touch Support
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      isDragging = true;
+      isAutoSpin = false;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startRotX = rotX;
+      startRotY = rotY;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDragging || e.touches.length !== 1) return;
+      rotY = startRotY + (e.touches[0].clientX - startX) * 0.6;
+      rotX = startRotX - (e.touches[0].clientY - startY) * 0.6;
+      updateCard();
+    });
+
+    window.addEventListener('touchend', () => { isDragging = false; });
+
+    // Gyroscope tilt on mobile
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', (e) => {
+        if (isDragging || isAutoSpin || !e.gamma || !e.beta) return;
+        rotY = e.gamma * 0.8;
+        rotX = (e.beta - 45) * 0.5;
+        updateCard();
+      });
+    }
+
+    function setAngle(x, y) {
+      isAutoSpin = false;
+      rotX = x;
+      rotY = y;
+      updateCard();
+    }
+
+    function toggleAutoSpin() {
+      isAutoSpin = !isAutoSpin;
+      if (isAutoSpin) {
+        function spin() {
+          if (!isAutoSpin) return;
+          rotY = (rotY + 0.8) % 360;
+          updateCard();
+          requestAnimationFrame(spin);
+        }
+        requestAnimationFrame(spin);
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `NodeMonke_${currentMonke.id}_3D_Interactive_Card.html`;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+
+      confetti({ particleCount: 70, spread: 70, origin: { y: 0.8 } });
+      onToast('3D 交互网页文件已保存！', `可直接双击打开 .html 文件，随时在浏览器中 360° 交互翻转！`, 'success');
+    } catch (e: any) {
+      console.error('Export 3D HTML error:', e);
+      onToast('导出 3D 网页失败', e?.message || '请重试', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [cardTheme, cardTitle, currentMonke, tier, ownerHandle, showVerified, customTitle, customMotto, activeAvatarSrc, activeTraits, onToast]);
 
   const activeThemeObj = THEMES.find((t) => t.id === cardTheme) || THEMES[0];
 
   return (
-    <div className="min-h-[calc(100vh-140px)] w-full max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
+    <div className="min-h-[calc(100vh-140px)] w-full max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6 select-none">
       
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
@@ -599,80 +1087,122 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
               🎴
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              3D Web3 极客通行证 <span className="text-amber-400 text-lg font-sans">Passport Studio</span>
+              3D Web3 极客卡片工坊 <span className="text-amber-400 text-lg font-sans">Card Studio</span>
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400">
-            为您的 NodeMonke 铸造独一无二的 3D 全息身份卡片，支持实时空间重力感应、正反翻转与 2K 高清 PNG 导出！
+            深度自定义画布内容，支持<strong>任意角度 360° 空间翻转拖拽</strong>，一键导出 2K 高清正面图与<strong>独立 3D 交互网页 HTML 文件</strong>！
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Dual Export Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setIsFlipped((f) => !f)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 text-xs font-mono font-bold transition-all active:scale-95 shadow-md"
+            onClick={handleExportPng}
+            disabled={isExporting}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs transition-all active:scale-95 border border-white/10 shadow-md"
           >
-            <RotateCw className="w-4 h-4 text-purple-400" />
-            <span>{isFlipped ? '查看正面' : '🔄 翻转背面'}</span>
+            <Download className="w-4 h-4 text-amber-400" />
+            <span>💾 导出正面图 PNG</span>
           </button>
 
           <button
-            onClick={handleExport}
+            onClick={handleExport3DHtml}
             disabled={isExporting}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-mono font-extrabold text-xs transition-all active:scale-95 shadow-lg shadow-amber-500/20"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-600 to-amber-500 hover:brightness-110 text-white font-mono font-extrabold text-xs transition-all active:scale-95 shadow-lg shadow-purple-500/25"
           >
-            <Download className="w-4 h-4" />
-            <span>{isExporting ? '正在渲染...' : '💾 导出高清通行证 PNG'}</span>
+            <FileCode className="w-4 h-4 text-amber-300" />
+            <span>🌐 导出 3D 交互网页 HTML</span>
           </button>
         </div>
       </div>
 
-      {/* Main Studio Grid: 3D Stage (Left) & Controls Panel (Right) */}
+      {/* Main Studio Grid: 3D Stage (Left 7 Cols) & Custom Canvas Editor (Right 5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left 3D Interactive Stage (7 Cols) */}
-        <div className="lg:col-span-7 flex flex-col items-center justify-center p-6 sm:p-12 rounded-3xl bg-slate-950/70 border border-white/10 backdrop-blur-xl shadow-2xl relative min-h-[560px] overflow-hidden">
+        {/* Left 3D Stage Container */}
+        <div className="lg:col-span-7 flex flex-col items-center justify-center p-6 sm:p-10 rounded-3xl bg-slate-950/70 border border-white/10 backdrop-blur-xl shadow-2xl relative min-h-[580px] overflow-hidden">
           
-          {/* Ambient Studio Lighting */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[350px] bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />
+          {/* Ambient Lighting */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[360px] bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />
 
-          {/* 3D Perspective Card Container */}
+          {/* Quick Rotation Angle Controls */}
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2 z-30">
+            <span className="text-[11px] font-mono text-slate-400 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>按住鼠标 / 触屏任意拖拽 360° 翻转</span>
+            </span>
+
+            <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md p-1 rounded-xl border border-white/10 text-xs font-mono">
+              <button
+                onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(0); }}
+                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all', rotY === 0 ? 'bg-amber-500 text-black' : 'text-slate-400 hover:text-white')}
+              >
+                正面
+              </button>
+              <button
+                onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(180); }}
+                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all', rotY === 180 ? 'bg-amber-500 text-black' : 'text-slate-400 hover:text-white')}
+              >
+                背面
+              </button>
+              <button
+                onClick={() => { setIsAutoSpin(false); setRotX(15); setRotY(35); }}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white"
+              >
+                立体
+              </button>
+              <button
+                onClick={() => setIsAutoSpin((s) => !s)}
+                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1', isAutoSpin ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white')}
+              >
+                <RotateCw className={clsx('w-3 h-3', isAutoSpin ? 'animate-spin' : '')} />
+                <span>自动巡航</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 360-Degree Free Orbit 3D Card */}
           <div 
-            className="relative perspective-[1200px] w-full max-w-[560px] cursor-grab active:cursor-grabbing select-none"
+            ref={cardContainerRef}
+            onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseUpOrLeave}
+            className="relative perspective-[1200px] w-full max-w-[560px] aspect-[1.58/1] cursor-grab active:cursor-grabbing select-none my-auto mt-12 mb-6"
           >
             <motion.div
-              ref={cardRef}
               animate={{
-                rotateX: rotateX,
-                rotateY: rotateY + (isFlipped ? 180 : 0),
+                rotateX: rotX,
+                rotateY: rotY,
               }}
-              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              transition={isDragging ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 22 }}
               style={{ transformStyle: 'preserve-3d' }}
               className={clsx(
-                'relative w-full aspect-[1.58/1] rounded-3xl p-1 shadow-[0_25px_60px_rgba(0,0,0,0.85)] border transition-shadow duration-300',
+                'relative w-full h-full rounded-3xl p-1 shadow-[0_25px_60px_rgba(0,0,0,0.85)] border transition-shadow duration-300',
                 'bg-gradient-to-br',
                 activeThemeObj.border
               )}
             >
-              {/* Card Inner Surface */}
-              <div className="w-full h-full rounded-[22px] relative overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
+              <div className="w-full h-full rounded-[22px] relative" style={{ transformStyle: 'preserve-3d' }}>
                 
-                {/* Dynamic Holographic Rainbow Sheen */}
+                {/* Holographic Sheen Layer */}
                 <div
-                  className="absolute inset-0 pointer-events-none mix-blend-color-dodge transition-opacity duration-300 z-20"
+                  className="absolute inset-0 pointer-events-none mix-blend-color-dodge transition-opacity duration-300 z-20 rounded-[22px]"
                   style={{
-                    background: `radial-gradient(circle at ${sheen.x}% ${sheen.y}%, rgba(255,255,255,0.7) 0%, rgba(236,72,153,0.3) 30%, rgba(59,130,246,0.3) 60%, transparent 80%)`,
-                    opacity: sheen.opacity,
+                    background: `radial-gradient(circle at ${((rotY % 360 + 360) % 360) / 360 * 100}% 50%, rgba(255,255,255,0.7) 0%, rgba(236,72,153,0.3) 30%, rgba(59,130,246,0.3) 60%, transparent 80%)`,
+                    opacity: sheenIntensity / 100,
                   }}
                 />
 
                 {/* FRONT FACE */}
                 <div 
-                  className={clsx('w-full h-full p-5 sm:p-6 flex flex-col justify-between absolute inset-0', activeThemeObj.bg)}
+                  className={clsx('w-full h-full p-5 sm:p-6 rounded-[22px] flex flex-col justify-between absolute inset-0', activeThemeObj.bg)}
                   style={{ 
+                    transform: 'rotateY(0deg)',
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
                   }}
@@ -684,7 +1214,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                         ⚡
                       </div>
                       <span className="text-xs sm:text-sm font-extrabold text-white font-mono tracking-wider">
-                        NODEMONKES PASSPORT
+                        {cardTitle}
                       </span>
                     </div>
 
@@ -700,11 +1230,13 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
 
                   {/* Card Center Body */}
                   <div className="grid grid-cols-12 gap-4 items-center my-auto">
-                    {/* Left: Pixel Art Monke Avatar */}
                     <div className="col-span-5 flex items-center justify-center">
-                      <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-black/60 border border-white/15 p-2 shadow-2xl relative group overflow-hidden">
+                      <div 
+                        style={{ transform: `scale(${avatarScale / 100})` }}
+                        className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-black/60 border border-white/15 p-2 shadow-2xl relative group overflow-hidden transition-transform"
+                      >
                         <img
-                          src={getMonkeImageUrl(currentMonke.id)}
+                          src={activeAvatarSrc}
                           alt={`NodeMonke #${currentMonke.id}`}
                           className="w-full h-full object-contain pixelated filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
                         />
@@ -714,13 +1246,12 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                       </div>
                     </div>
 
-                    {/* Right: Identity Stats */}
                     <div className="col-span-7 flex flex-col gap-1.5 font-mono">
                       <div className="flex items-center gap-1.5">
                         <span className="text-base sm:text-lg font-black text-white">
                           {ownerHandle}
                         </span>
-                        <CheckCircle2 className="w-4 h-4 text-sky-400 fill-sky-400/20" />
+                        {showVerified && <CheckCircle2 className="w-4 h-4 text-sky-400 fill-sky-400/20" />}
                       </div>
 
                       <div className="inline-block">
@@ -732,7 +1263,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                       <div className="text-[11px] text-slate-400 flex flex-col gap-0.5 mt-1">
                         <span>Inscription: <strong className="text-slate-200">#{currentMonke.inscription}</strong></span>
                         <span>Block Height: <strong className="text-slate-200">#{currentMonke.block}</strong></span>
-                        <span>Traits: <strong className="text-slate-200">{currentMonke.attributes.Count} Parts</strong></span>
+                        <span>Traits: <strong className="text-slate-200">{activeTraits.Count || 4} Parts</strong></span>
                       </div>
                     </div>
                   </div>
@@ -762,28 +1293,26 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                     </span>
                   </div>
 
-                  {/* Back Traits Breakdown & QR Code */}
                   <div className="grid grid-cols-12 gap-4 items-center my-auto font-mono">
                     <div className="col-span-8 flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
                         <span className="text-slate-400">Body:</span>
-                        <span className="font-bold text-white">{currentMonke.attributes.Body}</span>
+                        <span className="font-bold text-white">{activeTraits.Body}</span>
                       </div>
                       <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
                         <span className="text-slate-400">Head:</span>
-                        <span className="font-bold text-white">{currentMonke.attributes.Head}</span>
+                        <span className="font-bold text-white">{activeTraits.Head}</span>
                       </div>
                       <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
                         <span className="text-slate-400">Eyes:</span>
-                        <span className="font-bold text-white">{currentMonke.attributes.Eyes}</span>
+                        <span className="font-bold text-white">{activeTraits.Eyes}</span>
                       </div>
                       <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
                         <span className="text-slate-400">Earring:</span>
-                        <span className="font-bold text-white">{currentMonke.attributes.Earring}</span>
+                        <span className="font-bold text-white">{activeTraits.Earring}</span>
                       </div>
                     </div>
 
-                    {/* QR Code Simulation */}
                     <div className="col-span-4 flex flex-col items-center justify-center gap-1">
                       <div className="w-20 h-20 bg-white p-1.5 rounded-xl flex items-center justify-center shadow-lg">
                         <QrCode className="w-full h-full text-black" />
@@ -802,20 +1331,24 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
             </motion.div>
           </div>
 
-          <span className="text-[11px] font-mono text-slate-500 mt-6 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>移动鼠标体验 3D 重力感应全息反光 • 点击右上角翻转卡片</span>
+          <span className="text-[11px] font-mono text-slate-500 mt-2 flex items-center gap-1.5">
+            <span>当前视角: X: {Math.round(rotX)}° | Y: {Math.round(rotY)}°</span>
           </span>
         </div>
 
-        {/* Right Controls Customizer (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-5 p-6 rounded-3xl bg-slate-950/70 border border-white/10 backdrop-blur-xl shadow-2xl">
+        {/* Right Custom Canvas Editor Panel (5 Cols) */}
+        <div className="lg:col-span-5 flex flex-col gap-4 p-6 rounded-3xl bg-slate-950/70 border border-white/10 backdrop-blur-xl shadow-2xl max-h-[640px] overflow-y-auto pr-2 no-scrollbar">
           
-          {/* Pick Monke */}
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+            <Sliders className="w-4 h-4 text-amber-400" />
+            <h2 className="text-sm font-bold font-mono text-white">画布内容自定义编辑 (Custom Editor)</h2>
+          </div>
+
+          {/* 1. Pick Monke ID */}
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Search className="w-3.5 h-3.5 text-amber-400" />
-              <span>选择目标猴子 (Select Monke)</span>
+              <span>目标神兽编号 (Monke ID)</span>
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -828,16 +1361,16 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                 placeholder="ID (1-10000)"
               />
               <span className="text-xs font-mono text-slate-400">
-                当前: NodeMonke #{currentMonke.id} (Rank #{currentMonke.rank || 'N/A'})
+                NodeMonke #{currentMonke.id} ({tier.label})
               </span>
             </div>
           </div>
 
-          {/* Card Finish Theme */}
-          <div className="flex flex-col gap-2">
+          {/* 2. Card Material Theme */}
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-purple-400" />
-              <span>卡片材质与全息主题 (Card Material)</span>
+              <span>卡片全息材质主题 (Card Finish)</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {THEMES.map((th) => (
@@ -845,39 +1378,65 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                   key={th.id}
                   onClick={() => setCardTheme(th.id)}
                   className={clsx(
-                    'p-2.5 rounded-xl text-xs font-mono font-bold border transition-all text-left flex items-center gap-1.5 active:scale-95',
+                    'p-2 rounded-xl text-xs font-mono font-bold border transition-all text-left flex items-center gap-1.5 active:scale-95',
                     cardTheme === th.id
                       ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-sm'
                       : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
                   )}
                 >
                   <span>{th.icon}</span>
-                  <span className="truncate">{th.nameZh.split(' ')[1]}</span>
+                  <span className="truncate text-[11px]">{th.nameZh.split(' ')[1]}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Owner Handle Input */}
-          <div className="flex flex-col gap-2">
+          {/* 3. Card Title */}
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-sky-400" />
-              <span>持有者推特 / 昵称 (Owner Handle)</span>
+              <Type className="w-3.5 h-3.5 text-amber-400" />
+              <span>卡片顶部主标题 (Header Title)</span>
             </label>
+            <input
+              type="text"
+              value={cardTitle}
+              onChange={(e) => setCardTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all"
+              placeholder="NODEMONKES PASSPORT"
+            />
+          </div>
+
+          {/* 4. Owner Handle & Verified Checkmark */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-sky-400" />
+                <span>持有者推特 / 昵称 (Owner Handle)</span>
+              </label>
+              <label className="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showVerified}
+                  onChange={(e) => setShowVerified(e.target.checked)}
+                  className="rounded border-white/20 text-sky-500"
+                />
+                <span>蓝标认证</span>
+              </label>
+            </div>
             <input
               type="text"
               value={ownerHandle}
               onChange={(e) => setOwnerHandle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-amber-400 transition-all"
-              placeholder="@your_twitter_handle"
+              className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all"
+              placeholder="@your_handle"
             />
           </div>
 
-          {/* Custom Badge Preset Chips */}
-          <div className="flex flex-col gap-2">
+          {/* 5. Custom Badge Pill */}
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span>个性头衔与身份标识 (Badge Title)</span>
+              <span>个性身份头衔 (Badge Title)</span>
             </label>
             <div className="flex flex-wrap gap-1.5">
               {PRESET_BADGES.map((b) => (
@@ -885,7 +1444,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                   key={b}
                   onClick={() => setCustomTitle(b)}
                   className={clsx(
-                    'px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition-all active:scale-95',
+                    'px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border transition-all active:scale-95',
                     customTitle === b
                       ? 'bg-amber-500/25 border-amber-400 text-amber-300'
                       : 'bg-white/5 border-white/5 text-slate-400 hover:text-white'
@@ -899,23 +1458,55 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
               type="text"
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all mt-1"
+              className="w-full px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all mt-1"
               placeholder="自定义头衔..."
             />
           </div>
 
-          {/* Custom Motto Slogan */}
-          <div className="flex flex-col gap-2">
+          {/* 6. Custom Motto */}
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Quote className="w-3.5 h-3.5 text-rose-400" />
-              <span>个性签名 (Custom Motto)</span>
+              <span>底部个性签名 (Motto Slogan)</span>
             </label>
             <input
               type="text"
               value={customMotto}
               onChange={(e) => setCustomMotto(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all"
+              className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all"
               placeholder="In Monkes We Trust..."
+            />
+          </div>
+
+          {/* 7. Avatar Scale Slider */}
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-300 font-bold">
+              <span>头像缩放比例 (Avatar Scale)</span>
+              <span className="text-amber-400">{avatarScale}%</span>
+            </div>
+            <input
+              type="range"
+              min={70}
+              max={130}
+              value={avatarScale}
+              onChange={(e) => setAvatarScale(parseInt(e.target.value, 10))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+          </div>
+
+          {/* 8. Sheen Intensity Slider */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-300 font-bold">
+              <span>全息光斑亮度 (Holo Sheen)</span>
+              <span className="text-purple-400">{sheenIntensity}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={sheenIntensity}
+              onChange={(e) => setSheenIntensity(parseInt(e.target.value, 10))}
+              className="w-full accent-purple-500 cursor-pointer"
             />
           </div>
 

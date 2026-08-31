@@ -75,6 +75,22 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') as TabType;
+      if (tab && ['explorer', 'gif', 'diy', 'santa', 'poster', 'passport', 'arcade'].includes(tab)) {
+        setActiveTab(tab);
+      }
+      const id = parseInt(params.get('id') || '209', 10);
+      if (!isNaN(id) && id >= 1 && id <= 10000) {
+        setTargetMonkeId(id);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
@@ -106,6 +122,20 @@ const AppContent: React.FC = () => {
   const handleOpenInPoster = (id: number) => {
     handleTabChange('poster', id);
     addToast(t.toastPosterLoaded, `${t.toastPosterLoadedDesc} (#${id})`, 'info');
+  };
+
+  const [customPassportData, setCustomPassportData] = useState<{
+    avatarUrl?: string;
+    traits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number };
+  } | null>(null);
+
+  const handleOpenInPassport = (
+    avatarUrl?: string,
+    traits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number }
+  ) => {
+    setCustomPassportData(avatarUrl ? { avatarUrl, traits } : null);
+    handleTabChange('passport', targetMonkeId);
+    addToast('已载入 3D 卡片工坊', '您的专属 DIY 节点猴已进入 3D 空间！', 'success');
   };
 
   return (
@@ -184,7 +214,10 @@ const AppContent: React.FC = () => {
               animate="animate"
               exit="exit"
             >
-              <DiyStudio onToast={addToast} />
+              <DiyStudio 
+                onOpenInPassport={handleOpenInPassport}
+                onToast={addToast} 
+              />
             </motion.div>
           )}
 
@@ -235,6 +268,8 @@ const AppContent: React.FC = () => {
               <PassportStudio
                 initialMonkeId={targetMonkeId}
                 monkes={monkes}
+                customAvatarUrl={customPassportData?.avatarUrl}
+                customTraits={customPassportData?.traits}
                 onToast={addToast}
               />
             </motion.div>
