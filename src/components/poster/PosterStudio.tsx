@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Download, 
   Sparkles, 
@@ -13,12 +13,14 @@ import {
   ChevronsDown, 
   FlipHorizontal, 
   RotateCw, 
-  Layers, 
   Layout, 
   Palette, 
   Type, 
-  Move,
-  Maximize2
+  Upload, 
+  X, 
+  Image as ImageIcon,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { clsx } from 'clsx';
@@ -33,7 +35,7 @@ interface PosterStudioProps {
 }
 
 export type PosterLayout = 'banner' | 'wallpaper' | 'square' | 'cinema';
-export type AuraTheme = 'btc' | 'cyber' | 'dark' | 'emerald' | 'minimal';
+export type AuraTheme = 'btc' | 'cyber' | 'dark' | 'emerald' | 'minimal' | 'custom';
 
 export interface MonkeLayer {
   id: string;
@@ -45,6 +47,18 @@ export interface MonkeLayer {
   flipX: boolean;
 }
 
+export interface TextLayer {
+  x: number;
+  y: number;
+  headline: string;
+  subheadline: string;
+  fontSize: number;
+  color: string;
+  subColor: string;
+  align: 'left' | 'center' | 'right';
+  visible: boolean;
+}
+
 const FORMAT_CONFIG: Record<PosterLayout, { w: number; h: number; name: string }> = {
   banner: { w: 1500, h: 500, name: 'Twitter Banner (3:1)' },
   wallpaper: { w: 1080, h: 1920, name: 'Phone Wallpaper (9:16)' },
@@ -52,7 +66,7 @@ const FORMAT_CONFIG: Record<PosterLayout, { w: number; h: number; name: string }
   cinema: { w: 1920, h: 1080, name: 'Cinema 4K (16:9)' },
 };
 
-// Image caching helper
+// Image caching
 const imgCache = new Map<string, HTMLImageElement>();
 function loadImg(src: string): Promise<HTMLImageElement> {
   if (imgCache.has(src)) {
@@ -82,11 +96,27 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const { lang, t } = useLanguage();
   const [layout, setLayout] = useState<PosterLayout>('banner');
   const [theme, setTheme] = useState<AuraTheme>('btc');
-  const [headline, setHeadline] = useState('WE ARE NODEMONKES');
-  const [subheadline, setSubheadline] = useState('BITCOIN ORDINALS • 10,000 SACRED INSCRIPTIONS');
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
   
-  // Dynamic Layers System
+  // Custom Background
+  const [customBgImage, setCustomBgImage] = useState<string | null>(null);
+  const [customBgColor, setCustomBgColor] = useState<string>('#0B0D13');
+  const [bgDim, setBgDim] = useState<number>(30); // 0-100% overlay
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Text Layer State
+  const [textLayer, setTextLayer] = useState<TextLayer>(() => ({
+    x: 80,
+    y: 240,
+    headline: 'WE ARE NODEMONKES',
+    subheadline: 'BITCOIN ORDINALS • 10,000 SACRED INSCRIPTIONS',
+    fontSize: 52,
+    color: '#FFFFFF',
+    subColor: '#F59E0B',
+    align: 'left',
+    visible: true,
+  }));
+
+  // Dynamic Layers System (layers[0] is drawn on top)
   const [layers, setLayers] = useState<MonkeLayer[]>(() => {
     const { w, h } = FORMAT_CONFIG['banner'];
     const baseIds = [209, 7277, 3361, 4143, 8812];
@@ -106,13 +136,20 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }));
   });
 
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(layers[0]?.id || null);
+  const [selectedId, setSelectedId] = useState<string | 'text' | null>(layers[0]?.id || null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // Refs for ultra-smooth 60fps/120fps drag rendering
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const liveLayersRef = useRef<MonkeLayer[]>(layers);
+  const liveTextRef = useRef<TextLayer>(textLayer);
+  liveLayersRef.current = layers;
+  liveTextRef.current = textLayer;
+
   const isDraggingRef = useRef<{
+    target: 'monke' | 'text' | null;
     mode: 'move' | 'scale' | 'rotate' | null;
-    layerId: string | null;
+    id: string | null;
     startX: number;
     startY: number;
     origX: number;
@@ -120,8 +157,9 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     origSize: number;
     origRot: number;
   }>({
+    target: null,
     mode: null,
-    layerId: null,
+    id: null,
     startX: 0,
     startY: 0,
     origX: 0,
@@ -130,8 +168,40 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     origRot: 0,
   });
 
-  // Selected Layer
-  const selectedLayer = layers.find((l) => l.id === selectedLayerId) || null;
+  const selectedMonkeLayer = layers.find((l) => l.id === selectedId) || null;
+
+  // Sync initial Monke
+  useEffect(() => {
+    if (initialMonkeId && !layers.some((l) => l.monkeId === initialMonkeId)) {
+      setLayers((prev) => [
+        {
+          id: generateLayerId(),
+          monkeId: initialMonkeId,
+          x: FORMAT_CONFIG[layout].w * 0.5,
+          y: FORMAT_CONFIG[layout].h * 0.45,
+          size: 400,
+          rotation: 0,
+          flipX: false,
+        },
+        ...prev,
+      ]);
+    }
+  }, [initialMonkeId, layout]);
+
+  // Handle Custom Background Upload
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setCustomBgImage(event.target.result);
+        setTheme('custom');
+        onToast('背景图已上传', '已加载自定义背景壁纸', 'success');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Preset Template Applier
   const applyPresetTemplate = (type: 'squad' | 'duo' | 'pyramid' | 'solo' | 'scatter') => {
@@ -156,7 +226,12 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           flipX: false,
         },
       ];
-      setTextAlign(layout === 'banner' ? 'left' : 'center');
+      setTextLayer((t) => ({
+        ...t,
+        x: layout === 'banner' ? 80 : w / 2,
+        y: layout === 'banner' ? h / 2 - 10 : h * 0.82,
+        align: layout === 'banner' ? 'left' : 'center',
+      }));
     } else if (type === 'duo') {
       const size = layout === 'banner' ? 390 : layout === 'wallpaper' ? 560 : 520;
       newLayers = [
@@ -176,14 +251,19 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           y: layout === 'wallpaper' ? h * 0.44 + 30 : h * 0.45,
           size,
           rotation: 0,
-          flipX: true, // Face each other!
+          flipX: true,
         },
       ];
+      setTextLayer((t) => ({
+        ...t,
+        x: layout === 'banner' ? 80 : w / 2,
+        y: layout === 'banner' ? h / 2 - 10 : h * 0.82,
+        align: layout === 'banner' ? 'left' : 'center',
+      }));
     } else if (type === 'pyramid') {
       const baseSize = layout === 'wallpaper' ? 440 : 380;
       const topSize = baseSize * 1.15;
       newLayers = [
-        // Front leader (on top)
         {
           id: generateLayerId(),
           monkeId: pool[0] || 209,
@@ -193,7 +273,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           rotation: 0,
           flipX: false,
         },
-        // Left wing
         {
           id: generateLayerId(),
           monkeId: pool[1] || 7277,
@@ -203,7 +282,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           rotation: -6,
           flipX: false,
         },
-        // Right wing
         {
           id: generateLayerId(),
           monkeId: pool[2] || 3361,
@@ -214,10 +292,14 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           flipX: true,
         },
       ];
-      setTextAlign('center');
+      setTextLayer((t) => ({
+        ...t,
+        x: w / 2,
+        y: layout === 'wallpaper' ? h * 0.80 : h * 0.84,
+        align: 'center',
+      }));
     } else if (type === 'scatter') {
-      const count = 5;
-      newLayers = Array.from({ length: count }).map((_, i) => ({
+      newLayers = Array.from({ length: 5 }).map((_, i) => ({
         id: generateLayerId(),
         monkeId: pool[i] || Math.floor(Math.random() * 10000) + 1,
         x: w * (0.2 + 0.6 * Math.random()),
@@ -227,7 +309,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         flipX: Math.random() > 0.5,
       }));
     } else {
-      // 5-Squad Row with left-on-top ordering
+      // 5-Squad
       const size = layout === 'banner' ? 390 : layout === 'wallpaper' ? 520 : 500;
       const spacing = layout === 'banner' ? 135 : 150;
       const startX = layout === 'banner' ? w * 0.46 : (w - (4 * spacing)) / 2;
@@ -242,29 +324,42 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         rotation: 0,
         flipX: false,
       }));
+
+      setTextLayer((t) => ({
+        ...t,
+        x: layout === 'banner' ? 80 : w / 2,
+        y: layout === 'banner' ? h / 2 - 10 : h * 0.82,
+        align: layout === 'banner' ? 'left' : 'center',
+      }));
     }
 
     setLayers(newLayers);
-    setSelectedLayerId(newLayers[0]?.id || null);
-    onToast('排版已应用', '已加载所选版式预设', 'info');
+    setSelectedId(newLayers[0]?.id || null);
   };
 
-  // Switch Layout format
+  // Switch Format
   const handleFormatChange = (newLayout: PosterLayout) => {
     setLayout(newLayout);
     const { w, h } = FORMAT_CONFIG[newLayout];
-    
-    // Scale and center existing layers to fit new canvas
+    const oldConfig = FORMAT_CONFIG[layout];
+
     setLayers((prev) =>
       prev.map((l) => ({
         ...l,
-        x: Math.min(w * 0.85, Math.max(w * 0.15, l.x * (w / FORMAT_CONFIG[layout].w))),
-        y: Math.min(h * 0.85, Math.max(h * 0.15, l.y * (h / FORMAT_CONFIG[layout].h))),
+        x: Math.min(w * 0.85, Math.max(w * 0.15, l.x * (w / oldConfig.w))),
+        y: Math.min(h * 0.85, Math.max(h * 0.15, l.y * (h / oldConfig.h))),
       }))
     );
+
+    setTextLayer((prev) => ({
+      ...prev,
+      x: newLayout === 'banner' ? 80 : w / 2,
+      y: newLayout === 'banner' ? h / 2 - 10 : h * 0.82,
+      align: newLayout === 'banner' ? 'left' : 'center',
+    }));
   };
 
-  // Layer CRUD Operations
+  // Layer CRUD
   const handleAddMonke = (customId?: number) => {
     const { w, h } = FORMAT_CONFIG[layout];
     const newId = customId || Math.floor(Math.random() * 10000) + 1;
@@ -277,17 +372,16 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       rotation: 0,
       flipX: false,
     };
-    // Prepend to layers so new layer is drawn ON TOP (leftmost/highest priority)
     setLayers((prev) => [newLayer, ...prev]);
-    setSelectedLayerId(newLayer.id);
+    setSelectedId(newLayer.id);
     onToast(t.posterAddMonke, `已添加 NodeMonke #${newId}`, 'success');
   };
 
   const handleDeleteLayer = (id: string) => {
     setLayers((prev) => {
       const next = prev.filter((l) => l.id !== id);
-      if (selectedLayerId === id) {
-        setSelectedLayerId(next[0]?.id || null);
+      if (selectedId === id) {
+        setSelectedId(next[0]?.id || null);
       }
       return next;
     });
@@ -301,7 +395,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       y: layer.y + 40,
     };
     setLayers((prev) => [dup, ...prev]);
-    setSelectedLayerId(dup.id);
+    setSelectedId(dup.id);
   };
 
   const handleBringToFront = (id: string) => {
@@ -344,14 +438,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     });
   };
 
-  const updateSelected = (partial: Partial<MonkeLayer>) => {
-    if (!selectedLayerId) return;
+  const updateSelectedMonke = (partial: Partial<MonkeLayer>) => {
+    if (!selectedId || selectedId === 'text') return;
     setLayers((prev) =>
-      prev.map((l) => (l.id === selectedLayerId ? { ...l, ...partial } : l))
+      prev.map((l) => (l.id === selectedId ? { ...l, ...partial } : l))
     );
   };
 
-  // Convert client pointer event to canvas internal coordinate
+  // Quick scale +/- step on canvas
+  const handleScaleStep = (delta: number) => {
+    if (!selectedId || selectedId === 'text') return;
+    setLayers((prev) =>
+      prev.map((l) =>
+        l.id === selectedId ? { ...l, size: Math.max(100, Math.min(1400, l.size + delta)) } : l
+      )
+    );
+  };
+
+  // Convert client pointer event to canvas coordinate
   const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -364,9 +468,22 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     };
   };
 
-  // Canvas Hit Testing
-  const findHitLayer = (x: number, y: number): { layer: MonkeLayer; part: 'body' | 'corner' | 'rotate' } | null => {
-    // Check in layer priority order (layers[0] is on top)
+  // Precise Hit Testing
+  const findHit = (x: number, y: number): { type: 'monke' | 'text'; id: string; part: 'body' | 'corner' | 'rotate' } | null => {
+    // 1. First check if clicked on Text Layer
+    if (textLayer.visible) {
+      const textWidth = Math.max(textLayer.headline.length * (textLayer.fontSize * 0.65), 350);
+      const textHeight = textLayer.fontSize * 2.6;
+      let boxLeft = textLayer.x;
+      if (textLayer.align === 'center') boxLeft = textLayer.x - textWidth / 2;
+      if (textLayer.align === 'right') boxLeft = textLayer.x - textWidth;
+
+      if (x >= boxLeft - 20 && x <= boxLeft + textWidth + 20 && y >= textLayer.y - textLayer.fontSize - 10 && y <= textLayer.y + textHeight - textLayer.fontSize) {
+        return { type: 'text', id: 'text', part: 'body' };
+      }
+    }
+
+    // 2. Check Monke Layers from TOP to BOTTOM (layers[0] to layers[last])
     for (const l of layers) {
       const dx = x - l.x;
       const dy = y - l.y;
@@ -376,88 +493,116 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
       const half = l.size / 2;
 
-      // Check rotate knob (above top center)
-      if (l.id === selectedLayerId) {
-        const knobX = 0;
-        const knobY = -half - 35;
-        if (Math.hypot(localX - knobX, localY - knobY) < 30) {
-          return { layer: l, part: 'rotate' };
+      // Rotate handle check (if selected)
+      if (l.id === selectedId) {
+        if (Math.hypot(localX, localY - (-half - 35)) < 30) {
+          return { type: 'monke', id: l.id, part: 'rotate' };
         }
-        // Check corner scale handle (bottom-right)
-        if (Math.abs(localX - half) < 35 && Math.abs(localY - half) < 35) {
-          return { layer: l, part: 'corner' };
+        // Corner scale handle check (4 corners)
+        if (Math.hypot(Math.abs(localX) - half, Math.abs(localY) - half) < 32) {
+          return { type: 'monke', id: l.id, part: 'corner' };
         }
       }
 
-      // Check body
+      // Body bounding check
       if (Math.abs(localX) <= half && Math.abs(localY) <= half) {
-        return { layer: l, part: 'body' };
+        return { type: 'monke', id: l.id, part: 'body' };
       }
     }
+
     return null;
   };
 
-  // Pointer Down on Canvas
+  // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoords(e);
-    const hit = findHitLayer(x, y);
+    const hit = findHit(x, y);
 
     if (hit) {
-      setSelectedLayerId(hit.layer.id);
+      setSelectedId(hit.id);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-      isDraggingRef.current = {
-        mode: hit.part === 'rotate' ? 'rotate' : hit.part === 'corner' ? 'scale' : 'move',
-        layerId: hit.layer.id,
-        startX: x,
-        startY: y,
-        origX: hit.layer.x,
-        origY: hit.layer.y,
-        origSize: hit.layer.size,
-        origRot: hit.layer.rotation,
-      };
+      if (hit.type === 'text') {
+        isDraggingRef.current = {
+          target: 'text',
+          mode: 'move',
+          id: 'text',
+          startX: x,
+          startY: y,
+          origX: textLayer.x,
+          origY: textLayer.y,
+          origSize: textLayer.fontSize,
+          origRot: 0,
+        };
+      } else {
+        const layer = layers.find((l) => l.id === hit.id);
+        if (layer) {
+          isDraggingRef.current = {
+            target: 'monke',
+            mode: hit.part === 'rotate' ? 'rotate' : hit.part === 'corner' ? 'scale' : 'move',
+            id: layer.id,
+            startX: x,
+            startY: y,
+            origX: layer.x,
+            origY: layer.y,
+            origSize: layer.size,
+            origRot: layer.rotation,
+          };
+        }
+      }
     } else {
-      setSelectedLayerId(null);
+      setSelectedId(null);
     }
   };
 
-  // Pointer Move on Canvas
+  // Pointer Move (Buttery Smooth 60fps/120fps direct drag)
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = isDraggingRef.current;
-    if (!drag.mode || !drag.layerId) return;
+    if (!drag.mode || !drag.id) return;
 
     const { x, y } = getCanvasCoords(e);
 
-    if (drag.mode === 'move') {
+    if (drag.target === 'text') {
       const dx = x - drag.startX;
       const dy = y - drag.startY;
-      setLayers((prev) =>
-        prev.map((l) =>
-          l.id === drag.layerId ? { ...l, x: drag.origX + dx, y: drag.origY + dy } : l
-        )
-      );
-    } else if (drag.mode === 'scale') {
-      const target = layers.find((l) => l.id === drag.layerId);
-      if (!target) return;
-      const dist = Math.hypot(x - target.x, y - target.y);
-      const newSize = Math.max(100, Math.min(1400, dist * 1.414));
-      setLayers((prev) =>
-        prev.map((l) => (l.id === drag.layerId ? { ...l, size: newSize } : l))
-      );
-    } else if (drag.mode === 'rotate') {
-      const target = layers.find((l) => l.id === drag.layerId);
-      if (!target) return;
-      const angle = (Math.atan2(y - target.y, x - target.x) * 180) / Math.PI + 90;
-      setLayers((prev) =>
-        prev.map((l) => (l.id === drag.layerId ? { ...l, rotation: Math.round(angle) } : l))
-      );
+      setTextLayer((prev) => ({
+        ...prev,
+        x: Math.round(drag.origX + dx),
+        y: Math.round(drag.origY + dy),
+      }));
+    } else if (drag.target === 'monke') {
+      if (drag.mode === 'move') {
+        const dx = x - drag.startX;
+        const dy = y - drag.startY;
+        setLayers((prev) =>
+          prev.map((l) =>
+            l.id === drag.id ? { ...l, x: Math.round(drag.origX + dx), y: Math.round(drag.origY + dy) } : l
+          )
+        );
+      } else if (drag.mode === 'scale') {
+        const target = layers.find((l) => l.id === drag.id);
+        if (!target) return;
+        const dist = Math.hypot(x - target.x, y - target.y);
+        const newSize = Math.max(80, Math.min(1500, dist * 1.414));
+        setLayers((prev) =>
+          prev.map((l) => (l.id === drag.id ? { ...l, size: Math.round(newSize) } : l))
+        );
+      } else if (drag.mode === 'rotate') {
+        const target = layers.find((l) => l.id === drag.id);
+        if (!target) return;
+        const angle = (Math.atan2(y - target.y, x - target.x) * 180) / Math.PI + 90;
+        setLayers((prev) =>
+          prev.map((l) => (l.id === drag.id ? { ...l, rotation: Math.round(angle) } : l))
+        );
+      }
     }
   };
 
-  // Pointer Up on Canvas
+  // Pointer Up
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDraggingRef.current.mode = null;
-    isDraggingRef.current.layerId = null;
+    isDraggingRef.current.id = null;
+    isDraggingRef.current.target = null;
     try {
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     } catch (e) {}
@@ -465,19 +610,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
   // Mouse Wheel Scale
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (!selectedLayerId) return;
+    if (!selectedId) return;
     e.preventDefault();
-    const delta = e.deltaY < 0 ? 25 : -25;
-    setLayers((prev) =>
-      prev.map((l) =>
-        l.id === selectedLayerId
-          ? { ...l, size: Math.max(100, Math.min(1400, l.size + delta)) }
-          : l
-      )
-    );
+    const delta = e.deltaY < 0 ? 30 : -30;
+
+    if (selectedId === 'text') {
+      setTextLayer((t) => ({ ...t, fontSize: Math.max(20, Math.min(120, t.fontSize + (delta > 0 ? 2 : -2))) }));
+    } else {
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.id === selectedId
+            ? { ...l, size: Math.max(80, Math.min(1500, l.size + delta)) }
+            : l
+        )
+      );
+    }
   };
 
-  // Canvas Main Drawing Loop
+  // Main Canvas Render Loop
   useEffect(() => {
     let active = true;
     const canvas = canvasRef.current;
@@ -490,11 +640,26 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     canvas.width = w;
     canvas.height = h;
 
-    const renderCanvas = async () => {
-      // 1. Background Fill
+    const renderPoster = async () => {
       ctx.clearRect(0, 0, w, h);
 
-      if (theme === 'btc') {
+      // 1. Draw Background
+      if (customBgImage) {
+        try {
+          const bgImg = await loadImg(customBgImage);
+          if (!active) return;
+          ctx.drawImage(bgImg, 0, 0, w, h);
+
+          // Optional Dimming Overlay
+          if (bgDim > 0) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${bgDim / 100})`;
+            ctx.fillRect(0, 0, w, h);
+          }
+        } catch (e) {
+          ctx.fillStyle = customBgColor;
+          ctx.fillRect(0, 0, w, h);
+        }
+      } else if (theme === 'btc') {
         const bgGrad = ctx.createLinearGradient(0, 0, w, h);
         bgGrad.addColorStop(0, '#0C0A09');
         bgGrad.addColorStop(0.5, '#1C1307');
@@ -545,11 +710,11 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
       } else {
-        ctx.fillStyle = '#06080D';
+        ctx.fillStyle = customBgColor;
         ctx.fillRect(0, 0, w, h);
       }
 
-      // Draw Subtle Ambient Grid Dots
+      // Draw Ambient Grid
       ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
       const step = 32;
       for (let x = 0; x < w; x += step) {
@@ -558,8 +723,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         }
       }
 
-      // 2. Draw Layers in REVERSE order (layers[last] to layers[0])
-      // so layers[0] is drawn LAST on the very TOP (left-over-right priority)
+      // 2. Draw Monke Layers in REVERSE order (layers[last] to layers[0])
+      // so layers[0] is on the very TOP (left-on-top order)
       try {
         const imgMap = new Map<number, HTMLImageElement>();
         for (const l of layers) {
@@ -570,7 +735,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         }
 
         if (!active) return;
-
         ctx.imageSmoothingEnabled = false;
 
         for (let i = layers.length - 1; i >= 0; i--) {
@@ -580,123 +744,113 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
           ctx.save();
           ctx.translate(l.x, l.y);
-          if (l.rotation !== 0) {
-            ctx.rotate((l.rotation * Math.PI) / 180);
-          }
-          if (l.flipX) {
-            ctx.scale(-1, 1);
-          }
+          if (l.rotation !== 0) ctx.rotate((l.rotation * Math.PI) / 180);
+          if (l.flipX) ctx.scale(-1, 1);
 
           ctx.drawImage(img, -l.size / 2, -l.size / 2, l.size, l.size);
           ctx.restore();
         }
 
-        // 3. Draw Typography
-        ctx.save();
-        if (layout === 'banner') {
-          ctx.textAlign = textAlign;
-          const textX = textAlign === 'left' ? 80 : textAlign === 'center' ? w / 2 : w - 80;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 52px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-          ctx.fillText(headline, textX, h / 2 - 14);
+        // 3. Draw Text Layer
+        if (textLayer.visible) {
+          ctx.save();
+          ctx.textAlign = textLayer.align;
+          ctx.fillStyle = textLayer.color;
+          ctx.font = `900 ${textLayer.fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          ctx.fillText(textLayer.headline, textLayer.x, textLayer.y);
 
-          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : theme === 'emerald' ? '#10B981' : theme === 'cyber' ? '#C084FC' : '#94A3B8';
-          ctx.font = '700 20px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-          ctx.fillText(subheadline, textX, h / 2 + 36);
+          ctx.fillStyle = textLayer.subColor;
+          ctx.font = `700 ${Math.round(textLayer.fontSize * 0.38)}px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace`;
+          ctx.fillText(textLayer.subheadline, textLayer.x, textLayer.y + textLayer.fontSize * 0.9);
 
           ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.font = '600 14px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText('NODE MONKES • BITCOIN LAYER 1', textX, h / 2 + 78);
-        } else if (layout === 'wallpaper') {
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 64px -apple-system, BlinkMacSystemFont, sans-serif';
-          ctx.fillText(headline, w / 2, h * 0.78);
-
-          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : '#94A3B8';
-          ctx.font = '700 24px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText(subheadline, w / 2, h * 0.83);
-
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-          ctx.font = '600 17px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText('ORDINALS INSCRIPTION ART • 2026', w / 2, h * 0.88);
-        } else {
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 54px -apple-system, BlinkMacSystemFont, sans-serif';
-          ctx.fillText(headline, w / 2, h * 0.84);
-
-          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : '#94A3B8';
-          ctx.font = '700 21px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText(subheadline, w / 2, h * 0.90);
+          ctx.font = `600 ${Math.round(textLayer.fontSize * 0.28)}px ui-monospace, SFMono-Regular, monospace`;
+          ctx.fillText('NODE MONKES • BITCOIN LAYER 1', textLayer.x, textLayer.y + textLayer.fontSize * 1.6);
+          ctx.restore();
         }
-        ctx.restore();
 
-        // 4. Draw Active Selection Outline & Transform Handles (Only in editing mode, not exported)
-        if (selectedLayer && !isExporting) {
-          const l = selectedLayer;
-          const half = l.size / 2;
+        // 4. Draw Interactive Selection Overlay (Only during edit mode, not exported)
+        if (!isExporting) {
+          // If Monke layer is selected
+          if (selectedMonkeLayer) {
+            const l = selectedMonkeLayer;
+            const half = l.size / 2;
 
-          ctx.save();
-          ctx.translate(l.x, l.y);
-          if (l.rotation !== 0) {
-            ctx.rotate((l.rotation * Math.PI) / 180);
-          }
+            ctx.save();
+            ctx.translate(l.x, l.y);
+            if (l.rotation !== 0) ctx.rotate((l.rotation * Math.PI) / 180);
 
-          // Dashed Cyan/Gold Selection Box
-          ctx.strokeStyle = '#38BDF8';
-          ctx.lineWidth = 3;
-          ctx.setLineDash([8, 6]);
-          ctx.strokeRect(-half, -half, l.size, l.size);
+            // Dashed Selection Box
+            ctx.strokeStyle = '#38BDF8';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.strokeRect(-half, -half, l.size, l.size);
 
-          // 4 Corner Resize Dots
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#38BDF8';
-          [
-            [-half, -half],
-            [half, -half],
-            [-half, half],
-            [half, half],
-          ].forEach(([cx, cy]) => {
+            // 4 Corner Resize Handles
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#38BDF8';
+            [
+              [-half, -half],
+              [half, -half],
+              [-half, half],
+              [half, half],
+            ].forEach(([cx, cy]) => {
+              ctx.beginPath();
+              ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = '#FFFFFF';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            });
+
+            // Top Rotate Handle
             ctx.beginPath();
-            ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+            ctx.moveTo(0, -half);
+            ctx.lineTo(0, -half - 32);
+            ctx.strokeStyle = '#38BDF8';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(0, -half - 32, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#F59E0B';
             ctx.fill();
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 2;
             ctx.stroke();
-          });
 
-          // Top Rotation Stem & Handle
-          ctx.beginPath();
-          ctx.moveTo(0, -half);
-          ctx.lineTo(0, -half - 32);
-          ctx.strokeStyle = '#38BDF8';
-          ctx.lineWidth = 2;
-          ctx.stroke();
+            ctx.restore();
+          }
 
-          ctx.beginPath();
-          ctx.arc(0, -half - 32, 9, 0, Math.PI * 2);
-          ctx.fillStyle = '#F59E0B';
-          ctx.fill();
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 2;
-          ctx.stroke();
+          // If Text layer is selected
+          if (selectedId === 'text' && textLayer.visible) {
+            const textWidth = Math.max(textLayer.headline.length * (textLayer.fontSize * 0.65), 350);
+            const textHeight = textLayer.fontSize * 2.2;
+            let boxLeft = textLayer.x;
+            if (textLayer.align === 'center') boxLeft = textLayer.x - textWidth / 2;
+            if (textLayer.align === 'right') boxLeft = textLayer.x - textWidth;
 
-          ctx.restore();
+            ctx.save();
+            ctx.strokeStyle = '#A855F7';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([6, 5]);
+            ctx.strokeRect(boxLeft - 15, textLayer.y - textLayer.fontSize, textWidth + 30, textHeight);
+            ctx.restore();
+          }
         }
       } catch (err) {
-        console.error('Canvas render error:', err);
+        console.error('Render error:', err);
       }
     };
 
-    renderCanvas();
+    renderPoster();
 
     return () => {
       active = false;
     };
-  }, [layout, theme, headline, subheadline, textAlign, layers, selectedLayerId, isExporting]);
+  }, [layout, theme, customBgImage, customBgColor, bgDim, layers, textLayer, selectedId, selectedMonkeLayer, isExporting]);
 
-  // Export Clean PNG (Renders without selection box)
+  // Clean PNG Export
   const handleExport = () => {
     const canvas = canvasRef.current;
     if (!canvas || isExporting) return;
@@ -705,19 +859,19 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     setTimeout(() => {
       try {
         canvas.toBlob((blob) => {
-          if (!blob) throw new Error('Export blob failed');
+          if (!blob) throw new Error('Export blob error');
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `nodemonkes_poster_${layout}_${theme}_${Date.now()}.png`;
+          link.download = `nodemonkes_poster_${layout}_${Date.now()}.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
           setTimeout(() => URL.revokeObjectURL(url), 100);
 
           confetti({
-            particleCount: 90,
-            spread: 75,
+            particleCount: 100,
+            spread: 80,
             origin: { y: 0.6 },
             colors: ['#F59E0B', '#8B5CF6', '#10B981', '#38BDF8'],
           });
@@ -725,7 +879,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           onToast(t.posterSuccess, t.posterSuccessDesc, 'success');
           setIsExporting(false);
         }, 'image/png');
-      } catch (err: any) {
+      } catch (err) {
         console.error('Export error:', err);
         setIsExporting(false);
       }
@@ -749,7 +903,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         </p>
       </div>
 
-      {/* Preset Templates Quick Bar */}
+      {/* Template Presets Bar */}
       <div className="glass-panel p-3 rounded-2xl border border-white/10 flex items-center justify-between gap-2 overflow-x-auto">
         <span className="text-xs font-mono text-slate-400 font-bold px-2 whitespace-nowrap">
           ⚡ {t.posterTemplates}:
@@ -780,6 +934,49 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         </button>
       </div>
 
+      {/* Layer Selection Chips (Instant Precise Hit Selection) */}
+      <div className="glass-panel p-2.5 rounded-2xl border border-white/10 flex items-center gap-2 overflow-x-auto">
+        <span className="text-[11px] font-mono text-slate-400 font-bold px-1 whitespace-nowrap">
+          📑 {t.posterLayerList}:
+        </span>
+
+        {/* Text Layer Chip */}
+        <button
+          onClick={() => setSelectedId('text')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all whitespace-nowrap',
+            selectedId === 'text'
+              ? 'bg-purple-500/25 border-purple-400 text-purple-300 shadow-sm'
+              : 'bg-slate-950/60 border-white/10 text-slate-300 hover:text-white'
+          )}
+        >
+          <Type className="w-3 h-3 text-purple-400" />
+          <span>文案排版 (Text)</span>
+        </button>
+
+        {/* Monke Layer Chips in order */}
+        {layers.map((l, index) => (
+          <button
+            key={l.id}
+            onClick={() => setSelectedId(l.id)}
+            className={clsx(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold border transition-all whitespace-nowrap',
+              selectedId === l.id
+                ? 'bg-amber-500/25 border-amber-400 text-amber-300 shadow-sm'
+                : 'bg-slate-950/60 border-white/10 text-slate-300 hover:text-white'
+            )}
+          >
+            <img
+              src={getMonkeImageUrl(l.monkeId)}
+              alt={`#${l.monkeId}`}
+              className="w-4 h-4 rounded-md pixelated bg-black/50"
+            />
+            <span>#{l.monkeId}</span>
+            {index === 0 && <span className="text-[9px] text-amber-400/80 font-normal">(顶层)</span>}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left: Interactive Canvas Studio */}
@@ -796,10 +993,53 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               className="w-full h-auto max-h-[560px] object-contain rounded-2xl shadow-2xl border border-white/10 cursor-grab active:cursor-grabbing touch-none select-none"
             />
 
-            {/* Canvas Hint Overlay */}
-            <div className="mt-3 text-[11px] font-mono text-slate-400 text-center w-full">
-              {t.posterCanvasHint}
-            </div>
+            {/* Floating Micro-Toolbar on Canvas when Monke is Selected */}
+            {selectedMonkeLayer && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-white/15 shadow-2xl flex items-center gap-2 z-20">
+                <button
+                  onClick={() => handleScaleStep(-30)}
+                  title="缩小"
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-mono font-bold text-amber-300 px-1">
+                  {Math.round(selectedMonkeLayer.size)}px
+                </span>
+                <button
+                  onClick={() => handleScaleStep(30)}
+                  title="放大"
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <div className="w-[1px] h-4 bg-white/10" />
+                <button
+                  onClick={() => updateSelectedMonke({ flipX: !selectedMonkeLayer.flipX })}
+                  title={t.posterFlipH}
+                  className={clsx(
+                    'p-1.5 rounded-lg text-slate-300 hover:text-white',
+                    selectedMonkeLayer.flipX ? 'bg-purple-500/30 text-purple-300' : 'bg-white/5'
+                  )}
+                >
+                  <FlipHorizontal className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleBringToFront(selectedMonkeLayer.id)}
+                  title={t.posterBringFront}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
+                >
+                  <ChevronsUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteLayer(selectedMonkeLayer.id)}
+                  title={t.posterDeleteMonke}
+                  className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Export Action */}
@@ -815,7 +1055,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           </motion.button>
         </div>
 
-        {/* Right: Layers & Property Inspector */}
+        {/* Right: Properties Inspector Panel */}
         <div className="lg:col-span-4 space-y-4">
           
           {/* Format & Dimensions */}
@@ -847,30 +1087,98 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             </div>
           </div>
 
-          {/* Selected Layer Properties Inspector */}
-          {selectedLayer ? (
+          {/* Text Layer Inspector (When Text is selected or always available) */}
+          {selectedId === 'text' ? (
             <div className="glass-panel p-4 rounded-3xl border border-purple-500/30 space-y-3.5 shadow-2xl bg-purple-950/10">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
+                <span className="text-xs font-bold text-purple-300 font-mono flex items-center gap-1.5">
+                  <Type className="w-4 h-4" />
+                  <span>文案排版设置 (Text Layer)</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">画布可拖拽</span>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 font-mono block mb-1">{t.posterHeadline}</label>
+                <input
+                  type="text"
+                  value={textLayer.headline}
+                  onChange={(e) => setTextLayer((t) => ({ ...t, headline: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs font-semibold text-white focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 font-mono block mb-1">{t.posterSubheadline}</label>
+                <input
+                  type="text"
+                  value={textLayer.subheadline}
+                  onChange={(e) => setTextLayer((t) => ({ ...t, subheadline: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-slate-300 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              {/* Font Size & Align */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <span>{t.posterTextFontSize}</span>
+                  <span className="text-white font-bold">{textLayer.fontSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={24}
+                  max={100}
+                  step={2}
+                  value={textLayer.fontSize}
+                  onChange={(e) => setTextLayer((t) => ({ ...t, fontSize: parseInt(e.target.value, 10) }))}
+                  className="w-full accent-purple-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] font-mono text-slate-400">对齐方式:</span>
+                <div className="flex items-center gap-1">
+                  {(['left', 'center', 'right'] as const).map((al) => (
+                    <button
+                      key={al}
+                      onClick={() => setTextLayer((t) => ({ ...t, align: al }))}
+                      className={clsx(
+                        'px-2.5 py-1 rounded-xl text-xs font-mono uppercase',
+                        textLayer.align === al
+                          ? 'bg-purple-500/30 text-purple-300 font-bold border border-purple-400'
+                          : 'bg-white/5 text-slate-400 border border-white/5'
+                      )}
+                    >
+                      {al}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : selectedMonkeLayer ? (
+            /* Selected Monke Inspector */
+            <div className="glass-panel p-4 rounded-3xl border border-amber-500/30 space-y-3.5 shadow-2xl bg-amber-950/10">
               <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
                 <div className="flex items-center gap-2">
                   <img
-                    src={getMonkeImageUrl(selectedLayer.monkeId)}
-                    alt={`#${selectedLayer.monkeId}`}
+                    src={getMonkeImageUrl(selectedMonkeLayer.monkeId)}
+                    alt={`#${selectedMonkeLayer.monkeId}`}
                     className="w-7 h-7 rounded-lg bg-black/60 pixelated border border-white/10"
                   />
                   <span className="text-xs font-bold text-white font-mono">
-                    NodeMonke #{selectedLayer.monkeId}
+                    NodeMonke #{selectedMonkeLayer.monkeId}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleDuplicateLayer(selectedLayer)}
+                    onClick={() => handleDuplicateLayer(selectedMonkeLayer)}
                     title={t.posterDuplicateMonke}
                     className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteLayer(selectedLayer.id)}
+                    onClick={() => handleDeleteLayer(selectedMonkeLayer.id)}
                     title={t.posterDeleteMonke}
                     className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300"
                   >
@@ -886,14 +1194,14 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                   type="number"
                   min={1}
                   max={10000}
-                  value={selectedLayer.monkeId}
+                  value={selectedMonkeLayer.monkeId}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v) && v >= 1 && v <= 10000) {
-                      updateSelected({ monkeId: v });
+                      updateSelectedMonke({ monkeId: v });
                     }
                   }}
-                  className="w-24 px-2 py-1 rounded-xl bg-slate-950/70 border border-white/10 text-center font-mono text-xs text-white focus:outline-none focus:border-purple-400"
+                  className="w-24 px-2 py-1 rounded-xl bg-slate-950/70 border border-white/10 text-center font-mono text-xs text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
 
@@ -901,24 +1209,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
                   <span>{t.posterSize}</span>
-                  <span className="text-white font-bold">{Math.round(selectedLayer.size)}px</span>
+                  <span className="text-white font-bold">{Math.round(selectedMonkeLayer.size)}px</span>
                 </div>
                 <input
                   type="range"
                   min={100}
-                  max={1200}
+                  max={1400}
                   step={10}
-                  value={selectedLayer.size}
-                  onChange={(e) => updateSelected({ size: parseFloat(e.target.value) })}
-                  className="w-full accent-purple-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
+                  value={selectedMonkeLayer.size}
+                  onChange={(e) => updateSelectedMonke({ size: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
                 />
               </div>
 
-              {/* Rotation Slider & Flip */}
+              {/* Rotation Slider */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
                   <span>{t.posterRotate}</span>
-                  <span className="text-white font-bold">{selectedLayer.rotation}°</span>
+                  <span className="text-white font-bold">{selectedMonkeLayer.rotation}°</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -926,27 +1234,27 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                     min={-180}
                     max={180}
                     step={1}
-                    value={selectedLayer.rotation}
-                    onChange={(e) => updateSelected({ rotation: parseInt(e.target.value, 10) })}
-                    className="flex-1 accent-purple-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
+                    value={selectedMonkeLayer.rotation}
+                    onChange={(e) => updateSelectedMonke({ rotation: parseInt(e.target.value, 10) })}
+                    className="flex-1 accent-amber-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
                   />
                   <button
-                    onClick={() => updateSelected({ rotation: 0 })}
+                    onClick={() => updateSelectedMonke({ rotation: 0 })}
                     className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[10px] font-mono text-slate-300"
                   >
-                    重置
+                    0°
                   </button>
                 </div>
               </div>
 
-              {/* Layer Actions & Flip */}
+              {/* Actions & Flip */}
               <div className="flex items-center justify-between gap-1 pt-1">
                 <button
-                  onClick={() => updateSelected({ flipX: !selectedLayer.flipX })}
+                  onClick={() => updateSelectedMonke({ flipX: !selectedMonkeLayer.flipX })}
                   className={clsx(
                     'flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl border text-xs font-mono font-medium transition-all',
-                    selectedLayer.flipX
-                      ? 'bg-purple-500/25 border-purple-400 text-purple-300 font-bold'
+                    selectedMonkeLayer.flipX
+                      ? 'bg-amber-500/25 border-amber-400 text-amber-300 font-bold'
                       : 'bg-white/5 border-white/10 text-slate-300'
                   )}
                 >
@@ -956,28 +1264,28 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleBringToFront(selectedLayer.id)}
+                    onClick={() => handleBringToFront(selectedMonkeLayer.id)}
                     title={t.posterBringFront}
                     className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10"
                   >
                     <ChevronsUp className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleMoveUp(selectedLayer.id)}
+                    onClick={() => handleMoveUp(selectedMonkeLayer.id)}
                     title={t.posterMoveUp}
                     className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleMoveDown(selectedLayer.id)}
+                    onClick={() => handleMoveDown(selectedMonkeLayer.id)}
                     title={t.posterMoveDown}
                     className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10"
                   >
                     <ArrowDown className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleSendToBack(selectedLayer.id)}
+                    onClick={() => handleSendToBack(selectedMonkeLayer.id)}
                     title={t.posterSendBack}
                     className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10"
                   >
@@ -988,53 +1296,48 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
             </div>
           ) : (
-            <div className="glass-panel p-4 rounded-3xl border border-white/5 text-center py-6 space-y-2">
-              <span className="text-xs font-mono text-slate-400 block">点击画布选择一只猴子进行编辑</span>
-              <button
-                onClick={() => handleAddMonke()}
-                className="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold mx-auto flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t.posterAddMonke}</span>
-              </button>
+            <div className="glass-panel p-4 rounded-3xl border border-white/5 text-center py-5 space-y-2">
+              <span className="text-xs font-mono text-slate-400 block">点击上方图层或画布元素进行编辑</span>
             </div>
           )}
 
-          {/* Typography Panel */}
-          <div className="glass-panel p-4 rounded-3xl border border-white/10 space-y-2.5 shadow-xl">
-            <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block flex items-center gap-1.5">
-              <Type className="w-3.5 h-3.5 text-purple-400" />
-              <span>文案排版 (Typography)</span>
-            </span>
-
-            <div>
-              <label className="text-[10px] text-slate-400 font-mono block mb-1">{t.posterHeadline}</label>
-              <input
-                type="text"
-                value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs font-semibold text-white focus:outline-none focus:border-purple-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-400 font-mono block mb-1">{t.posterSubheadline}</label>
-              <input
-                type="text"
-                value={subheadline}
-                onChange={(e) => setSubheadline(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs text-slate-300 focus:outline-none focus:border-purple-400"
-              />
-            </div>
-          </div>
-
-          {/* Aura Background */}
-          <div className="glass-panel p-4 rounded-3xl border border-white/10 space-y-2.5 shadow-xl">
+          {/* Custom Background & Lighting Panel */}
+          <div className="glass-panel p-4 rounded-3xl border border-white/10 space-y-3 shadow-xl">
             <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-purple-400" />
               <span>{t.posterThemeTitle}</span>
             </span>
 
+            {/* Upload Custom BG */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleBgUpload}
+              className="hidden"
+            />
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 py-2 px-3 rounded-2xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{t.posterUploadBg}</span>
+              </button>
+
+              {customBgImage && (
+                <button
+                  onClick={() => setCustomBgImage(null)}
+                  className="p-2 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-mono"
+                  title={t.posterRemoveBg}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Built-in Aura Themes */}
             <div className="grid grid-cols-2 gap-2">
               {[
                 { id: 'btc' as AuraTheme, label: t.posterThemeBtc },
@@ -1045,10 +1348,13 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               ].map((th) => (
                 <button
                   key={th.id}
-                  onClick={() => setTheme(th.id)}
+                  onClick={() => {
+                    setTheme(th.id);
+                    setCustomBgImage(null);
+                  }}
                   className={clsx(
                     'py-2 px-2 rounded-2xl border text-xs font-medium transition-all text-center',
-                    theme === th.id
+                    theme === th.id && !customBgImage
                       ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold shadow-sm'
                       : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                   )}
@@ -1057,6 +1363,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Custom Overlay Dimming Slider */}
+            {customBgImage && (
+              <div className="space-y-1 pt-2 border-t border-white/[0.06]">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <span>背景压暗蒙版</span>
+                  <span className="text-white">{bgDim}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={80}
+                  value={bgDim}
+                  onChange={(e) => setBgDim(parseInt(e.target.value, 10))}
+                  className="w-full accent-purple-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
+                />
+              </div>
+            )}
           </div>
 
         </div>

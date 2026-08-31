@@ -206,8 +206,13 @@ export interface Translations {
   posterTemplatePyramid: string;
   posterTemplateSolo: string;
   posterTemplateScatter: string;
-  posterLayers: string;
-  posterCanvasHint: string;
+  posterUploadBg: string;
+  posterRemoveBg: string;
+  posterBgColor: string;
+  posterTextProps: string;
+  posterTextFontSize: string;
+  posterTextColor: string;
+  posterLayerList: string;
   posterExportBtn: string;
   posterExporting: string;
   posterSuccess: string;
@@ -438,8 +443,13 @@ export const translations: Record<Language, Translations> = {
     posterTemplatePyramid: '金字塔阵',
     posterTemplateSolo: '单猴特写',
     posterTemplateScatter: '自由散落',
-    posterLayers: '猴子图层 (支持画布拖拽/缩放/旋转)',
-    posterCanvasHint: '💡 提示：点击画布上的猴子可直接拖拽移动、拉伸四角缩放或旋转，滚轮可快速缩放',
+    posterUploadBg: '📁 上传自定义背景图',
+    posterRemoveBg: '清除自定义背景',
+    posterBgColor: '自定义背景底色',
+    posterTextProps: '文案排版与样式',
+    posterTextFontSize: '文字大小',
+    posterTextColor: '文字颜色',
+    posterLayerList: '图层列表 (点击精准选中)',
     posterExportBtn: '导出高清海报 PNG',
     posterExporting: '正在渲染海报...',
     posterSuccess: '海报导出成功！',
@@ -668,8 +678,13 @@ export const translations: Record<Language, Translations> = {
     posterTemplatePyramid: 'Pyramid',
     posterTemplateSolo: 'Solo Hero',
     posterTemplateScatter: 'Scattered Art',
-    posterLayers: 'Monke Layers (Drag, Scale & Rotate on Canvas)',
-    posterCanvasHint: '💡 Hint: Click on canvas to drag, scale via handles/wheel, or rotate freely',
+    posterUploadBg: '📁 Upload Custom Background',
+    posterRemoveBg: 'Clear Custom Background',
+    posterBgColor: 'Custom Background Color',
+    posterTextProps: 'Text & Typography',
+    posterTextFontSize: 'Font Size',
+    posterTextColor: 'Text Color',
+    posterLayerList: 'Layers List (Click to Select)',
     posterExportBtn: 'Export HD Poster PNG',
     posterExporting: 'Rendering Poster...',
     posterSuccess: 'Poster Exported Successfully!',
