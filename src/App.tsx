@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { TabType, Monke, ToastMessage } from './types';
 import { fetchMonkes } from './utils/api';
 import { Navbar } from './components/layout/Navbar';
@@ -10,10 +11,15 @@ import { SantaStudio } from './components/santa/SantaStudio';
 import { ToastContainer } from './components/ui/Toast';
 import { LanguageProvider, useLanguage } from './utils/i18n';
 
+const pageVariants = {
+  initial: { opacity: 0, y: 12, filter: 'blur(4px)' },
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.28, ease: 'easeOut' as const } },
+  exit: { opacity: 0, y: -8, filter: 'blur(4px)', transition: { duration: 0.18, ease: 'easeIn' as const } },
+};
+
 const AppContent: React.FC = () => {
   const { t } = useLanguage();
 
-  // Sync tab and ID with URL Search Params
   const getInitialTab = (): TabType => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') as TabType;
@@ -36,7 +42,6 @@ const AppContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Update URL parameters without reloading
   const handleTabChange = useCallback((tab: TabType, id?: number) => {
     setActiveTab(tab);
     if (id !== undefined) {
@@ -54,7 +59,7 @@ const AppContent: React.FC = () => {
   const addToast = useCallback((title: string, description?: string, type?: 'success' | 'info' | 'warning' | 'error') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => {
-      const filtered = prev.slice(-1); // Keep at most 1 previous toast
+      const filtered = prev.slice(-1);
       return [...filtered, { id, title, description, type }];
     });
     setTimeout(() => {
@@ -66,7 +71,6 @@ const AppContent: React.FC = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Fetch Monkes metadata on mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -97,8 +101,11 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0A0D14] text-slate-100 selection:bg-amber-500/30 selection:text-amber-200">
+    <div className="min-h-screen flex flex-col bg-ambient-mesh text-slate-100 selection:bg-amber-500/30 selection:text-amber-200 relative">
       
+      {/* Top Subtle Ambient Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[280px] bg-gradient-to-b from-amber-500/10 via-orange-500/5 to-transparent blur-[90px] pointer-events-none -z-10" />
+
       {/* Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -107,11 +114,11 @@ const AppContent: React.FC = () => {
         onQuickSearchClick={() => handleTabChange('explorer')}
       />
 
-      {/* Main View Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      {/* Main View Area with Fluid Spring Tab Switch Transitions */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 relative z-10">
         
         {error && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-950/50 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-between">
+          <div className="mb-6 p-4 rounded-2xl bg-rose-950/50 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-between shadow-lg">
             <span>{error}</span>
             <button
               onClick={() => window.location.reload()}
@@ -122,48 +129,74 @@ const AppContent: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 1: Explorer */}
-        {activeTab === 'explorer' && (
-          <div className="animate-in fade-in duration-300">
-            <MonkesExplorer
-              monkes={monkes}
-              loading={loading}
-              onOpenInGif={handleOpenInGif}
-              onOpenInSanta={handleOpenInSanta}
-              onToast={addToast}
-            />
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {/* Tab 1: Explorer */}
+          {activeTab === 'explorer' && (
+            <motion.div
+              key="explorer"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <MonkesExplorer
+                monkes={monkes}
+                loading={loading}
+                onOpenInGif={handleOpenInGif}
+                onOpenInSanta={handleOpenInSanta}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
 
-        {/* Tab 2: GIF Studio */}
-        {activeTab === 'gif' && (
-          <div className="animate-in fade-in duration-300">
-            <GifStudio
-              initialMonkeId={targetMonkeId}
-              monkes={monkes}
-              onToast={addToast}
-            />
-          </div>
-        )}
+          {/* Tab 2: GIF Studio */}
+          {activeTab === 'gif' && (
+            <motion.div
+              key="gif"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <GifStudio
+                initialMonkeId={targetMonkeId}
+                monkes={monkes}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
 
-        {/* Tab 3: DIY Studio */}
-        {activeTab === 'diy' && (
-          <div className="animate-in fade-in duration-300">
-            <DiyStudio onToast={addToast} />
-          </div>
-        )}
+          {/* Tab 3: DIY Studio */}
+          {activeTab === 'diy' && (
+            <motion.div
+              key="diy"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <DiyStudio onToast={addToast} />
+            </motion.div>
+          )}
 
-        {/* Tab 4: Santa Monkes */}
-        {activeTab === 'santa' && (
-          <div className="animate-in fade-in duration-300">
-            <SantaStudio
-              initialMonkeId={targetMonkeId}
-              monkes={monkes}
-              onOpenInGif={handleOpenInGif}
-              onToast={addToast}
-            />
-          </div>
-        )}
+          {/* Tab 4: Santa Monkes */}
+          {activeTab === 'santa' && (
+            <motion.div
+              key="santa"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <SantaStudio
+                initialMonkeId={targetMonkeId}
+                monkes={monkes}
+                onOpenInGif={handleOpenInGif}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </main>
 

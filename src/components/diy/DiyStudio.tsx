@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Paintbrush, Download, Shuffle, RefreshCw, Check } from 'lucide-react';
+import { motion } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import { clsx } from 'clsx';
 import { BODY_COLORS, PRESET_COLORS } from '../../utils/constants';
 import { useLanguage } from '../../utils/i18n';
@@ -53,7 +55,6 @@ const RESOLUTION_OPTIONS = [
   { label: '4096px (4K)', value: 4096 },
 ];
 
-// Helper to load layer image for canvas export with cache-buster
 function loadCanvasImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -76,7 +77,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     Head: '',
   });
 
-  // Background State Mode
   const [bgMode, setBgMode] = useState<BgModeType>('transparent');
   const [customColor, setCustomColor] = useState<string>('#310000');
   const [saveResolution, setSaveResolution] = useState<number>(1008);
@@ -92,7 +92,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     peer: { Body: [], Earring: [], Eyes: [], Head: [] },
   });
 
-  // Calculate dynamic background color based on mode
   const currentBgColor = useMemo(() => {
     if (bgMode === 'transparent') return 'transparent';
     if (bgMode === 'orange') return '#F97316';
@@ -107,12 +106,11 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
           }
         }
       }
-      return '#FFAA01'; // Default fallback
+      return '#FFAA01';
     }
     return 'transparent';
   }, [bgMode, customColor, selectedParts.Body]);
 
-  // 1. Fetch Metadata and Build Component Lists
   useEffect(() => {
     let mounted = true;
 
@@ -159,7 +157,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
               url: `${BASE_URLS[series]}/${category.toLowerCase()}/${value}.png`,
             }));
 
-            // Add 'None' option
             if (['Earring', 'Eyes'].includes(category) || (category === 'Head' && series === 'normal')) {
               parts.unshift({ value: 'None', url: 'none' });
             }
@@ -171,7 +168,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
         if (!mounted) return;
         setComponents(newComponents);
 
-        // Initial randomize
         const initialParts: Record<CategoryType, string> = {
           Body: '',
           Earring: '',
@@ -207,7 +203,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     };
   }, []);
 
-  // Select a part
   const selectPart = (category: CategoryType, src: string) => {
     setSelectedParts((prev) => ({
       ...prev,
@@ -215,7 +210,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     }));
   };
 
-  // Switch Series
   const setActiveSeriesHandler = (series: SeriesType) => {
     setActiveSeries(series);
     if (!SERIES_COMPONENTS[series].includes(activeCategory)) {
@@ -230,7 +224,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     });
   };
 
-  // Randomize
   const randomize = () => {
     const newParts: Record<CategoryType, string> = {
       Body: '',
@@ -260,7 +253,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     setSelectedParts(newParts);
   };
 
-  // Save Avatar
   const saveAvatar = async () => {
     setSaving(true);
     try {
@@ -273,13 +265,11 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
       canvas.height = size;
       ctx.imageSmoothingEnabled = false;
 
-      // Draw background
       if (currentBgColor && currentBgColor !== 'transparent') {
         ctx.fillStyle = currentBgColor;
         ctx.fillRect(0, 0, size, size);
       }
 
-      // Draw layers in order: Body -> Earring -> Eyes -> Head
       for (const category of CATEGORIES) {
         const imgSrc = selectedParts[category];
         if (imgSrc && imgSrc !== 'none') {
@@ -298,6 +288,14 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 100);
+
+        // Confetti Celebration
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#10B981', '#34D399', '#F59E0B', '#6EE7B7'],
+        });
 
         onToast(t.diySuccess, `${t.diySuccessDesc} (${size} × ${size})`, 'success');
         setSaving(false);
@@ -324,31 +322,30 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     <div className="max-w-6xl mx-auto space-y-6">
       
       {/* Title Header */}
-      <div className="text-center space-y-1.5">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-semibold">
+      <div className="text-center space-y-2 px-2">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-semibold shadow-sm">
           <Paintbrush className="w-3.5 h-3.5" />
           <span>{t.diyBadge}</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">
           {t.diyTitle}
         </h1>
-        <p className="text-slate-400 text-sm max-w-xl mx-auto font-sans">
+        <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto font-sans">
           {t.diySub}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Side: Original 4-Layer DOM Preview & Action Buttons */}
+        {/* Left Side: 4-Layer DOM Preview & Action Buttons */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl space-y-4">
+          <div className="glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl space-y-4">
             
-            {/* ⭐️ EXACT Original Preview Container with 4 stacked <img> tags (Native 0-CORS) */}
+            {/* Preview Container */}
             <div 
               className="relative w-full aspect-square rounded-2xl border border-white/10 overflow-hidden shadow-inner flex items-center justify-center transition-colors"
               style={{ backgroundColor: currentBgColor }}
             >
-              {/* Checkerboard Pattern for transparent bg */}
               {currentBgColor === 'transparent' && (
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]" />
               )}
@@ -396,39 +393,41 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 </div>
               )}
 
-              <div className="absolute top-3 left-3 z-50 flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[11px] font-mono text-slate-300">
+              <div className="absolute top-3 left-3 z-50 flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[11px] font-mono text-slate-300 shadow-md">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>{activeSeriesLabel} {t.diySeriesSuffix}</span>
               </div>
             </div>
 
-            {/* Quick Actions (Save & Randomize) */}
-            <div className="space-y-2.5">
+            {/* Quick Actions */}
+            <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2.5">
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={randomize}
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs transition-all shadow-md active:scale-95"
+                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs transition-all shadow-md"
                 >
                   <Shuffle className="w-4 h-4 text-emerald-400" />
                   <span>{t.diyRandomBtn}</span>
-                </button>
+                </motion.button>
 
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={saveAvatar}
                   disabled={loading || saving}
-                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 transition-all"
                 >
                   {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   <span>{saving ? t.diySavingBtn : `${t.diySaveBtn} (${saveResolution}px)`}</span>
-                </button>
+                </motion.button>
               </div>
 
               {/* Resolution Options Selector */}
-              <div className="flex items-center justify-between gap-1 p-1 bg-slate-900/80 rounded-xl border border-white/5 text-[11px] font-mono">
-                <span className="text-slate-400 px-2">{t.diyResTitle}</span>
+              <div className="flex flex-wrap items-center justify-between gap-1 p-1 bg-slate-950/60 rounded-2xl border border-white/5 text-[11px] font-mono shadow-inner">
+                <span className="text-slate-400 px-2 font-medium">{t.diyResTitle}</span>
                 <div className="flex items-center gap-1">
                   {RESOLUTION_OPTIONS.map((r) => (
                     <button
@@ -436,9 +435,9 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                       type="button"
                       onClick={() => setSaveResolution(r.value)}
                       className={clsx(
-                        'px-2 py-1 rounded-lg transition-all',
+                        'px-2.5 py-1 rounded-xl transition-all font-semibold',
                         saveResolution === r.value
-                          ? 'bg-emerald-500 text-slate-950 font-bold shadow'
+                          ? 'bg-emerald-500 text-slate-950 shadow-sm'
                           : 'text-slate-400 hover:text-white'
                       )}
                     >
@@ -449,9 +448,9 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
               </div>
             </div>
 
-            {/* Background Selector Buttons */}
-            <div className="space-y-2 pt-3 border-t border-white/5">
-              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+            {/* Background Selector */}
+            <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block font-bold">
                 {t.diyBgTitle}
               </span>
               <div className="grid grid-cols-4 gap-1.5">
@@ -459,10 +458,10 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                   type="button"
                   onClick={() => setBgMode('transparent')}
                   className={clsx(
-                    'py-2 px-1 rounded-lg text-xs font-medium border transition-all text-center',
+                    'py-2 px-1 rounded-xl text-xs font-medium border transition-all text-center',
                     bgMode === 'transparent'
-                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow'
-                      : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-sm'
+                      : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                   )}
                 >
                   {t.diyBgNone}
@@ -472,10 +471,10 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                   type="button"
                   onClick={() => setBgMode('orange')}
                   className={clsx(
-                    'py-2 px-1 rounded-lg text-xs font-medium border transition-all text-center',
+                    'py-2 px-1 rounded-xl text-xs font-medium border transition-all text-center',
                     bgMode === 'orange'
-                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow'
-                      : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-sm'
+                      : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                   )}
                 >
                   {t.diyBgOrange}
@@ -485,10 +484,10 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                   type="button"
                   onClick={() => setBgMode('auto')}
                   className={clsx(
-                    'py-2 px-1 rounded-lg text-xs font-medium border transition-all text-center',
+                    'py-2 px-1 rounded-xl text-xs font-medium border transition-all text-center',
                     bgMode === 'auto'
-                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow'
-                      : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-sm'
+                      : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                   )}
                 >
                   {t.diyBgAuto}
@@ -499,10 +498,10 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                     type="button"
                     onClick={() => setBgMode('custom')}
                     className={clsx(
-                      'w-full py-2 px-1 rounded-lg text-xs font-medium border transition-all text-center relative overflow-hidden flex items-center justify-center',
+                      'w-full py-2 px-1 rounded-xl text-xs font-medium border transition-all text-center relative overflow-hidden flex items-center justify-center',
                       bgMode === 'custom'
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow'
-                        : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-sm'
+                        : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                     )}
                   >
                     <span>{t.diyBgCustom}</span>
@@ -520,7 +519,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
               </div>
 
               {bgMode === 'custom' && (
-                <div className="p-2 rounded-xl bg-slate-900/80 border border-white/5 flex items-center gap-2 flex-wrap animate-in fade-in">
+                <div className="p-2.5 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center gap-2 flex-wrap animate-in fade-in">
                   {PRESET_COLORS.map((c) => (
                     <button
                       key={c.value}
@@ -531,7 +530,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                       }}
                       title={c.name}
                       className={clsx(
-                        'w-6 h-6 rounded-md border transition-transform',
+                        'w-6 h-6 rounded-lg border transition-transform',
                         customColor.toLowerCase() === c.value.toLowerCase()
                           ? 'scale-110 ring-2 ring-emerald-400 border-white'
                           : 'border-white/20 hover:scale-105'
@@ -544,8 +543,8 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
             </div>
 
             {/* Series Buttons */}
-            <div className="space-y-2 pt-3 border-t border-white/5">
-              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+            <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block font-bold">
                 {t.diySeriesTitle}
               </span>
               <div className="grid grid-cols-5 gap-1.5">
@@ -557,8 +556,8 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                     className={clsx(
                       'py-2 rounded-xl text-xs font-mono font-semibold transition-all text-center border',
                       activeSeries === s.id
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-lg shadow-emerald-500/20 scale-[1.02]'
-                        : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md shadow-emerald-500/20 scale-[1.02]'
+                        : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
                     )}
                   >
                     {lang === 'zh' ? s.zh : s.en}
@@ -571,10 +570,10 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
         </div>
 
         {/* Right Side: Category Tabs & Trait Parts Grid */}
-        <div className="lg:col-span-7 glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl flex flex-col min-h-[580px]">
+        <div className="lg:col-span-7 glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl flex flex-col min-h-[580px]">
           
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-2xl border border-white/10 mb-4">
+          {/* Category Tabs with Fluid Indicator */}
+          <div className="relative flex items-center gap-1.5 p-1 bg-slate-950/70 rounded-2xl border border-white/10 mb-4 shadow-inner">
             {CATEGORIES.map((cat) => {
               const isSupported = SERIES_COMPONENTS[activeSeries].includes(cat);
               const isActive = activeCategory === cat;
@@ -586,15 +585,20 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                   onClick={() => isSupported && setActiveCategory(cat)}
                   disabled={!isSupported}
                   className={clsx(
-                    'flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-center',
+                    'relative flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-center select-none z-10',
                     !isSupported && 'opacity-30 cursor-not-allowed text-slate-600',
-                    isActive
-                      ? 'bg-emerald-500 text-slate-950 shadow-md font-bold'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
                   )}
                 >
-                  <span>{getCategoryLabel(cat)}</span>
-                  {!isSupported && <span className="text-[10px] ml-1 opacity-60">({lang === 'zh' ? '无' : 'N/A'})</span>}
+                  {isActive && (
+                    <motion.div
+                      layoutId="diyCategoryPill"
+                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                      className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-xl shadow-md"
+                    />
+                  )}
+                  <span className="relative z-10">{getCategoryLabel(cat)}</span>
+                  {!isSupported && <span className="relative z-10 text-[10px] ml-1 opacity-60">({lang === 'zh' ? '无' : 'N/A'})</span>}
                 </button>
               );
             })}
@@ -617,17 +621,18 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                   const isNone = part.url === 'none';
 
                   return (
-                    <div
+                    <motion.div
                       key={part.value}
+                      whileHover={{ scale: 1.04, y: -2 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => selectPart(activeCategory, part.url)}
                       className={clsx(
                         'aspect-square rounded-2xl p-2 cursor-pointer transition-all duration-200 flex flex-col items-center justify-between border group relative overflow-hidden',
                         isSelected
-                          ? 'bg-emerald-950/60 border-emerald-400 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/20 scale-[1.03]'
-                          : 'bg-slate-900/60 border-white/5 hover:border-emerald-500/40 hover:bg-slate-800/80 hover:-translate-y-0.5'
+                          ? 'bg-emerald-950/60 border-emerald-400 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/20'
+                          : 'bg-slate-950/40 border-white/5 hover:border-emerald-500/40 hover:bg-slate-900/80'
                       )}
                     >
-                      {/* Image Thumbnail or None Icon */}
                       <div className="w-full h-full flex items-center justify-center overflow-hidden p-1">
                         {isNone ? (
                           <div className="relative w-10 h-10 rounded-full border-2 border-dashed border-slate-500 flex items-center justify-center">
@@ -643,18 +648,20 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                         )}
                       </div>
 
-                      {/* Label */}
                       <span className="text-[10px] text-center font-sans text-slate-300 truncate w-full px-1">
                         {isNone ? (lang === 'zh' ? '无' : 'None') : part.value}
                       </span>
 
-                      {/* Selected Indicator Check */}
                       {isSelected && (
-                        <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow">
+                        <motion.span 
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow"
+                        >
                           <Check className="w-3 h-3 stroke-[3]" />
-                        </span>
+                        </motion.span>
                       )}
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>

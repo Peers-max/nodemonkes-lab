@@ -6,16 +6,19 @@ export const Footer: React.FC = () => {
   const { t } = useLanguage();
 
   return (
-    <footer className="w-full border-t border-white/5 bg-[#080B10] py-8 mt-16 text-slate-400 text-xs">
+    <footer className="w-full border-t border-white/[0.06] bg-[#07090E]/90 py-8 mt-16 text-slate-400 text-xs backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
         
         <div className="flex items-center gap-2">
-          <span className="font-extrabold text-white tracking-tight">NODEMONKES SUITE</span>
+          <span className="font-extrabold text-white tracking-tight">NODEMONKES</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold">
+            LAB
+          </span>
           <span>•</span>
           <span>{t.footerDesc}</span>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 font-mono text-xs">
           <a
             href="https://www.satflow.com/ordinals/nodemonkes"
             target="_blank"
