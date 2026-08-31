@@ -220,17 +220,24 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
     (selectedEyes !== 'all' ? 1 : 0) + 
     (selectedEarring !== 'all' ? 1 : 0);
 
-  const handleLaunchScreensaver = (startIndex: number = 0) => {
+  const handleLaunchScreensaver = async (startIndex: number = 0) => {
+    setTheatreIndex(startIndex);
     try {
       const el = document.documentElement as any;
-      const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || el.mozRequestFullScreen;
-      if (rfs && !document.fullscreenElement) {
-        rfs.call(el).catch((err: any) => console.log('Fullscreen request notice:', err));
+      if (!document.fullscreenElement) {
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+          await el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+          await el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+          await el.msRequestFullscreen();
+        }
       }
     } catch (e) {
-      console.warn('Fullscreen call error:', e);
+      console.warn('Fullscreen call note:', e);
     }
-    setTheatreIndex(startIndex);
   };
 
   const resetAllFilters = () => {

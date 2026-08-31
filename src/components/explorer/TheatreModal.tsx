@@ -291,20 +291,20 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             <ChevronLeft className="w-8 h-8" />
           </motion.button>
 
-          {/* Monke Image Stage - Expanded for true full screen canvas */}
+          {/* Monke Image Stage - Giant cinematic pixel art filling 86% of viewport height */}
           <div className="relative z-10 flex flex-col items-center justify-center">
             <motion.div
               key={currentMonke.id}
-              initial={{ opacity: 0, scale: 0.93, filter: 'blur(8px)' }}
+              initial={{ opacity: 0, scale: 0.94, filter: 'blur(8px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.93, filter: 'blur(8px)' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-              className="w-[min(80vw,min(75vh,640px))] h-[min(80vw,min(75vh,640px))] rounded-3xl bg-black/50 border border-white/10 p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.95)] flex items-center justify-center backdrop-blur-md"
+              exit={{ opacity: 0, scale: 0.94, filter: 'blur(8px)' }}
+              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+              className="w-[min(90vw,86vh)] h-[min(90vw,86vh)] max-w-[1200px] max-h-[1200px] flex items-center justify-center p-0 select-none"
             >
               <img
                 src={getMonkeImageUrl(currentMonke.id)}
                 alt={`NodeMonke #${currentMonke.id}`}
-                className="w-full h-full object-contain pixelated filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]"
+                className="w-full h-full object-contain pixelated filter drop-shadow-[0_20px_60px_rgba(0,0,0,0.95)] transition-transform duration-300"
               />
             </motion.div>
           </div>
