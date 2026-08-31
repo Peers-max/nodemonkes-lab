@@ -101,8 +101,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         ctx.fillRect(0, 0, w, h);
 
         const radial = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, Math.max(w, h) * 0.6);
-        radial.addColorStop(0, 'rgba(245, 158, 11, 0.22)');
-        radial.addColorStop(0.5, 'rgba(234, 88, 12, 0.08)');
+        radial.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+        radial.addColorStop(0.5, 'rgba(234, 88, 12, 0.10)');
         radial.addColorStop(1, 'transparent');
         ctx.fillStyle = radial;
         ctx.fillRect(0, 0, w, h);
@@ -114,13 +114,13 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         ctx.fillRect(0, 0, w, h);
 
         const rad1 = ctx.createRadialGradient(w * 0.2, h * 0.3, 20, w * 0.2, h * 0.3, w * 0.5);
-        rad1.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
+        rad1.addColorStop(0, 'rgba(168, 85, 247, 0.22)');
         rad1.addColorStop(1, 'transparent');
         ctx.fillStyle = rad1;
         ctx.fillRect(0, 0, w, h);
 
         const rad2 = ctx.createRadialGradient(w * 0.8, h * 0.7, 20, w * 0.8, h * 0.7, w * 0.5);
-        rad2.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+        rad2.addColorStop(0, 'rgba(6, 182, 212, 0.22)');
         rad2.addColorStop(1, 'transparent');
         ctx.fillStyle = rad2;
         ctx.fillRect(0, 0, w, h);
@@ -132,14 +132,14 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         ctx.fillRect(0, 0, w, h);
 
         const rad = ctx.createRadialGradient(w / 2, h * 0.4, 50, w / 2, h * 0.4, w * 0.5);
-        rad.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
+        rad.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
         rad.addColorStop(1, 'transparent');
         ctx.fillStyle = rad;
         ctx.fillRect(0, 0, w, h);
       } else if (theme === 'minimal') {
         const bgGrad = ctx.createLinearGradient(0, 0, w, h);
-        bgGrad.addColorStop(0, '#12151C');
-        bgGrad.addColorStop(1, '#090B0F');
+        bgGrad.addColorStop(0, '#141822');
+        bgGrad.addColorStop(1, '#080A0E');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
       } else {
@@ -167,92 +167,161 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
         ctx.imageSmoothingEnabled = false;
 
-        // 3. Render Monkes based on Layout and Mode
+        // Helper function to draw images in REVERSE order (from Right to Left)
+        // so the leftmost monke is drawn LAST (on TOP, overlapping to the right - PEER style)
+        const drawSquadReversed = (positions: { img: HTMLImageElement; x: number; y: number; size: number }[]) => {
+          for (let i = positions.length - 1; i >= 0; i--) {
+            const p = positions[i];
+            ctx.drawImage(p.img, p.x, p.y, p.size, p.size);
+          }
+        };
+
+        // 3. Render Monkes based on Layout with enlarged sizes and left-on-top overlapping
         if (layout === 'banner') {
-          // Twitter Banner 3:1 (1500 x 500)
-          const imgSize = 280;
-          const startY = (h - imgSize) / 2 - 20;
+          // Twitter Banner 3:1 (1500 x 500) - Enlarged and bold
+          const imgSize = 390;
+          const startY = (h - imgSize) / 2 + 10;
 
           if (activeIds.length === 1) {
-            ctx.drawImage(loadedImgs[0], w * 0.65, startY, imgSize, imgSize);
+            ctx.drawImage(loadedImgs[0], w * 0.68, startY, imgSize, imgSize);
           } else if (activeIds.length === 2) {
-            ctx.drawImage(loadedImgs[0], w * 0.52, startY, imgSize, imgSize);
-            ctx.drawImage(loadedImgs[1], w * 0.74, startY, imgSize, imgSize);
+            const pos = [
+              { img: loadedImgs[0], x: w * 0.55, y: startY, size: imgSize },
+              { img: loadedImgs[1], x: w * 0.74, y: startY, size: imgSize },
+            ];
+            drawSquadReversed(pos);
           } else {
-            const spacing = (w * 0.55) / activeIds.length;
-            const startX = w * 0.42;
-            loadedImgs.forEach((img, idx) => {
-              ctx.drawImage(img, startX + idx * spacing, startY, imgSize * 0.9, imgSize * 0.9);
-            });
+            // 5-Monke Squad with Left-Over-Right overlap
+            const spacing = 135;
+            const startX = w * 0.44;
+            const pos = loadedImgs.map((img, idx) => ({
+              img,
+              x: startX + idx * spacing,
+              y: startY,
+              size: imgSize,
+            }));
+            drawSquadReversed(pos);
           }
 
-          // Typography Left-Aligned
+          // Typography Left-Aligned with grand contrast
           ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 48px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-          ctx.fillText(headline, 90, h / 2 - 10);
+          ctx.font = '900 52px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillText(headline, 80, h / 2 - 14);
 
-          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : theme === 'emerald' ? '#10B981' : '#94A3B8';
-          ctx.font = '700 18px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-          ctx.fillText(subheadline, 90, h / 2 + 36);
+          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : theme === 'emerald' ? '#10B981' : theme === 'cyber' ? '#C084FC' : '#94A3B8';
+          ctx.font = '700 20px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+          ctx.fillText(subheadline, 80, h / 2 + 36);
 
           ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.font = '600 13px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText('NODE MONKES • BITCOIN LAYER 1', 90, h / 2 + 75);
+          ctx.font = '600 14px ui-monospace, SFMono-Regular, monospace';
+          ctx.fillText('NODE MONKES • BITCOIN LAYER 1', 80, h / 2 + 78);
         } else if (layout === 'wallpaper') {
-          // Phone Wallpaper 9:16 (1080 x 1920)
-          const imgSize = 440;
-          const centerY = h * 0.48;
+          // Phone Wallpaper 9:16 (1080 x 1920) - Grand scale
+          const imgSize = activeIds.length === 1 ? 680 : 540;
+          const centerY = h * 0.44;
 
           if (activeIds.length === 1) {
             ctx.drawImage(loadedImgs[0], (w - imgSize) / 2, centerY - imgSize / 2, imgSize, imgSize);
+          } else if (activeIds.length === 2) {
+            const pos = [
+              { img: loadedImgs[0], x: w * 0.18, y: centerY - imgSize / 2, size: imgSize },
+              { img: loadedImgs[1], x: w * 0.46, y: centerY - imgSize / 2 + 30, size: imgSize },
+            ];
+            drawSquadReversed(pos);
           } else {
-            const spacing = 180;
-            const startX = (w - (activeIds.length * spacing)) / 2;
-            loadedImgs.forEach((img, idx) => {
-              ctx.drawImage(img, startX + idx * spacing - 50, centerY - imgSize / 2 + (idx % 2 === 1 ? 50 : -30), imgSize * 0.7, imgSize * 0.7);
-            });
+            const spacing = 140;
+            const startX = (w - (activeIds.length * spacing + (imgSize - spacing))) / 2;
+            const pos = loadedImgs.map((img, idx) => ({
+              img,
+              x: startX + idx * spacing,
+              y: centerY - imgSize / 2 + (idx % 2 === 1 ? 40 : -20),
+              size: imgSize,
+            }));
+            drawSquadReversed(pos);
           }
 
           // Typography
           ctx.textAlign = 'center';
           ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 56px -apple-system, BlinkMacSystemFont, sans-serif';
-          ctx.fillText(headline, w / 2, h * 0.78);
+          ctx.font = '900 64px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillText(headline, w / 2, h * 0.76);
 
           ctx.fillStyle = theme === 'btc' ? '#F59E0B' : '#94A3B8';
-          ctx.font = '700 22px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText(subheadline, w / 2, h * 0.83);
+          ctx.font = '700 24px ui-monospace, SFMono-Regular, monospace';
+          ctx.fillText(subheadline, w / 2, h * 0.81);
 
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.font = '600 16px ui-monospace, SFMono-Regular, monospace';
-          ctx.fillText('ORDINALS INSCRIPTION ART • 2026', w / 2, h * 0.88);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+          ctx.font = '600 17px ui-monospace, SFMono-Regular, monospace';
+          ctx.fillText('ORDINALS INSCRIPTION ART • 2026', w / 2, h * 0.86);
           ctx.textAlign = 'start';
-        } else {
-          // Square 1:1 (1200 x 1200) or Cinema 16:9 (1920 x 1080)
-          const imgSize = layout === 'square' ? 480 : 420;
-          const centerY = layout === 'square' ? h * 0.45 : h * 0.45;
+        } else if (layout === 'cinema') {
+          // Cinema 16:9 (1920 x 1080) - Cinematic widescreen scale
+          const imgSize = activeIds.length === 1 ? 620 : 540;
+          const centerY = h * 0.42;
 
           if (activeIds.length === 1) {
             ctx.drawImage(loadedImgs[0], (w - imgSize) / 2, centerY - imgSize / 2, imgSize, imgSize);
           } else if (activeIds.length === 2) {
-            ctx.drawImage(loadedImgs[0], w * 0.28 - imgSize / 2, centerY - imgSize / 2, imgSize, imgSize);
-            ctx.drawImage(loadedImgs[1], w * 0.72 - imgSize / 2, centerY - imgSize / 2, imgSize, imgSize);
+            const pos = [
+              { img: loadedImgs[0], x: w * 0.32 - imgSize / 2, y: centerY - imgSize / 2, size: imgSize },
+              { img: loadedImgs[1], x: w * 0.68 - imgSize / 2, y: centerY - imgSize / 2, size: imgSize },
+            ];
+            drawSquadReversed(pos);
           } else {
-            const spacing = (w * 0.8) / activeIds.length;
-            const startX = w * 0.12;
-            loadedImgs.forEach((img, idx) => {
-              ctx.drawImage(img, startX + idx * spacing, centerY - imgSize / 2, imgSize * 0.75, imgSize * 0.75);
-            });
+            const spacing = 190;
+            const startX = (w - (activeIds.length * spacing + (imgSize - spacing))) / 2;
+            const pos = loadedImgs.map((img, idx) => ({
+              img,
+              x: startX + idx * spacing,
+              y: centerY - imgSize / 2,
+              size: imgSize,
+            }));
+            drawSquadReversed(pos);
           }
 
           // Typography Centered at Bottom
           ctx.textAlign = 'center';
           ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 52px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.font = '900 58px -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.fillText(headline, w / 2, h * 0.82);
 
           ctx.fillStyle = theme === 'btc' ? '#F59E0B' : '#94A3B8';
-          ctx.font = '700 20px ui-monospace, SFMono-Regular, monospace';
+          ctx.font = '700 22px ui-monospace, SFMono-Regular, monospace';
+          ctx.fillText(subheadline, w / 2, h * 0.88);
+          ctx.textAlign = 'start';
+        } else {
+          // Square 1:1 (1200 x 1200) - Maximum visual impact
+          const imgSize = activeIds.length === 1 ? 680 : 520;
+          const centerY = h * 0.42;
+
+          if (activeIds.length === 1) {
+            ctx.drawImage(loadedImgs[0], (w - imgSize) / 2, centerY - imgSize / 2, imgSize, imgSize);
+          } else if (activeIds.length === 2) {
+            const pos = [
+              { img: loadedImgs[0], x: w * 0.28 - imgSize / 2, y: centerY - imgSize / 2, size: imgSize },
+              { img: loadedImgs[1], x: w * 0.72 - imgSize / 2, y: centerY - imgSize / 2, size: imgSize },
+            ];
+            drawSquadReversed(pos);
+          } else {
+            const spacing = 135;
+            const startX = (w - (activeIds.length * spacing + (imgSize - spacing))) / 2;
+            const pos = loadedImgs.map((img, idx) => ({
+              img,
+              x: startX + idx * spacing,
+              y: centerY - imgSize / 2,
+              size: imgSize,
+            }));
+            drawSquadReversed(pos);
+          }
+
+          // Typography Centered at Bottom
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '900 54px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillText(headline, w / 2, h * 0.82);
+
+          ctx.fillStyle = theme === 'btc' ? '#F59E0B' : '#94A3B8';
+          ctx.font = '700 21px ui-monospace, SFMono-Regular, monospace';
           ctx.fillText(subheadline, w / 2, h * 0.88);
           ctx.textAlign = 'start';
         }
