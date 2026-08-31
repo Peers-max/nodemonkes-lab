@@ -116,7 +116,55 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     setSheen((s) => ({ ...s, opacity: 0 }));
   };
 
-  // High-Res 2D Canvas Export
+  // Helper to draw rounded rectangle
+  const drawRoundRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+  ) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
+  // Helper to draw Twitter/Web3 Verified Badge
+  const drawVerifiedBadge = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: number
+  ) => {
+    ctx.save();
+    ctx.fillStyle = '#38BDF8';
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White Checkmark
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = size * 0.16;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + size * 0.28, y + size * 0.52);
+    ctx.lineTo(x + size * 0.44, y + size * 0.68);
+    ctx.lineTo(x + size * 0.72, y + size * 0.34);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // 1:1 Pixel-Perfect High-Res 2D Canvas Export
   const handleExport = useCallback(async () => {
     try {
       setIsExporting(true);
@@ -124,120 +172,407 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const w = 1200;
-      const h = 760;
+      // 2K Ultra HD Dimensions (Aspect 1.58 : 1)
+      const w = 1264;
+      const h = 800;
       canvas.width = w;
       canvas.height = h;
 
-      // Background Luxury Gradient
-      const grad = ctx.createLinearGradient(0, 0, w, h);
+      const padding = 16;
+      const cardX = padding;
+      const cardY = padding;
+      const cardW = w - padding * 2;
+      const cardH = h - padding * 2;
+      const outerRadius = 40;
+      const innerRadius = 32;
+      const borderWidth = 10;
+
+      // 1. Draw Outer Glowing Metallic Border
+      const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
       if (cardTheme === 'gold') {
-        grad.addColorStop(0, '#1E1503');
-        grad.addColorStop(0.5, '#332205');
-        grad.addColorStop(1, '#120C02');
+        borderGrad.addColorStop(0, '#FDE047');
+        borderGrad.addColorStop(0.5, '#F59E0B');
+        borderGrad.addColorStop(1, '#FEF08A');
       } else if (cardTheme === 'cyber') {
-        grad.addColorStop(0, '#0F0728');
-        grad.addColorStop(0.5, '#1A0B3B');
-        grad.addColorStop(1, '#080318');
+        borderGrad.addColorStop(0, '#C084FC');
+        borderGrad.addColorStop(0.5, '#22D3EE');
+        borderGrad.addColorStop(1, '#EC4899');
       } else if (cardTheme === 'matrix') {
-        grad.addColorStop(0, '#02180C');
-        grad.addColorStop(0.5, '#042815');
-        grad.addColorStop(1, '#010E07');
+        borderGrad.addColorStop(0, '#34D399');
+        borderGrad.addColorStop(0.5, '#22C55E');
+        borderGrad.addColorStop(1, '#5EEAD4');
       } else if (cardTheme === 'sunset') {
-        grad.addColorStop(0, '#1A081E');
-        grad.addColorStop(0.5, '#2C0D23');
-        grad.addColorStop(1, '#120417');
+        borderGrad.addColorStop(0, '#FB7185');
+        borderGrad.addColorStop(0.5, '#F59E0B');
+        borderGrad.addColorStop(1, '#6366F1');
       } else {
-        grad.addColorStop(0, '#0C0A09');
-        grad.addColorStop(0.5, '#1C1917');
-        grad.addColorStop(1, '#0A0A0A');
+        // obsidian
+        borderGrad.addColorStop(0, '#FBBF24');
+        borderGrad.addColorStop(0.5, '#D97706');
+        borderGrad.addColorStop(1, '#FDE68A');
       }
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
 
-      // Card Metallic Border
-      ctx.lineWidth = 14;
-      const borderGrad = ctx.createLinearGradient(0, 0, w, h);
-      borderGrad.addColorStop(0, '#F59E0B');
-      borderGrad.addColorStop(0.5, '#EC4899');
-      borderGrad.addColorStop(1, '#3B82F6');
-      ctx.strokeStyle = borderGrad;
-      ctx.strokeRect(10, 10, w - 20, h - 20);
+      ctx.save();
+      drawRoundRect(ctx, cardX, cardY, cardW, cardH, outerRadius);
+      ctx.fillStyle = borderGrad;
+      ctx.fill();
+      ctx.restore();
 
-      // Load Monke Avatar
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = getMonkeImageUrl(currentMonke.id);
-      await new Promise((res) => {
-        img.onload = res;
-        img.onerror = res;
-      });
+      // 2. Draw Card Inner Background
+      const innerX = cardX + borderWidth;
+      const innerY = cardY + borderWidth;
+      const innerW = cardW - borderWidth * 2;
+      const innerH = cardH - borderWidth * 2;
 
-      // Draw Avatar Box
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(60, 130, 480, 480);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(60, 130, 480, 480);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 70, 140, 460, 460);
+      const innerGrad = ctx.createLinearGradient(innerX, innerY, innerX + innerW, innerY + innerH);
+      if (cardTheme === 'gold') {
+        innerGrad.addColorStop(0, '#1E1503');
+        innerGrad.addColorStop(0.5, '#332205');
+        innerGrad.addColorStop(1, '#120C02');
+      } else if (cardTheme === 'cyber') {
+        innerGrad.addColorStop(0, '#0F0728');
+        innerGrad.addColorStop(0.5, '#1A0B3B');
+        innerGrad.addColorStop(1, '#080318');
+      } else if (cardTheme === 'matrix') {
+        innerGrad.addColorStop(0, '#02180C');
+        innerGrad.addColorStop(0.5, '#042815');
+        innerGrad.addColorStop(1, '#010E07');
+      } else if (cardTheme === 'sunset') {
+        innerGrad.addColorStop(0, '#1A081E');
+        innerGrad.addColorStop(0.5, '#2C0D23');
+        innerGrad.addColorStop(1, '#120417');
+      } else {
+        // obsidian
+        innerGrad.addColorStop(0, '#0C0A09');
+        innerGrad.addColorStop(0.5, '#1C1917');
+        innerGrad.addColorStop(1, '#0A0A0A');
+      }
 
-      // Header Texts
-      ctx.fillStyle = '#F59E0B';
-      ctx.font = 'bold 36px monospace';
-      ctx.fillText('⚡ NODEMONKES PASSPORT', 60, 80);
+      ctx.save();
+      drawRoundRect(ctx, innerX, innerY, innerW, innerH, innerRadius);
+      ctx.fillStyle = innerGrad;
+      ctx.fill();
+      ctx.clip(); // Clip everything strictly inside inner surface
 
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'bold 22px monospace';
-      ctx.fillText('BITCOIN ORDINALS AUTHENTICATED ID', 700, 80);
+      if (!isFlipped) {
+        // ================= FRONT FACE (1:1 UI MATCH) =================
 
-      // Info Rows
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 54px monospace';
-      ctx.fillText(`NodeMonke #${currentMonke.id}`, 580, 190);
+        // A. Header (Top y: 55 ~ 115)
+        const headerY = innerY + 45;
 
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = 'bold 32px monospace';
-      ctx.fillText(`RANK #${currentMonke.rank || 'N/A'}  •  ${tier.label}`, 580, 245);
+        // Lightning Badge Box
+        drawRoundRect(ctx, innerX + 45, headerY, 44, 44, 12);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = '26px monospace';
-      ctx.fillText(`Inscription: #${currentMonke.inscription}`, 580, 310);
-      ctx.fillText(`Block Height: #${currentMonke.block}`, 580, 355);
-      ctx.fillText(`Owner: ${ownerHandle}`, 580, 410);
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = 'bold 22px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡', innerX + 67, headerY + 31);
 
-      ctx.fillStyle = '#38BDF8';
-      ctx.font = 'bold 28px monospace';
-      ctx.fillText(`[ ${customTitle} ]`, 580, 475);
+        // Header Title
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 26px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('NODEMONKES PASSPORT', innerX + 104, headerY + 32);
 
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'italic 22px sans-serif';
-      ctx.fillText(`"${customMotto}"`, 580, 535);
+        // Header Right Badges (Tier & Rank)
+        const tierBadgeW = 120;
+        const tierBadgeH = 34;
+        const tierBadgeX = innerX + innerW - 45 - tierBadgeW;
+        const tierBadgeY = headerY + 5;
 
-      // Traits List Bar
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fillRect(60, 640, 1080, 75);
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = 'bold 20px monospace';
-      const attrs = currentMonke.attributes;
-      ctx.fillText(`BODY: ${attrs.Body}  |  HEAD: ${attrs.Head}  |  EYES: ${attrs.Eyes}  |  EARRING: ${attrs.Earring}`, 85, 685);
+        const rankBadgeW = 125;
+        const rankBadgeH = 34;
+        const rankBadgeX = tierBadgeX - 12 - rankBadgeW;
+        const rankBadgeY = tierBadgeY;
+
+        // Rank Badge
+        drawRoundRect(ctx, rankBadgeX, rankBadgeY, rankBadgeW, rankBadgeH, 8);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = 'bold 15px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Rank #${currentMonke.rank || 'N/A'}`, rankBadgeX + rankBadgeW / 2, rankBadgeY + 23);
+
+        // Tier Badge
+        drawRoundRect(ctx, tierBadgeX, tierBadgeY, tierBadgeW, tierBadgeH, 17);
+        if (tier.label.includes('SSS')) {
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+          ctx.strokeStyle = '#FBBF24';
+        } else if (tier.label.includes('SS')) {
+          ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
+          ctx.strokeStyle = '#C084FC';
+        } else if (tier.label.includes('S')) {
+          ctx.fillStyle = 'rgba(6, 182, 212, 0.2)';
+          ctx.strokeStyle = '#22D3EE';
+        } else {
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+          ctx.strokeStyle = '#34D399';
+        }
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 14px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(tier.label, tierBadgeX + tierBadgeW / 2, tierBadgeY + 23);
+
+        // Header Divider Line
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(innerX + 45, headerY + 62);
+        ctx.lineTo(innerX + innerW - 45, headerY + 62);
+        ctx.stroke();
+
+        // B. Center Body (Avatar Left & Identity Right)
+        const bodyY = headerY + 95;
+        const avatarBoxSize = 390;
+        const avatarX = innerX + 50;
+
+        // Avatar Frame Box
+        drawRoundRect(ctx, avatarX, bodyY, avatarBoxSize, avatarBoxSize, 28);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Load & Draw Monke
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = getMonkeImageUrl(currentMonke.id);
+        await new Promise((res) => {
+          img.onload = res;
+          img.onerror = res;
+        });
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, avatarX + 20, bodyY + 20, avatarBoxSize - 40, avatarBoxSize - 40);
+
+        // Avatar Top-Left ID Badge (#209)
+        drawRoundRect(ctx, avatarX + 16, bodyY + 16, 76, 28, 8);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`#${currentMonke.id}`, avatarX + 16 + 38, bodyY + 16 + 19);
+
+        // Right Info Content
+        const infoX = avatarX + avatarBoxSize + 48;
+        let curInfoY = bodyY + 50;
+
+        // 1. Owner Handle & Verified Badge
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 40px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(ownerHandle, infoX, curInfoY);
+
+        const handleTextWidth = ctx.measureText(ownerHandle).width;
+        drawVerifiedBadge(ctx, infoX + handleTextWidth + 14, curInfoY - 30, 32);
+
+        // 2. Title Badge Pill
+        curInfoY += 38;
+        ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
+        const titleText = customTitle.toUpperCase();
+        const titleTextW = ctx.measureText(titleText).width;
+        const titleBoxW = titleTextW + 30;
+        const titleBoxH = 34;
+
+        drawRoundRect(ctx, infoX, curInfoY, titleBoxW, titleBoxH, 8);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FDE68A';
+        ctx.textAlign = 'center';
+        ctx.fillText(titleText, infoX + titleBoxW / 2, curInfoY + 23);
+
+        // 3. Info Metadata Rows
+        curInfoY += 68;
+        const rowLineH = 42;
+
+        // Inscription Row
+        ctx.textAlign = 'left';
+        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Inscription: ', infoX, curInfoY);
+        const inscLabelW = ctx.measureText('Inscription: ').width;
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`#${currentMonke.inscription}`, infoX + inscLabelW, curInfoY);
+
+        // Block Height Row
+        curInfoY += rowLineH;
+        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Block Height: ', infoX, curInfoY);
+        const blockLabelW = ctx.measureText('Block Height: ').width;
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`#${currentMonke.block}`, infoX + blockLabelW, curInfoY);
+
+        // Traits Count Row
+        curInfoY += rowLineH;
+        ctx.font = '22px "Space Mono", ui-monospace, monospace';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Traits: ', infoX, curInfoY);
+        const traitsLabelW = ctx.measureText('Traits: ').width;
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = 'bold 22px "Space Mono", ui-monospace, monospace';
+        ctx.fillText(`${currentMonke.attributes.Count || 4} Parts`, infoX + traitsLabelW, curInfoY);
+
+        // C. Footer (Bottom y: innerY + innerH - 55)
+        const footerY = innerY + innerH - 45;
+
+        // Footer Divider Line
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(innerX + 45, footerY - 24);
+        ctx.lineTo(innerX + innerW - 45, footerY - 24);
+        ctx.stroke();
+
+        // Footer Motto
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = 'italic 20px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`"${customMotto}"`, innerX + 45, footerY + 8);
+
+        // Footer Verified Tag
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerY + 8);
+
+      } else {
+        // ================= BACK FACE (1:1 UI MATCH) =================
+        const headerY = innerY + 45;
+
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = 'bold 24px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('AUTHENTICATED ORDINALS INSCRIPTION', innerX + 45, headerY + 30);
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(`SHA256: ${currentMonke.id.toString(16).padStart(8, '0')}...`, innerX + innerW - 45, headerY + 30);
+
+        // Divider
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(innerX + 45, headerY + 55);
+        ctx.lineTo(innerX + innerW - 45, headerY + 55);
+        ctx.stroke();
+
+        // 4 Trait Cards
+        const traitsY = headerY + 95;
+        const traitW = 680;
+        const traitH = 70;
+        const gap = 20;
+
+        const traitList = [
+          { label: 'Body', val: currentMonke.attributes.Body },
+          { label: 'Head', val: currentMonke.attributes.Head },
+          { label: 'Eyes', val: currentMonke.attributes.Eyes },
+          { label: 'Earring', val: currentMonke.attributes.Earring },
+        ];
+
+        traitList.forEach((tr, i) => {
+          const tY = traitsY + i * (traitH + gap);
+          drawRoundRect(ctx, innerX + 50, tY, traitW, traitH, 16);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = '22px "Space Mono", ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${tr.label}:`, innerX + 75, tY + 44);
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 24px "Space Mono", ui-monospace, monospace';
+          ctx.textAlign = 'right';
+          ctx.fillText(String(tr.val), innerX + 50 + traitW - 25, tY + 44);
+        });
+
+        // QR Code Box (Right)
+        const qrBoxX = innerX + 780;
+        const qrBoxY = traitsY + 30;
+        const qrBoxSize = 280;
+
+        drawRoundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 28);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 90px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⛶', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize / 2 + 30);
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '18px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Scan Ordinals Inscription', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize + 40);
+
+        // Footer
+        const footerY = innerY + innerH - 45;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(innerX + 45, footerY - 24);
+        ctx.lineTo(innerX + innerW - 45, footerY - 24);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748B';
+        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('GENESIS BLOCK #776487', innerX + 45, footerY + 8);
+
+        ctx.fillStyle = '#10B981';
+        ctx.font = 'bold 18px "Space Mono", ui-monospace, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('100% ON-CHAIN', innerX + innerW - 45, footerY + 8);
+      }
+
+      ctx.restore();
 
       // Trigger Download
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `NodeMonke_${currentMonke.id}_Passport.png`;
+      link.download = `NodeMonke_${currentMonke.id}_Passport_${cardTheme}${isFlipped ? '_Back' : ''}.png`;
       link.href = url;
       link.click();
 
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
-      onToast('通行证导出成功！', `NodeMonke #${currentMonke.id} 3D 通行证已保存为高清 PNG`, 'success');
+      onToast('通行证导出成功！', `NodeMonke #${currentMonke.id} 3D 通行证已保存为 1:1 高清卡片`, 'success');
     } catch (e: any) {
       console.error('Export passport error:', e);
       onToast('导出失败', e?.message || '请重试', 'error');
     } finally {
       setIsExporting(false);
     }
-  }, [cardTheme, currentMonke, tier, ownerHandle, customTitle, customMotto, onToast]);
+  }, [cardTheme, currentMonke, tier, ownerHandle, customTitle, customMotto, isFlipped, onToast]);
 
   const activeThemeObj = THEMES.find((t) => t.id === cardTheme) || THEMES[0];
 
