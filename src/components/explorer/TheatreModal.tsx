@@ -64,15 +64,15 @@ const FX_LIST: { id: EntranceFx; icon: string }[] = [
   { id: 'slide', icon: '↔️' },
   { id: 'flip3d', icon: '🔄' },
   { id: 'flip3dX', icon: '🔃' },
-  { id: 'drop', icon: '🪂' },
+  { id: 'drop', icon: '☄️' },
   { id: 'launch', icon: '🔥' },
   { id: 'glitch', icon: '⚡' },
   { id: 'spin', icon: '🌀' },
-  { id: 'cube', icon: '🧊' },
+  { id: 'cube', icon: '💎' },
   { id: 'pulse', icon: '💓' },
-  { id: 'swing', icon: '🪢' },
+  { id: 'swing', icon: '🔔' },
   { id: 'matrix', icon: '👁️' },
-  { id: 'fade', icon: '🫧' },
+  { id: 'fade', icon: '💫' },
 ];
 
 const BG_LIST: { id: ScreensaverBg; icon: string }[] = [
