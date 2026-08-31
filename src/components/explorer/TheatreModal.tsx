@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Play, Pause, Sparkles, Gift, Maximize, Minimize } from 'lucide-react';
+import { 
+  X, 
+  ChevronLeft, 
+  ChevronRight, 
+  Play, 
+  Pause, 
+  Sparkles, 
+  Gift, 
+  Maximize, 
+  Minimize,
+  Shuffle,
+  Wand2,
+  Clock,
+  Gauge
+} from 'lucide-react';
+import { clsx } from 'clsx';
 import type { Monke } from '../../types';
 import { getMonkeImageUrl } from '../../utils/api';
 import { useLanguage } from '../../utils/i18n';
+
+export type EntranceFx = 'random' | 'zoom' | 'slide' | 'flip3d' | 'drop' | 'glitch' | 'fade';
 
 interface TheatreModalProps {
   isOpen: boolean;
@@ -15,6 +32,23 @@ interface TheatreModalProps {
   onOpenInSanta: (monkeId: number) => void;
   onOpenInPoster: (monkeId: number) => void;
 }
+
+const FX_LIST: { id: EntranceFx; icon: string }[] = [
+  { id: 'random', icon: '🎲' },
+  { id: 'zoom', icon: '🚀' },
+  { id: 'slide', icon: '↔️' },
+  { id: 'flip3d', icon: '🔄' },
+  { id: 'drop', icon: '🪂' },
+  { id: 'glitch', icon: '⚡' },
+  { id: 'fade', icon: '🫧' },
+];
+
+const SPEED_OPTIONS = [
+  { label: '2.0s', val: 2000 },
+  { label: '3.0s', val: 3000 },
+  { label: '4.5s', val: 4500 },
+  { label: '6.0s', val: 6000 },
+];
 
 export const TheatreModal: React.FC<TheatreModalProps> = ({
   isOpen,
@@ -30,9 +64,23 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHud, setShowHud] = useState(true);
+  
+  // Transition FX & Speed State
+  const [selectedFx, setSelectedFx] = useState<EntranceFx>('random');
+  const [activeFx, setActiveFx] = useState<Exclude<EntranceFx, 'random'>>('zoom');
+  const [direction, setDirection] = useState<number>(1);
+  const [intervalSpeed, setIntervalSpeed] = useState<number>(3000);
+
   const timerRef = useRef<any>(null);
 
-  // Toggle Fullscreen helper with vendor prefix support
+  // Pick random effect helper
+  const pickRandomFx = useCallback((): Exclude<EntranceFx, 'random'> => {
+    const candidates: Exclude<EntranceFx, 'random'>[] = ['zoom', 'slide', 'flip3d', 'drop', 'glitch', 'fade'];
+    const idx = Math.floor(Math.random() * candidates.length);
+    return candidates[idx];
+  }, []);
+
+  // Toggle Fullscreen
   const toggleFullscreen = useCallback(async () => {
     try {
       const doc = document as any;
@@ -74,8 +122,9 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       setCurrentIndex(initialIndex);
       setIsPlaying(true);
       setShowHud(true);
+      setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
 
-      // Request browser fullscreen on open
+      // Auto browser fullscreen
       try {
         const doc = document as any;
         const el = document.documentElement as any;
@@ -94,7 +143,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         timerRef.current = null;
       }
     }
-  }, [isOpen, initialIndex]);
+  }, [isOpen, initialIndex, selectedFx, pickRandomFx]);
 
   // Listen to browser fullscreen change
   useEffect(() => {
@@ -115,13 +164,17 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
 
   const handlePrev = useCallback(() => {
     if (!monkes.length) return;
+    setDirection(-1);
+    setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : monkes.length - 1));
-  }, [monkes.length]);
+  }, [monkes.length, selectedFx, pickRandomFx]);
 
   const handleNext = useCallback(() => {
     if (!monkes.length) return;
+    setDirection(1);
+    setActiveFx(selectedFx === 'random' ? pickRandomFx() : selectedFx);
     setCurrentIndex((prev) => (prev < monkes.length - 1 ? prev + 1 : 0));
-  }, [monkes.length]);
+  }, [monkes.length, selectedFx, pickRandomFx]);
 
   // Autoplay Screensaver Timer
   useEffect(() => {
@@ -133,7 +186,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
     if (isOpen && isPlaying && monkes.length > 1) {
       timerRef.current = setInterval(() => {
         handleNext();
-      }, 2500);
+      }, intervalSpeed);
     }
 
     return () => {
@@ -142,7 +195,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         timerRef.current = null;
       }
     };
-  }, [isOpen, isPlaying, monkes.length, handleNext]);
+  }, [isOpen, isPlaying, monkes.length, intervalSpeed, handleNext]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -177,7 +230,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         if (isPlaying) setShowHud(false);
-      }, 2500);
+      }, 3000);
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -192,6 +245,69 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
   const currentMonke = monkes[currentIndex] || monkes[0];
   const attrs = currentMonke.attributes;
 
+  // Animation Variant Generator based on activeFx
+  const getVariants = () => {
+    switch (activeFx) {
+      case 'zoom':
+        return {
+          initial: { scale: 0.15, opacity: 0, filter: 'blur(20px)' },
+          animate: { scale: 1, opacity: 1, filter: 'blur(0px)' },
+          exit: { scale: 1.3, opacity: 0, filter: 'blur(16px)' },
+          transition: { type: 'spring' as const, stiffness: 260, damping: 20 },
+        };
+      case 'slide':
+        return {
+          initial: { x: direction * 380, opacity: 0, filter: 'blur(12px)' },
+          animate: { x: 0, opacity: 1, filter: 'blur(0px)' },
+          exit: { x: -direction * 380, opacity: 0, filter: 'blur(12px)' },
+          transition: { type: 'spring' as const, stiffness: 230, damping: 24 },
+        };
+      case 'flip3d':
+        return {
+          initial: { rotateY: 90, opacity: 0, scale: 0.7 },
+          animate: { rotateY: 0, opacity: 1, scale: 1 },
+          exit: { rotateY: -90, opacity: 0, scale: 0.7 },
+          transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+        };
+      case 'drop':
+        return {
+          initial: { y: -350, opacity: 0, scale: 0.8 },
+          animate: { y: 0, opacity: 1, scale: 1 },
+          exit: { y: 200, opacity: 0, scale: 0.8 },
+          transition: { type: 'spring' as const, stiffness: 280, damping: 18 },
+        };
+      case 'glitch':
+        return {
+          initial: { x: -40, opacity: 0, scale: 1.15, filter: 'hue-rotate(90deg) contrast(1.6) blur(6px)' },
+          animate: { x: 0, opacity: 1, scale: 1, filter: 'hue-rotate(0deg) contrast(1) blur(0px)' },
+          exit: { x: 40, opacity: 0, scale: 0.9, filter: 'hue-rotate(-90deg) blur(6px)' },
+          transition: { duration: 0.35, ease: 'easeOut' as const },
+        };
+      case 'fade':
+      default:
+        return {
+          initial: { opacity: 0, scale: 0.95 },
+          animate: { opacity: 1, scale: 1 },
+          exit: { opacity: 0, scale: 1.05 },
+          transition: { duration: 0.45, ease: 'easeInOut' as const },
+        };
+    }
+  };
+
+  const anim = getVariants();
+
+  const getFxLabel = (id: EntranceFx) => {
+    switch (id) {
+      case 'random': return t.theatreFxRandom;
+      case 'zoom': return t.theatreFxZoom;
+      case 'slide': return t.theatreFxSlide;
+      case 'flip3d': return t.theatreFxFlip3d;
+      case 'drop': return t.theatreFxDrop;
+      case 'glitch': return t.theatreFxGlitch;
+      case 'fade': return t.theatreFxFade;
+    }
+  };
+
   const content = (
     <AnimatePresence>
       <motion.div
@@ -204,7 +320,7 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
         <motion.div
           animate={{ opacity: showHud ? 1 : 0, y: showHud ? 0 : -20 }}
           transition={{ duration: 0.3 }}
-          className={`flex flex-col sm:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
+          className={`flex flex-col lg:flex-row items-center justify-between gap-3 z-30 w-full ${!showHud ? 'pointer-events-none' : ''}`}
         >
           {/* Left Title & Status */}
           <div className="flex items-center gap-3 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
@@ -238,14 +354,58 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             </div>
           </div>
 
-          {/* Center Hint Prompt Badge */}
-          <div className="hidden lg:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300/90 text-xs font-mono shadow-xl">
-            <span>{t.screensaverHint}</span>
+          {/* Center: Entrance Animation Effects & Speed Selector */}
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 px-3 rounded-2xl border border-white/10 shadow-2xl overflow-x-auto max-w-full">
+            <span className="text-[11px] font-mono font-bold text-amber-400/90 whitespace-nowrap flex items-center gap-1">
+              <Wand2 className="w-3.5 h-3.5" />
+              <span>{t.theatreFxTitle}:</span>
+            </span>
+
+            <div className="flex items-center gap-1">
+              {FX_LIST.map((fx) => (
+                <button
+                  key={fx.id}
+                  onClick={() => {
+                    setSelectedFx(fx.id);
+                    setActiveFx(fx.id === 'random' ? pickRandomFx() : fx.id);
+                  }}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap active:scale-95',
+                    selectedFx === fx.id
+                      ? 'bg-amber-500/25 border border-amber-400 text-amber-300 font-bold shadow-sm'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                  )}
+                  title={getFxLabel(fx.id)}
+                >
+                  <span>{fx.icon}</span>
+                  <span className="hidden xl:inline ml-1">{getFxLabel(fx.id)}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="w-[1px] h-4 bg-white/15 mx-1 hidden sm:block" />
+
+            {/* Speed Selector */}
+            <div className="hidden sm:flex items-center gap-1">
+              {SPEED_OPTIONS.map((sp) => (
+                <button
+                  key={sp.val}
+                  onClick={() => setIntervalSpeed(sp.val)}
+                  className={clsx(
+                    'px-2 py-0.5 rounded-lg text-[11px] font-mono transition-all',
+                    intervalSpeed === sp.val
+                      ? 'bg-purple-500/30 text-purple-300 font-bold border border-purple-400'
+                      : 'text-slate-400 hover:text-white'
+                  )}
+                >
+                  {sp.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
-            {/* Play / Pause Toggle */}
             <button
               onClick={() => setIsPlaying((p) => !p)}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold transition-all active:scale-95"
@@ -254,16 +414,14 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
               <span>{isPlaying ? t.screensaverPause : t.screensaverPlay}</span>
             </button>
 
-            {/* Fullscreen Toggle */}
             <button
               onClick={toggleFullscreen}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all active:scale-95"
-              title={isFullscreen ? 'F11' : 'F11'}
+              title="F11"
             >
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
 
-            {/* Exit Screensaver */}
             <button
               onClick={handleExit}
               className="p-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-mono font-bold"
@@ -275,11 +433,11 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
           </div>
         </motion.div>
 
-        {/* Center Stage: Magnificent Huge Pixel Art Monke with Ambient Pulsing Aura */}
-        <div className="relative flex-1 flex items-center justify-center my-auto w-full h-full">
+        {/* Center Stage: Magnificent Huge Pixel Art Monke with Entrance Transitions */}
+        <div className="relative flex-1 flex items-center justify-center my-auto w-full h-full perspective-[1200px]">
           
           {/* Ambient Glow Aura */}
-          <div className="absolute w-[500px] sm:w-[750px] h-[500px] sm:h-[750px] bg-gradient-to-tr from-amber-500/20 via-orange-500/10 to-rose-500/10 rounded-full blur-[160px] pointer-events-none animate-pulse" />
+          <div className="absolute w-[500px] sm:w-[800px] h-[500px] sm:h-[800px] bg-gradient-to-tr from-amber-500/20 via-orange-500/10 to-purple-500/10 rounded-full blur-[170px] pointer-events-none animate-pulse" />
 
           {/* Left Arrow Button */}
           <motion.button
@@ -291,22 +449,25 @@ export const TheatreModal: React.FC<TheatreModalProps> = ({
             <ChevronLeft className="w-8 h-8" />
           </motion.button>
 
-          {/* Monke Image Stage - Giant cinematic pixel art filling 86% of viewport height */}
+          {/* Monke Image Stage with Rich Dynamic Entrance Animations */}
           <div className="relative z-10 flex flex-col items-center justify-center">
-            <motion.div
-              key={currentMonke.id}
-              initial={{ opacity: 0, scale: 0.94, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.94, filter: 'blur(8px)' }}
-              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-              className="w-[min(90vw,86vh)] h-[min(90vw,86vh)] max-w-[1200px] max-h-[1200px] flex items-center justify-center p-0 select-none"
-            >
-              <img
-                src={getMonkeImageUrl(currentMonke.id)}
-                alt={`NodeMonke #${currentMonke.id}`}
-                className="w-full h-full object-contain pixelated filter drop-shadow-[0_20px_60px_rgba(0,0,0,0.95)] transition-transform duration-300"
-              />
-            </motion.div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentMonke.id}
+                initial={anim.initial}
+                animate={anim.animate}
+                exit={anim.exit}
+                transition={anim.transition}
+                className="w-[min(90vw,86vh)] h-[min(90vw,86vh)] max-w-[1200px] max-h-[1200px] flex items-center justify-center p-0 select-none transform-gpu"
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <img
+                  src={getMonkeImageUrl(currentMonke.id)}
+                  alt={`NodeMonke #${currentMonke.id}`}
+                  className="w-full h-full object-contain pixelated filter drop-shadow-[0_20px_60px_rgba(0,0,0,0.95)]"
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Right Arrow Button */}

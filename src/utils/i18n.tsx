@@ -229,6 +229,15 @@ export interface Translations {
   theatreNext: string;
   theatreAutoPlay: string;
   theatrePause: string;
+  theatreFxTitle: string;
+  theatreFxRandom: string;
+  theatreFxZoom: string;
+  theatreFxSlide: string;
+  theatreFxFlip3d: string;
+  theatreFxDrop: string;
+  theatreFxGlitch: string;
+  theatreFxFade: string;
+  theatreSpeedTitle: string;
 
   // Toast Messages
   toastGifLoaded: string;
@@ -471,6 +480,15 @@ export const translations: Record<Language, Translations> = {
     theatreNext: '下一只 (→)',
     theatreAutoPlay: '自动播放',
     theatrePause: '暂停',
+    theatreFxTitle: '进场动效',
+    theatreFxRandom: '🎲 随机特效',
+    theatreFxZoom: '🚀 时空跃进',
+    theatreFxSlide: '↔️ 电影平移',
+    theatreFxFlip3d: '🔄 3D 翻转',
+    theatreFxDrop: '🪂 弹性坠落',
+    theatreFxGlitch: '⚡ 赛博故障',
+    theatreFxFade: '🫧 极简渐变',
+    theatreSpeedTitle: '轮播速度',
 
     // Toast Messages
     toastGifLoaded: '已载入动图工坊',
@@ -711,6 +729,15 @@ export const translations: Record<Language, Translations> = {
     theatreNext: 'Next (→)',
     theatreAutoPlay: 'Autoplay',
     theatrePause: 'Pause',
+    theatreFxTitle: 'Transitions',
+    theatreFxRandom: '🎲 Random FX',
+    theatreFxZoom: '🚀 Warp Zoom',
+    theatreFxSlide: '↔️ Cinema Slide',
+    theatreFxFlip3d: '🔄 3D Flip',
+    theatreFxDrop: '🪂 Orbit Drop',
+    theatreFxGlitch: '⚡ Cyber Glitch',
+    theatreFxFade: '🫧 Fade Breathe',
+    theatreSpeedTitle: 'Speed',
 
     // Toast Messages
     toastGifLoaded: 'Loaded in GIF Studio',
