@@ -224,6 +224,21 @@ export interface Translations {
   posterExporting: string;
   posterSuccess: string;
   posterSuccessDesc: string;
+  posterLayerText: string;
+  posterTopLayer: string;
+  posterChangeId: string;
+  posterTextAlign: string;
+  posterTextSettings: string;
+  posterDraggableOnCanvas: string;
+  posterBatchScaleDown: string;
+  posterBatchScaleUp: string;
+  posterBatchBringFront: string;
+  posterBatchSendBack: string;
+  posterBatchDuplicate: string;
+  posterDeselectAllTip: string;
+  posterMultiSelectHint: string;
+  posterCanvasEmptyHint: string;
+  posterBgDimMask: string;
 
   // Theatre Mode
   theatreClose: string;
@@ -272,6 +287,85 @@ export interface Translations {
   theatreCatAsics9: string;
   theatreCatDeathbot: string;
   theatreCatHoodie: string;
+
+  // Passport Studio
+  passportBadge: string;
+  passportTitle: string;
+  passportSub: string;
+  passportExportPng: string;
+  passportExportHtml: string;
+  passportModeLayout: string;
+  passportMode3d: string;
+  passportResetLayout: string;
+  passportAngleFront: string;
+  passportAngleBack: string;
+  passportAngleTop: string;
+  passportAngleFlip: string;
+  passportAngleAuto: string;
+  passportHintLayout: string;
+  passportHint3d: string;
+  passportEditorTitle: string;
+  passportLayersTitle: string;
+  passportLayersSub: string;
+  passportSelected: string;
+  passportDeleteLayer: string;
+  passportRestoreLayer: string;
+  passportPosX: string;
+  passportPosY: string;
+  passportScale: string;
+  passportMonkeIdLabel: string;
+  passportQrLabel: string;
+  passportQrShow: string;
+  passportQrHide: string;
+  passportThemeLabel: string;
+  passportTitleLabel: string;
+  passportOwnerLabel: string;
+  passportVerifiedLabel: string;
+  passportBadgeLabel: string;
+  passportCustomBadgePlaceholder: string;
+  passportMottoLabel: string;
+  passportLayerHeader: string;
+  passportLayerBadges: string;
+  passportLayerAvatar: string;
+  passportLayerChip: string;
+  passportLayerGenesisTag: string;
+  passportLayerOwnerHandle: string;
+  passportLayerBadgePill: string;
+  passportLayerAttributes: string;
+  passportLayerQrCode: string;
+  passportLayerFooterMotto: string;
+  passportLayerFooterVerified: string;
+  passportExportSuccess: string;
+  passportExportSuccessDesc: string;
+  passportHtmlExportSuccess: string;
+  passportHtmlExportSuccessDesc: string;
+  passportResetToast: string;
+  passportResetToastDesc: string;
+
+  // Arcade Game
+  arcadeTitle: string;
+  arcadeSub: string;
+  arcadeSoundOn: string;
+  arcadeSoundOff: string;
+  arcadeReadyTitle: string;
+  arcadeReadySub: string;
+  arcadeStartBtn: string;
+  arcadeGameOverTitle: string;
+  arcadeCurrentScore: string;
+  arcadeBestScore: string;
+  arcadeRetryBtn: string;
+  arcadeExportScoreBtn: string;
+  arcadeHint: string;
+  arcadeChooseMonke: string;
+  arcadeHighScoreLabel: string;
+  arcadeRankLabel: string;
+  arcadeInscriptionLabel: string;
+  arcadeRulesTitle: string;
+  arcadeRule1: string;
+  arcadeRule2: string;
+  arcadeRule3: string;
+  arcadeScoreCardSuccess: string;
+  arcadeScoreCardSuccessDesc: string;
 
   // Toast Messages
   toastGifLoaded: string;
@@ -509,6 +603,21 @@ export const translations: Record<Language, Translations> = {
     posterExporting: '正在渲染海报...',
     posterSuccess: '海报导出成功！',
     posterSuccessDesc: '高清海报已保存至本地',
+    posterLayerText: '文案排版 (Text)',
+    posterTopLayer: '(顶层)',
+    posterChangeId: '更换猴子 ID:',
+    posterTextAlign: '对齐方式:',
+    posterTextSettings: '文案排版设置 (Text Layer)',
+    posterDraggableOnCanvas: '画布可拖拽',
+    posterBatchScaleDown: '批量缩小',
+    posterBatchScaleUp: '批量放大',
+    posterBatchBringFront: '批量置顶',
+    posterBatchSendBack: '批量置底',
+    posterBatchDuplicate: '批量复制',
+    posterDeselectAllTip: '取消全选',
+    posterMultiSelectHint: '💡 可以在画布上按住任意一只选中的猴子，整体同步平移或缩放。',
+    posterCanvasEmptyHint: '在画布上拖拽框选多个猴子，或点击单个猴子编辑',
+    posterBgDimMask: '背景压暗蒙版',
 
     // Theatre Mode
     theatreClose: '退出漫游 (ESC)',
@@ -557,6 +666,85 @@ export const translations: Record<Language, Translations> = {
     theatreCatAsics9: '⚡ 矿机神兽',
     theatreCatDeathbot: '🤖 死亡机器人',
     theatreCatHoodie: '🧥 连帽卫衣',
+
+    // Arcade Studio
+    arcadeTitle: 'Flappy Monke 像素跳跃街机',
+    arcadeSub: '操控你的 NodeMonke 穿越比特币赛博节点矿机阵列，收集 Satoshi 铭文金币，刷新最高连击纪录！',
+    arcadeSoundOn: '音效开启',
+    arcadeSoundOff: '静音',
+    arcadeReadyTitle: 'READY TO FLY?',
+    arcadeReadySub: '点击屏幕 / 按空格键起飞，穿梭比特币节点矿机机柜！',
+    arcadeStartBtn: 'START GAME',
+    arcadeGameOverTitle: 'GAME OVER',
+    arcadeCurrentScore: '本局得分',
+    arcadeBestScore: '历史最高',
+    arcadeRetryBtn: '再玩一次',
+    arcadeExportScoreBtn: '导出战绩',
+    arcadeHint: '💡 点击游戏窗口或按空格键跳跃 • 吃到 ₿ 金币额外 +5 分',
+    arcadeChooseMonke: '更换参赛神兽主角 (Choose Monke)',
+    arcadeHighScoreLabel: '最高分纪录 (Best High Score)',
+    arcadeRankLabel: '当前选手评级',
+    arcadeInscriptionLabel: '铭文序号',
+    arcadeRulesTitle: '街机挑战规则',
+    arcadeRule1: '• 每穿过一组赛博节点矿机柱得 1 分',
+    arcadeRule2: '• 收集空中的金色 ₿ 符文金币单次额外获得 +5 分',
+    arcadeRule3: '• 触碰矿机机柜或触底将中断连击并结算成绩',
+    arcadeScoreCardSuccess: '战绩卡片导出成功！',
+    arcadeScoreCardSuccessDesc: '已保存你的 Flappy Monke 街机战绩图',
+
+    // Passport Studio
+    passportBadge: '3D WEB3 极客卡片工坊',
+    passportTitle: '3D Web3 极客卡片工坊',
+    passportSub: '支持链上铭文专属二维码与全图层自由排版/删减，导出与屏幕所见 100% 像素级对齐！',
+    passportExportPng: '💾 4K 典藏卡 PNG',
+    passportExportHtml: '🌐 导出 3D 网页 HTML',
+    passportModeLayout: '🎨 自由拖拽排版模式',
+    passportMode3d: '🌐 3D 空间交互模式',
+    passportResetLayout: '恢复默认排版',
+    passportAngleFront: '正面',
+    passportAngleBack: '背面',
+    passportAngleTop: '3D俯瞰',
+    passportAngleFlip: '翻滚',
+    passportAngleAuto: '巡航',
+    passportHintLayout: '💡 提示：点击卡片上任意元素可直接拖动或按右侧 🗑️ 删除隐藏，随时精简卡面',
+    passportHint3d: '3D 视角参数:',
+    passportEditorTitle: '自由排版与内容编辑',
+    passportLayersTitle: '图层显隐与删减 (点击即删除/恢复)',
+    passportLayersSub: '支持自由精简',
+    passportSelected: '当前选中:',
+    passportDeleteLayer: '删除/隐藏此元素',
+    passportRestoreLayer: '恢复显示',
+    passportPosX: '水平 X',
+    passportPosY: '垂直 Y',
+    passportScale: '缩放比例 Scale',
+    passportMonkeIdLabel: '目标神兽编号 (Monke ID)',
+    passportQrLabel: '链上铭文专属二维码 (Ordinals QR)',
+    passportQrShow: '显示',
+    passportQrHide: '已删除',
+    passportThemeLabel: '卡片材质主题 (Card Finish)',
+    passportTitleLabel: '卡片顶部主标题 (Header Title)',
+    passportOwnerLabel: '持有者推特 / 昵称 (Owner Handle)',
+    passportVerifiedLabel: '蓝标认证',
+    passportBadgeLabel: '个性身份头衔 (Badge Title)',
+    passportCustomBadgePlaceholder: '自定义头衔...',
+    passportMottoLabel: '底部个性签名 (Motto Slogan)',
+    passportLayerHeader: '👑 顶部标题',
+    passportLayerBadges: '🏷️ 排名/评级',
+    passportLayerAvatar: '🖼️ 核心头像',
+    passportLayerChip: '💳 模拟芯片',
+    passportLayerGenesisTag: '🏷️ GENESIS标签',
+    passportLayerOwnerHandle: '👤 持有者昵称',
+    passportLayerBadgePill: '🎖️ 身份头衔',
+    passportLayerAttributes: '📋 铭文属性',
+    passportLayerQrCode: '📱 铭文二维码',
+    passportLayerFooterMotto: '💬 底部签名',
+    passportLayerFooterVerified: '⚡ 认证标识',
+    passportExportSuccess: '4K 典藏卡 PNG 导出成功！',
+    passportExportSuccessDesc: '100% 所见即所得，与屏幕排版完全一致',
+    passportHtmlExportSuccess: '3D 交互网页已导出！',
+    passportHtmlExportSuccessDesc: '包含链上二维码与自定义排版的 3D 网页已保存',
+    passportResetToast: '已恢复默认黄金比例排版',
+    passportResetToastDesc: '所有元素已自动重置到标准位置',
 
     // Toast Messages
     toastGifLoaded: '已载入动图工坊',
@@ -792,6 +980,21 @@ export const translations: Record<Language, Translations> = {
     posterExporting: 'Rendering Poster...',
     posterSuccess: 'Poster Exported Successfully!',
     posterSuccessDesc: 'High-resolution PNG saved to your device',
+    posterLayerText: 'Text Layer',
+    posterTopLayer: '(Top)',
+    posterChangeId: 'Change Monke ID:',
+    posterTextAlign: 'Text Alignment:',
+    posterTextSettings: 'Typography & Text Settings',
+    posterDraggableOnCanvas: 'Draggable on canvas',
+    posterBatchScaleDown: 'Scale Down All',
+    posterBatchScaleUp: 'Scale Up All',
+    posterBatchBringFront: 'Bring All to Front',
+    posterBatchSendBack: 'Send All to Back',
+    posterBatchDuplicate: 'Duplicate All',
+    posterDeselectAllTip: 'Deselect All',
+    posterMultiSelectHint: '💡 Drag any selected Monke on canvas to move or scale the entire group.',
+    posterCanvasEmptyHint: 'Drag marquee box on canvas to select multiple Monkes, or click one to edit',
+    posterBgDimMask: 'Background Dim Mask',
 
     // Theatre Mode
     theatreClose: 'Exit Theatre (ESC)',
@@ -840,6 +1043,85 @@ export const translations: Record<Language, Translations> = {
     theatreCatAsics9: '⚡ ASICS9',
     theatreCatDeathbot: '🤖 Deathbot',
     theatreCatHoodie: '🧥 Hoodie',
+
+    // Passport Studio
+    passportBadge: '3D WEB3 CARD STUDIO',
+    passportTitle: '3D Web3 Card Studio',
+    passportSub: 'Dynamic on-chain Ordinals QR code + full layer dragging & deletion. 100% WYSIWYG pixel-perfect export.',
+    passportExportPng: '💾 4K Card PNG',
+    passportExportHtml: '🌐 Export 3D HTML',
+    passportModeLayout: '🎨 2D Drag Layout Mode',
+    passportMode3d: '🌐 3D Space Orbit Mode',
+    passportResetLayout: 'Reset Layout',
+    passportAngleFront: 'Front',
+    passportAngleBack: 'Back',
+    passportAngleTop: '3D Top',
+    passportAngleFlip: 'Flip',
+    passportAngleAuto: 'Orbit',
+    passportHintLayout: '💡 Hint: Drag any element directly or click 🗑️ Delete/Hide on the right panel to customize.',
+    passportHint3d: '3D Camera Angles:',
+    passportEditorTitle: 'Layout & Content Editor',
+    passportLayersTitle: 'Layer Visibility & Deletion (Click to Toggle)',
+    passportLayersSub: 'Customizable minimalism',
+    passportSelected: 'Selected Layer:',
+    passportDeleteLayer: 'Delete / Hide Layer',
+    passportRestoreLayer: 'Restore Layer',
+    passportPosX: 'Horizontal X',
+    passportPosY: 'Vertical Y',
+    passportScale: 'Scale Size',
+    passportMonkeIdLabel: 'Choose Monke (ID)',
+    passportQrLabel: 'On-Chain Inscription QR',
+    passportQrShow: 'Visible',
+    passportQrHide: 'Hidden',
+    passportThemeLabel: 'Card Finish Theme',
+    passportTitleLabel: 'Header Main Title',
+    passportOwnerLabel: 'Owner Handle / Name',
+    passportVerifiedLabel: 'Verified Badge',
+    passportBadgeLabel: 'Identity Badge Title',
+    passportCustomBadgePlaceholder: 'Custom title...',
+    passportMottoLabel: 'Motto Slogan',
+    passportLayerHeader: '👑 Header Title',
+    passportLayerBadges: '🏷️ Rank & Tier',
+    passportLayerAvatar: '🖼️ Monke Avatar',
+    passportLayerChip: '💳 Chip Block',
+    passportLayerGenesisTag: '🏷️ Genesis 10K',
+    passportLayerOwnerHandle: '👤 Owner Handle',
+    passportLayerBadgePill: '🎖️ Badge Title',
+    passportLayerAttributes: '📋 Traits List',
+    passportLayerQrCode: '📱 Inscription QR',
+    passportLayerFooterMotto: '💬 Motto Slogan',
+    passportLayerFooterVerified: '⚡ Verified Mark',
+    passportExportSuccess: '4K Card PNG Exported!',
+    passportExportSuccessDesc: '100% WYSIWYG, identical to on-screen layout',
+    passportHtmlExportSuccess: '3D Webpage Exported!',
+    passportHtmlExportSuccessDesc: 'Standalone interactive 3D HTML saved',
+    passportResetToast: 'Default Layout Restored',
+    passportResetToastDesc: 'All layers reset to default golden ratio',
+
+    // Arcade Game
+    arcadeTitle: 'Flappy Monke 8-Bit Arcade',
+    arcadeSub: 'Flap your NodeMonke through Bitcoin on-chain candlestick bars, collect Satoshi coins, and set new high scores!',
+    arcadeSoundOn: 'Sound ON',
+    arcadeSoundOff: 'Muted',
+    arcadeReadyTitle: 'READY TO FLY?',
+    arcadeReadySub: 'Click screen or press Spacebar to flap and dodge Bitcoin candles!',
+    arcadeStartBtn: 'START GAME',
+    arcadeGameOverTitle: 'GAME OVER',
+    arcadeCurrentScore: 'Score',
+    arcadeBestScore: 'Best Score',
+    arcadeRetryBtn: 'Play Again',
+    arcadeExportScoreBtn: 'Share Score',
+    arcadeHint: '💡 Hint: Click or press Spacebar to jump • Grab ₿ Coins for +5 extra bonus pts',
+    arcadeChooseMonke: 'Choose Monke Character',
+    arcadeHighScoreLabel: 'Best High Score',
+    arcadeRankLabel: 'Rarity Tier',
+    arcadeInscriptionLabel: 'Inscription #',
+    arcadeRulesTitle: 'Arcade Challenge Rules',
+    arcadeRule1: '• Pass through a candle bar set for +1 pt',
+    arcadeRule2: '• Collect floating golden ₿ coins for +5 bonus pts',
+    arcadeRule3: '• Crashing into ceiling, ground or candle bars ends the game',
+    arcadeScoreCardSuccess: 'Score Card Exported!',
+    arcadeScoreCardSuccessDesc: 'Your arcade score achievement saved',
 
     // Toast Messages
     toastGifLoaded: 'Loaded in GIF Studio',

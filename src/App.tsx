@@ -124,20 +124,6 @@ const AppContent: React.FC = () => {
     addToast(t.toastPosterLoaded, `${t.toastPosterLoadedDesc} (#${id})`, 'info');
   };
 
-  const [customPassportData, setCustomPassportData] = useState<{
-    avatarUrl?: string;
-    traits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number };
-  } | null>(null);
-
-  const handleOpenInPassport = (
-    avatarUrl?: string,
-    traits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number }
-  ) => {
-    setCustomPassportData(avatarUrl ? { avatarUrl, traits } : null);
-    handleTabChange('passport', targetMonkeId);
-    addToast('已载入 3D 卡片工坊', '您的专属 DIY 节点猴已进入 3D 空间！', 'success');
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-ambient-mesh text-slate-100 selection:bg-amber-500/30 selection:text-amber-200 relative">
       
@@ -215,7 +201,6 @@ const AppContent: React.FC = () => {
               exit="exit"
             >
               <DiyStudio 
-                onOpenInPassport={handleOpenInPassport}
                 onToast={addToast} 
               />
             </motion.div>
@@ -268,8 +253,6 @@ const AppContent: React.FC = () => {
               <PassportStudio
                 initialMonkeId={targetMonkeId}
                 monkes={monkes}
-                customAvatarUrl={customPassportData?.avatarUrl}
-                customTraits={customPassportData?.traits}
                 onToast={addToast}
               />
             </motion.div>

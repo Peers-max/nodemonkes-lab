@@ -1,47 +1,72 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  CreditCard, 
   RotateCw, 
   Download, 
   Sparkles, 
   CheckCircle2, 
   Search, 
-  ShieldCheck, 
-  QrCode, 
-  Hash, 
   Crown,
-  Layers,
-  Palette,
-  User,
-  Quote,
-  Share2,
-  Globe,
-  Sliders,
-  Maximize2,
-  Minimize2,
-  Eye,
-  Type,
-  FileCode,
-  Compass,
+  Palette, 
+  User, 
+  Quote, 
+  Sliders, 
+  Type, 
+  FileCode, 
+  Compass, 
+  Zap,
+  Move,
   RotateCcw,
-  Zap
+  Eye,
+  EyeOff,
+  Trash2,
+  QrCode,
+  Layers
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import QRCode from 'qrcode';
+import { toPng } from 'html-to-image';
 import type { Monke } from '../../types';
 import { getMonkeImageUrl } from '../../utils/api';
 import { useLanguage } from '../../utils/i18n';
+import { NODE_STRATEGY_LOGO } from './logoBase64';
 import confetti from 'canvas-confetti';
 
 interface PassportStudioProps {
   initialMonkeId?: number;
   monkes: Monke[];
-  customAvatarUrl?: string;
-  customTraits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number };
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 export type CardTheme = 'obsidian' | 'gold' | 'cyber' | 'matrix' | 'sunset' | 'ruby';
+
+export interface CardLayoutState {
+  header: { x: number; y: number; scale: number; visible: boolean };
+  badges: { x: number; y: number; scale: number; visible: boolean };
+  avatar: { x: number; y: number; scale: number; visible: boolean };
+  chip: { x: number; y: number; scale: number; visible: boolean };
+  genesisTag: { x: number; y: number; scale: number; visible: boolean };
+  ownerHandle: { x: number; y: number; scale: number; visible: boolean };
+  badgePill: { x: number; y: number; scale: number; visible: boolean };
+  attributes: { x: number; y: number; scale: number; visible: boolean };
+  qrCode: { x: number; y: number; scale: number; visible: boolean };
+  footerMotto: { x: number; y: number; scale: number; visible: boolean };
+  footerVerified: { x: number; y: number; scale: number; visible: boolean };
+}
+
+export const DEFAULT_LAYOUT: CardLayoutState = {
+  header: { x: 5, y: 4, scale: 100, visible: true },
+  badges: { x: 58, y: 4.5, scale: 100, visible: true },
+  avatar: { x: 5, y: 19, scale: 100, visible: true },
+  chip: { x: 44, y: 20, scale: 100, visible: false },
+  genesisTag: { x: 79, y: 21, scale: 100, visible: true },
+  ownerHandle: { x: 44, y: 30, scale: 100, visible: true },
+  badgePill: { x: 44, y: 45, scale: 100, visible: true },
+  attributes: { x: 44, y: 58, scale: 100, visible: true },
+  qrCode: { x: 79, y: 42, scale: 100, visible: true },
+  footerMotto: { x: 5, y: 92, scale: 100, visible: true },
+  footerVerified: { x: 67, y: 92, scale: 100, visible: true },
+};
 
 const THEMES: { 
   id: CardTheme; 
@@ -60,72 +85,72 @@ const THEMES: {
     nameZh: '👑 曜石黑金', 
     nameEn: '👑 Obsidian Gold', 
     icon: '👑', 
-    border: 'from-amber-400 via-amber-600 to-amber-200', 
-    bg: 'bg-gradient-to-br from-[#0c0a09] via-[#1c1917] to-[#0a0a0a]',
-    gradCss: 'linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, #0a0a0a 100%)',
-    borderCss: 'linear-gradient(135deg, #FBBF24 0%, #D97706 50%, #FDE68A 100%)',
+    border: 'from-amber-200 via-amber-600 to-amber-400', 
+    bg: 'bg-gradient-to-br from-[#141312] via-[#0c0b0a] to-[#040404]',
+    gradCss: 'linear-gradient(135deg, #141312 0%, #0c0b0a 50%, #040404 100%)',
+    borderCss: 'linear-gradient(135deg, #FDE68A 0%, #D97706 50%, #F59E0B 100%)',
     rimColor: '#B45309',
-    glowColor: 'rgba(245, 158, 11, 0.45)'
+    glowColor: 'rgba(245, 158, 11, 0.2)'
   },
   { 
     id: 'gold', 
     nameZh: '🥇 纯金至尊', 
     nameEn: '🥇 Pure Gold', 
     icon: '🥇', 
-    border: 'from-yellow-300 via-amber-500 to-yellow-100', 
-    bg: 'bg-gradient-to-br from-[#1e1503] via-[#332205] to-[#120c02]',
-    gradCss: 'linear-gradient(135deg, #1e1503 0%, #332205 50%, #120c02 100%)',
-    borderCss: 'linear-gradient(135deg, #FDE047 0%, #F59E0B 50%, #FEF08A 100%)',
+    border: 'from-yellow-100 via-amber-400 to-amber-600', 
+    bg: 'bg-gradient-to-br from-[#1a1403] via-[#0f0b01] to-[#050300]',
+    gradCss: 'linear-gradient(135deg, #1a1403 0%, #0f0b01 50%, #050300 100%)',
+    borderCss: 'linear-gradient(135deg, #FEF08A 0%, #F59E0B 50%, #FFFBEB 100%)',
     rimColor: '#D97706',
-    glowColor: 'rgba(251, 191, 36, 0.5)'
+    glowColor: 'rgba(251, 191, 36, 0.2)'
   },
   { 
     id: 'cyber', 
-    nameZh: '🟣 赛博全息', 
-    nameEn: '🟣 Cyber Holo', 
+    nameZh: '🟣 钛黑赛博', 
+    nameEn: '🟣 Cyber Titanium', 
     icon: '🟣', 
-    border: 'from-purple-400 via-cyan-400 to-pink-500', 
-    bg: 'bg-gradient-to-br from-[#0f0728] via-[#1a0b3b] to-[#080318]',
-    gradCss: 'linear-gradient(135deg, #0f0728 0%, #1a0b3b 50%, #080318 100%)',
-    borderCss: 'linear-gradient(135deg, #C084FC 0%, #22D3EE 50%, #EC4899 100%)',
+    border: 'from-purple-400 via-cyan-400 to-indigo-500', 
+    bg: 'bg-gradient-to-br from-[#100824] via-[#080314] to-[#020108]',
+    gradCss: 'linear-gradient(135deg, #100824 0%, #080314 50%, #020108 100%)',
+    borderCss: 'linear-gradient(135deg, #E879F9 0%, #38BDF8 50%, #818CF8 100%)',
     rimColor: '#9333EA',
-    glowColor: 'rgba(192, 132, 252, 0.5)'
+    glowColor: 'rgba(192, 132, 252, 0.2)'
   },
   { 
     id: 'matrix', 
-    nameZh: '🟢 矩阵终端', 
-    nameEn: '🟢 Matrix Green', 
+    nameZh: '🟢 矩阵黑晶', 
+    nameEn: '🟢 Matrix Obsidian', 
     icon: '🟢', 
-    border: 'from-emerald-400 via-green-500 to-teal-300', 
-    bg: 'bg-gradient-to-br from-[#02180c] via-[#042815] to-[#010e07]',
-    gradCss: 'linear-gradient(135deg, #02180c 0%, #042815 50%, #010e07 100%)',
-    borderCss: 'linear-gradient(135deg, #34D399 0%, #22C55E 50%, #5EEAD4 100%)',
+    border: 'from-emerald-300 via-emerald-600 to-teal-400', 
+    bg: 'bg-gradient-to-br from-[#03170c] via-[#020d06] to-[#000502]',
+    gradCss: 'linear-gradient(135deg, #03170c 0%, #020d06 50%, #000502 100%)',
+    borderCss: 'linear-gradient(135deg, #6EE7B7 0%, #10B981 50%, #34D399 100%)',
     rimColor: '#059669',
-    glowColor: 'rgba(52, 211, 153, 0.5)'
+    glowColor: 'rgba(52, 211, 153, 0.2)'
   },
   { 
     id: 'sunset', 
-    nameZh: '🌅 暮光霞光', 
-    nameEn: '🌅 Twilight Glow', 
+    nameZh: '🌅 暮光暗金', 
+    nameEn: '🌅 Twilight Dark', 
     icon: '🌅', 
     border: 'from-rose-400 via-amber-500 to-indigo-500', 
-    bg: 'bg-gradient-to-br from-[#1a081e] via-[#2c0d23] to-[#120417]',
-    gradCss: 'linear-gradient(135deg, #1a081e 0%, #2c0d23 50%, #120417 100%)',
-    borderCss: 'linear-gradient(135deg, #FB7185 0%, #F59E0B 50%, #6366F1 100%)',
+    bg: 'bg-gradient-to-br from-[#17071c] via-[#0d0210] to-[#040005]',
+    gradCss: 'linear-gradient(135deg, #17071c 0%, #0d0210 50%, #040005 100%)',
+    borderCss: 'linear-gradient(135deg, #FDA4AF 0%, #FB923C 50%, #818CF8 100%)',
     rimColor: '#E11D48',
-    glowColor: 'rgba(251, 113, 133, 0.5)'
+    glowColor: 'rgba(251, 113, 133, 0.2)'
   },
   { 
     id: 'ruby', 
-    nameZh: '💎 绝版红宝', 
-    nameEn: '💎 Crimson Ruby', 
+    nameZh: '💎 深邃红宝', 
+    nameEn: '💎 Crimson Deep', 
     icon: '💎', 
-    border: 'from-rose-500 via-red-600 to-amber-400', 
-    bg: 'bg-gradient-to-br from-[#1a0404] via-[#2d0808] to-[#0f0202]',
-    gradCss: 'linear-gradient(135deg, #1a0404 0%, #2d0808 50%, #0f0202 100%)',
-    borderCss: 'linear-gradient(135deg, #F43F5E 0%, #DC2626 50%, #F59E0B 100%)',
+    border: 'from-rose-400 via-red-600 to-amber-300', 
+    bg: 'bg-gradient-to-br from-[#170303] via-[#0d0101] to-[#040000]',
+    gradCss: 'linear-gradient(135deg, #170303 0%, #0d0101 50%, #040000 100%)',
+    borderCss: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 50%, #FBBF24 100%)',
     rimColor: '#B91C1C',
-    glowColor: 'rgba(244, 63, 94, 0.5)'
+    glowColor: 'rgba(244, 63, 94, 0.2)'
   },
 ];
 
@@ -141,28 +166,54 @@ const PRESET_BADGES = [
 export const PassportStudio: React.FC<PassportStudioProps> = ({
   initialMonkeId = 209,
   monkes,
-  customAvatarUrl,
-  customTraits,
   onToast,
 }) => {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const [selectedId, setSelectedId] = useState<number>(initialMonkeId);
   const [cardTheme, setCardTheme] = useState<CardTheme>('obsidian');
 
-  // Deep Custom Content Fields (Fully Editable like Poster Studio)
+  // View Mode: 'layout' (2D Drag Editor) | '3d' (3D Interactive Physics)
+  const [viewMode, setViewMode] = useState<'layout' | '3d'>('layout');
+  const [selectedLayer, setSelectedLayer] = useState<keyof CardLayoutState | null>('ownerHandle');
+
+  // Customizable Element Positions & Visibility (% coordinates)
+  const [layout, setLayout] = useState<CardLayoutState>(() => ({ ...DEFAULT_LAYOUT }));
+
+  // Content Fields
   const [cardTitle, setCardTitle] = useState<string>('NODEMONKES PASSPORT');
   const [ownerHandle, setOwnerHandle] = useState<string>('@satoshi_monke');
   const [showVerified, setShowVerified] = useState<boolean>(true);
   const [customTitle, setCustomTitle] = useState<string>('GENESIS COLLECTOR');
   const [customMotto, setCustomMotto] = useState<string>('In Monkes We Trust • Bitcoin Ordinals');
-  const [avatarScale, setAvatarScale] = useState<number>(100);
-  const [sheenIntensity, setSheenIntensity] = useState<number>(65);
 
-  // High-Precision 3D Physics Engine State (Inertia Damping & Velocity)
+  // Dynamic Inscription QR Code Data URL
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+
+  // High-Precision 3D Physics State
   const [rotX, setRotX] = useState<number>(0);
   const [rotY, setRotY] = useState<number>(0);
   const [isAutoSpin, setIsAutoSpin] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // DOM Refs
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+  const cardFrontRef = useRef<HTMLDivElement>(null);
+
+  const dragInfoRef = useRef<{
+    isDraggingElement: boolean;
+    layerKey: keyof CardLayoutState | null;
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  }>({
+    isDraggingElement: false,
+    layerKey: null,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0
+  });
 
   const physicsRef = useRef<{
     vx: number;
@@ -176,25 +227,58 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
   const isDraggingRef = useRef<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  const getLayerName = useCallback((key: keyof CardLayoutState): string => {
+    switch (key) {
+      case 'header': return t.passportLayerHeader;
+      case 'badges': return t.passportLayerBadges;
+      case 'avatar': return t.passportLayerAvatar;
+      case 'chip': return t.passportLayerChip;
+      case 'genesisTag': return t.passportLayerGenesisTag;
+      case 'ownerHandle': return t.passportLayerOwnerHandle;
+      case 'badgePill': return t.passportLayerBadgePill;
+      case 'attributes': return t.passportLayerAttributes;
+      case 'qrCode': return t.passportLayerQrCode;
+      case 'footerMotto': return t.passportLayerFooterMotto;
+      case 'footerVerified': return t.passportLayerFooterVerified;
+    }
+  }, [t]);
+
   const currentMonke = useMemo(() => {
     return monkes.find((m) => m.id === selectedId) || monkes[0] || {
       id: 209,
       rank: 1,
-      inscription: 83985,
+      inscription: 83795,
       block: 776487,
       attributes: { Body: 'Alien', Head: 'None', Eyes: 'None', Earring: 'None', Count: 1 },
       scriptPubkey: ''
     };
   }, [monkes, selectedId]);
 
-  const activeAvatarSrc = customAvatarUrl || getMonkeImageUrl(currentMonke.id);
-  const activeTraits = customTraits || {
+  const activeAvatarSrc = getMonkeImageUrl(currentMonke.id);
+  const activeTraits = {
     Body: String(currentMonke.attributes.Body || 'Alien'),
     Head: String(currentMonke.attributes.Head || 'None'),
     Eyes: String(currentMonke.attributes.Eyes || 'None'),
     Earring: String(currentMonke.attributes.Earring || 'None'),
     Count: Number(currentMonke.attributes.Count || 4),
   };
+
+  // Generate Inscription QR Code dynamically
+  useEffect(() => {
+    const inscUrl = `https://ordinals.com/inscription/${currentMonke.inscription}`;
+    QRCode.toDataURL(inscUrl, {
+      margin: 1,
+      color: {
+        dark: '#FFFFFF',
+        light: '#00000000',
+      },
+      errorCorrectionLevel: 'M'
+    }).then((data) => {
+      setQrDataUrl(data);
+    }).catch((e) => {
+      console.warn('QR Code generation error:', e);
+    });
+  }, [currentMonke.inscription]);
 
   // Tier Rating
   const tier = useMemo(() => {
@@ -205,23 +289,21 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     return { label: 'A TIER', color: 'text-emerald-300 bg-emerald-500/20 border-emerald-400' };
   }, [currentMonke.rank]);
 
-  // Smooth Physics Inertia Decay Loop
+  // Physics Loop (Only in 3D Mode)
   useEffect(() => {
     const updatePhysics = () => {
-      if (!isDraggingRef.current) {
+      if (viewMode === '3d' && !isDraggingRef.current) {
         if (isAutoSpin) {
           setRotY((prev) => (prev + 0.85) % 360);
         } else {
-          // Inertia damping
           if (Math.abs(physicsRef.current.vx) > 0.01 || Math.abs(physicsRef.current.vy) > 0.01) {
             setRotY((prev) => prev + physicsRef.current.vx);
             setRotX((prev) => {
               const next = prev - physicsRef.current.vy;
-              // Clamp X tilt to prevent over-inversion dizziness
-              return Math.max(-65, Math.min(65, next));
+              return Math.max(-75, Math.min(75, next));
             });
-            physicsRef.current.vx *= 0.93; // friction
-            physicsRef.current.vy *= 0.93;
+            physicsRef.current.vx *= 0.94;
+            physicsRef.current.vy *= 0.94;
           }
         }
       }
@@ -235,450 +317,159 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [isAutoSpin]);
+  }, [viewMode, isAutoSpin]);
 
-  // Mouse Drag Handlers with Velocity Calculation
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    isDraggingRef.current = true;
-    setIsAutoSpin(false);
-    physicsRef.current = {
-      vx: 0,
-      vy: 0,
-      lastX: e.clientX,
-      lastY: e.clientY,
-      lastTime: performance.now(),
-    };
+  // Reset to default layout
+  const handleResetLayout = () => {
+    setLayout({ ...DEFAULT_LAYOUT });
+    onToast(t.passportResetToast, t.passportResetToastDesc, 'info');
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingRef.current) return;
-    const now = performance.now();
-    const dt = Math.max(1, now - physicsRef.current.lastTime);
-    const dx = e.clientX - physicsRef.current.lastX;
-    const dy = e.clientY - physicsRef.current.lastY;
-
-    setRotY((prev) => prev + dx * 0.5);
-    setRotX((prev) => {
-      const next = prev - dy * 0.5;
-      return Math.max(-75, Math.min(75, next));
+  // Toggle Visibility for any Layer
+  const toggleLayerVisibility = (layerKey: keyof CardLayoutState) => {
+    setLayout((prev) => {
+      const nextVisible = !prev[layerKey].visible;
+      const layerTitle = getLayerName(layerKey);
+      onToast(
+        nextVisible ? (lang === 'zh' ? `已显示: ${layerTitle}` : `Shown: ${layerTitle}`) : (lang === 'zh' ? `已删除/隐藏: ${layerTitle}` : `Hidden: ${layerTitle}`),
+        nextVisible ? (lang === 'zh' ? '元素已恢复显示' : 'Layer restored') : (lang === 'zh' ? '卡面已精简，导出时不包含此元素' : 'Layer will not be included in export'),
+        'info'
+      );
+      return {
+        ...prev,
+        [layerKey]: {
+          ...prev[layerKey],
+          visible: nextVisible
+        }
+      };
     });
+  };
 
-    physicsRef.current = {
-      vx: (dx / dt) * 12,
-      vy: (dy / dt) * 12,
-      lastX: e.clientX,
-      lastY: e.clientY,
-      lastTime: now,
+  // Element Dragging Handler in 2D Layout Mode
+  const startElementDrag = (layerKey: keyof CardLayoutState, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedLayer(layerKey);
+    dragInfoRef.current = {
+      isDraggingElement: true,
+      layerKey,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: layout[layerKey].x,
+      origY: layout[layerKey].y
     };
   };
 
-  const handleMouseUpOrLeave = () => {
+  // Stage Handlers
+  const handleStageMouseDown = (e: React.MouseEvent) => {
+    if (viewMode === '3d') {
+      setIsDragging(true);
+      isDraggingRef.current = true;
+      setIsAutoSpin(false);
+      physicsRef.current = {
+        vx: 0,
+        vy: 0,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        lastTime: performance.now(),
+      };
+    }
+  };
+
+  const handleStageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragInfoRef.current.isDraggingElement && dragInfoRef.current.layerKey && cardContainerRef.current) {
+      const cardRect = cardContainerRef.current.getBoundingClientRect();
+      const dxPx = e.clientX - dragInfoRef.current.startX;
+      const dyPx = e.clientY - dragInfoRef.current.startY;
+      const dxPct = (dxPx / cardRect.width) * 100;
+      const dyPct = (dyPx / cardRect.height) * 100;
+
+      const layerKey = dragInfoRef.current.layerKey;
+      const newX = Math.round(Math.max(-10, Math.min(95, dragInfoRef.current.origX + dxPct)));
+      const newY = Math.round(Math.max(-10, Math.min(95, dragInfoRef.current.origY + dyPct)));
+
+      setLayout((prev) => ({
+        ...prev,
+        [layerKey]: {
+          ...prev[layerKey],
+          x: newX,
+          y: newY
+        }
+      }));
+      return;
+    }
+
+    if (viewMode === '3d' && isDraggingRef.current) {
+      const now = performance.now();
+      const dt = Math.max(1, now - physicsRef.current.lastTime);
+      const dx = e.clientX - physicsRef.current.lastX;
+      const dy = e.clientY - physicsRef.current.lastY;
+
+      setRotY((prev) => prev + dx * 0.45);
+      setRotX((prev) => Math.max(-75, Math.min(75, prev - dy * 0.45)));
+
+      physicsRef.current = {
+        vx: (dx / dt) * 10,
+        vy: (dy / dt) * 10,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        lastTime: now,
+      };
+    }
+  };
+
+  const handleStageMouseUp = () => {
     setIsDragging(false);
     isDraggingRef.current = false;
+    dragInfoRef.current.isDraggingElement = false;
   };
 
-  // Touch handlers for mobile
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    setIsDragging(true);
-    isDraggingRef.current = true;
-    setIsAutoSpin(false);
-    physicsRef.current = {
-      vx: 0,
-      vy: 0,
-      lastX: e.touches[0].clientX,
-      lastY: e.touches[0].clientY,
-      lastTime: performance.now(),
-    };
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current || e.touches.length !== 1) return;
-    const now = performance.now();
-    const dt = Math.max(1, now - physicsRef.current.lastTime);
-    const dx = e.touches[0].clientX - physicsRef.current.lastX;
-    const dy = e.touches[0].clientY - physicsRef.current.lastY;
-
-    setRotY((prev) => prev + dx * 0.5);
-    setRotX((prev) => {
-      const next = prev - dy * 0.5;
-      return Math.max(-75, Math.min(75, next));
-    });
-
-    physicsRef.current = {
-      vx: (dx / dt) * 12,
-      vy: (dy / dt) * 12,
-      lastX: e.touches[0].clientX,
-      lastY: e.touches[0].clientY,
-      lastTime: now,
-    };
-  };
-
-  // Acrobatic 360 Full Spin Flip Trick
+  // Acrobatic 360 Flip
   const handleAcrobaticFlip = () => {
+    setViewMode('3d');
     setIsAutoSpin(false);
-    physicsRef.current.vx = 14;
+    physicsRef.current.vx = 16;
     physicsRef.current.vy = 4;
   };
 
-  // Helper to draw rounded rectangle in Canvas
-  const drawRoundRect = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r: number
-  ) => {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  };
-
-  // Helper to draw Verified Badge
-  const drawVerifiedBadge = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    size: number
-  ) => {
-    ctx.save();
-    ctx.fillStyle = '#38BDF8';
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = size * 0.16;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x + size * 0.28, y + size * 0.52);
-    ctx.lineTo(x + size * 0.44, y + size * 0.68);
-    ctx.lineTo(x + size * 0.72, y + size * 0.34);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  // EXPORT 1: 1:1 Pixel-Perfect 2K PNG Card Export
-  const handleExportPng = useCallback(async () => {
+  // EXPORT 1: 100% Pure WYSIWYG Ultra-HD 4K Collectible Card PNG (Direct DOM Capture at 4x DPI)
+  const handleExport2DCardPng = useCallback(async () => {
+    if (!cardFrontRef.current) return;
     try {
       setIsExporting(true);
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      
+      const prevSelected = selectedLayer;
+      setSelectedLayer(null);
+      await new Promise((r) => setTimeout(r, 60));
 
-      const w = 1264;
-      const h = 800;
-      canvas.width = w;
-      canvas.height = h;
-
-      const padding = 16;
-      const cardX = padding;
-      const cardY = padding;
-      const cardW = w - padding * 2;
-      const cardH = h - padding * 2;
-      const outerRadius = 40;
-      const innerRadius = 32;
-      const borderWidth = 10;
-
-      // Outer Border Gradient
-      const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-      if (cardTheme === 'gold') {
-        borderGrad.addColorStop(0, '#FDE047');
-        borderGrad.addColorStop(0.5, '#F59E0B');
-        borderGrad.addColorStop(1, '#FEF08A');
-      } else if (cardTheme === 'cyber') {
-        borderGrad.addColorStop(0, '#C084FC');
-        borderGrad.addColorStop(0.5, '#22D3EE');
-        borderGrad.addColorStop(1, '#EC4899');
-      } else if (cardTheme === 'matrix') {
-        borderGrad.addColorStop(0, '#34D399');
-        borderGrad.addColorStop(0.5, '#22C55E');
-        borderGrad.addColorStop(1, '#5EEAD4');
-      } else if (cardTheme === 'sunset') {
-        borderGrad.addColorStop(0, '#FB7185');
-        borderGrad.addColorStop(0.5, '#F59E0B');
-        borderGrad.addColorStop(1, '#6366F1');
-      } else if (cardTheme === 'ruby') {
-        borderGrad.addColorStop(0, '#F43F5E');
-        borderGrad.addColorStop(0.5, '#DC2626');
-        borderGrad.addColorStop(1, '#F59E0B');
-      } else {
-        borderGrad.addColorStop(0, '#FBBF24');
-        borderGrad.addColorStop(0.5, '#D97706');
-        borderGrad.addColorStop(1, '#FDE68A');
-      }
-
-      ctx.save();
-      drawRoundRect(ctx, cardX, cardY, cardW, cardH, outerRadius);
-      ctx.fillStyle = borderGrad;
-      ctx.fill();
-      ctx.restore();
-
-      // Inner Background
-      const innerX = cardX + borderWidth;
-      const innerY = cardY + borderWidth;
-      const innerW = cardW - borderWidth * 2;
-      const innerH = cardH - borderWidth * 2;
-
-      const innerGrad = ctx.createLinearGradient(innerX, innerY, innerX + innerW, innerY + innerH);
-      if (cardTheme === 'gold') {
-        innerGrad.addColorStop(0, '#1E1503');
-        innerGrad.addColorStop(0.5, '#332205');
-        innerGrad.addColorStop(1, '#120C02');
-      } else if (cardTheme === 'cyber') {
-        innerGrad.addColorStop(0, '#0F0728');
-        innerGrad.addColorStop(0.5, '#1A0B3B');
-        innerGrad.addColorStop(1, '#080318');
-      } else if (cardTheme === 'matrix') {
-        innerGrad.addColorStop(0, '#02180C');
-        innerGrad.addColorStop(0.5, '#042815');
-        innerGrad.addColorStop(1, '#010E07');
-      } else if (cardTheme === 'sunset') {
-        innerGrad.addColorStop(0, '#1A081E');
-        innerGrad.addColorStop(0.5, '#2C0D23');
-        innerGrad.addColorStop(1, '#120417');
-      } else if (cardTheme === 'ruby') {
-        innerGrad.addColorStop(0, '#1A0404');
-        innerGrad.addColorStop(0.5, '#2D0808');
-        innerGrad.addColorStop(1, '#0F0202');
-      } else {
-        innerGrad.addColorStop(0, '#0C0A09');
-        innerGrad.addColorStop(0.5, '#1C1917');
-        innerGrad.addColorStop(1, '#0A0A0A');
-      }
-
-      ctx.save();
-      drawRoundRect(ctx, innerX, innerY, innerW, innerH, innerRadius);
-      ctx.fillStyle = innerGrad;
-      ctx.fill();
-      ctx.clip();
-
-      // Header
-      const headerY = innerY + 45;
-
-      drawRoundRect(ctx, innerX + 45, headerY, 44, 44, 12);
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = 'bold 22px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡', innerX + 67, headerY + 31);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 26px "Space Mono", ui-monospace, monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(cardTitle.toUpperCase(), innerX + 104, headerY + 32);
-
-      // Right Badges
-      const tierBadgeW = 120;
-      const tierBadgeH = 34;
-      const tierBadgeX = innerX + innerW - 45 - tierBadgeW;
-      const tierBadgeY = headerY + 5;
-
-      const rankBadgeW = 125;
-      const rankBadgeH = 34;
-      const rankBadgeX = tierBadgeX - 12 - rankBadgeW;
-      const rankBadgeY = tierBadgeY;
-
-      drawRoundRect(ctx, rankBadgeX, rankBadgeY, rankBadgeW, rankBadgeH, 8);
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = 'bold 15px "Space Mono", ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Rank #${currentMonke.rank || 'N/A'}`, rankBadgeX + rankBadgeW / 2, rankBadgeY + 23);
-
-      drawRoundRect(ctx, tierBadgeX, tierBadgeY, tierBadgeW, tierBadgeH, 17);
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-      ctx.strokeStyle = '#FBBF24';
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 14px "Space Mono", ui-monospace, monospace';
-      ctx.fillText(tier.label, tierBadgeX + tierBadgeW / 2, tierBadgeY + 23);
-
-      // Header Divider
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(innerX + 45, headerY + 62);
-      ctx.lineTo(innerX + innerW - 45, headerY + 62);
-      ctx.stroke();
-
-      // Body (5:7 Grid)
-      const bodyTopY = headerY + 62;
-      const bodyBottomY = innerY + innerH - 65;
-      const bodyH = bodyBottomY - bodyTopY;
-      const bodyCenterY = bodyTopY + bodyH / 2;
-
-      const leftColW = innerW * 0.416;
-      const leftColCenterX = innerX + leftColW / 2;
-
-      const baseAvatarBoxSize = 340;
-      const avatarBoxSize = Math.round(baseAvatarBoxSize * (avatarScale / 100));
-      const avatarX = Math.round(leftColCenterX - avatarBoxSize / 2);
-      const avatarY = Math.round(bodyCenterY - avatarBoxSize / 2);
-
-      drawRoundRect(ctx, avatarX, avatarY, avatarBoxSize, avatarBoxSize, 26);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Draw Avatar
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = activeAvatarSrc;
-      await new Promise((res) => {
-        img.onload = res;
-        img.onerror = res;
+      const dataUrl = await toPng(cardFrontRef.current, {
+        pixelRatio: 4,
+        quality: 1,
+        cacheBust: true,
       });
 
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, avatarX + 18, avatarY + 18, avatarBoxSize - 36, avatarBoxSize - 36);
+      setSelectedLayer(prevSelected);
 
-      // Top Left Tag
-      drawRoundRect(ctx, avatarX + 14, avatarY + 14, 72, 26, 6);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 12px "Space Mono", ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`#${currentMonke.id}`, avatarX + 14 + 36, avatarY + 14 + 18);
-
-      // Right Column
-      const rightColX = innerX + leftColW + 20;
-      const rightGroupH = 220;
-      const rightStartY = Math.round(bodyCenterY - rightGroupH / 2);
-
-      let curInfoY = rightStartY + 30;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(ownerHandle, rightColX, curInfoY);
-
-      if (showVerified) {
-        const handleTextWidth = ctx.measureText(ownerHandle).width;
-        drawVerifiedBadge(ctx, rightColX + handleTextWidth + 12, curInfoY - 26, 28);
-      }
-
-      curInfoY += 24;
-      ctx.font = 'bold 13px "Space Mono", ui-monospace, monospace';
-      const titleText = customTitle.toUpperCase();
-      const titleBoxW = ctx.measureText(titleText).width + 24;
-      const titleBoxH = 28;
-
-      drawRoundRect(ctx, rightColX, curInfoY, titleBoxW, titleBoxH, 6);
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-
-      ctx.fillStyle = '#FDE68A';
-      ctx.textAlign = 'center';
-      ctx.fillText(titleText, rightColX + titleBoxW / 2, curInfoY + 19);
-
-      curInfoY += 56;
-      const rowLineH = 34;
-
-      ctx.textAlign = 'left';
-      ctx.font = '19px "Space Mono", ui-monospace, monospace';
-      ctx.fillStyle = '#94A3B8';
-      ctx.fillText('Inscription: ', rightColX, curInfoY);
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-      ctx.fillText(`#${currentMonke.inscription}`, rightColX + ctx.measureText('Inscription: ').width, curInfoY);
-
-      curInfoY += rowLineH;
-      ctx.font = '19px "Space Mono", ui-monospace, monospace';
-      ctx.fillStyle = '#94A3B8';
-      ctx.fillText('Block Height: ', rightColX, curInfoY);
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-      ctx.fillText(`#${currentMonke.block}`, rightColX + ctx.measureText('Block Height: ').width, curInfoY);
-
-      curInfoY += rowLineH;
-      ctx.font = '19px "Space Mono", ui-monospace, monospace';
-      ctx.fillStyle = '#94A3B8';
-      ctx.fillText('Traits: ', rightColX, curInfoY);
-      ctx.fillStyle = '#F8FAFC';
-      ctx.font = 'bold 19px "Space Mono", ui-monospace, monospace';
-      ctx.fillText(`${activeTraits.Count || 4} Parts`, rightColX + ctx.measureText('Traits: ').width, curInfoY);
-
-      // Footer
-      const footerDividerY = innerY + innerH - 65;
-      const footerTextY = footerDividerY + 38;
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(innerX + 45, footerDividerY);
-      ctx.lineTo(innerX + innerW - 45, footerDividerY);
-      ctx.stroke();
-
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'italic 17px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`"${customMotto}"`, innerX + 45, footerTextY);
-
-      ctx.fillStyle = '#FBBF24';
-      ctx.font = 'bold 16px "Space Mono", ui-monospace, monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText('ORDINALS VERIFIED', innerX + innerW - 45, footerTextY);
-
-      ctx.restore();
-
-      const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `NodeMonke_${currentMonke.id}_Passport_${cardTheme}.png`;
-      link.href = url;
+      link.download = `NodeMonke_${currentMonke.id}_4K_Passport_${cardTheme}.png`;
+      link.href = dataUrl;
       link.click();
 
-      confetti({ particleCount: 60, spread: 60, origin: { y: 0.8 } });
-      onToast('通行证正面 PNG 导出成功！', `NodeMonke #${currentMonke.id} 高清 1:1 卡片已保存`, 'success');
+      confetti({ particleCount: 70, spread: 70, origin: { y: 0.8 } });
+      onToast(t.passportExportSuccess, t.passportExportSuccessDesc, 'success');
     } catch (e: any) {
-      console.error('Export PNG error:', e);
-      onToast('导出失败', e?.message || '请重试', 'error');
+      console.error('WYSIWYG Export error:', e);
+      onToast(lang === 'zh' ? '导出失败' : 'Export Failed', e?.message || 'Please try again', 'error');
     } finally {
       setIsExporting(false);
     }
-  }, [cardTheme, cardTitle, currentMonke, tier, ownerHandle, showVerified, customTitle, customMotto, activeAvatarSrc, activeTraits, avatarScale, onToast]);
+  }, [currentMonke, cardTheme, selectedLayer, t, lang, onToast]);
 
-  // EXPORT 2: Standalone Interactive 3D HTML File Generator
+  // EXPORT 2: Standalone Interactive 3D HTML Generator
   const handleExport3DHtml = useCallback(async () => {
     try {
       setIsExporting(true);
-
       const activeThemeObj = THEMES.find((t) => t.id === cardTheme) || THEMES[0];
 
-      // Convert Avatar to Base64 Data URL for 100% offline standalone usage
       let avatarBase64 = activeAvatarSrc;
       try {
         const c = document.createElement('canvas');
@@ -702,7 +493,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       }
 
       const htmlContent = `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -723,20 +514,6 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       user-select: none;
       touch-action: none;
     }
-    .hint {
-      position: absolute;
-      top: 24px;
-      font-size: 13px;
-      color: #94A3B8;
-      background: rgba(0,0,0,0.65);
-      padding: 8px 20px;
-      border-radius: 99px;
-      border: 1px solid rgba(255,255,255,0.12);
-      backdrop-filter: blur(12px);
-      z-index: 100;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
     .stage {
       width: 100%;
       max-width: 660px;
@@ -749,21 +526,17 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       position: relative;
     }
     .stage:active { cursor: grabbing; }
-
-    /* Ground Shadow & Reflection Platform */
     .floor-shadow {
       position: absolute;
-      bottom: -40px;
+      bottom: -45px;
       width: 80%;
-      height: 40px;
-      background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 80%);
+      height: 44px;
+      background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 80%);
       border-radius: 50%;
-      filter: blur(14px);
+      filter: blur(16px);
       pointer-events: none;
       transform: rotateX(80deg);
-      transition: transform 0.1s ease;
     }
-
     .card-wrap {
       width: 100%;
       height: 100%;
@@ -771,17 +544,14 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       transform-style: preserve-3d;
       will-change: transform;
     }
-
-    /* 3D Multi-Layer Physical Card Thickness & Rim */
     .card-rim {
       position: absolute;
       inset: 0;
       border-radius: 28px;
       background: ${activeThemeObj.rimColor};
       transform: translateZ(0px);
-      box-shadow: 0 35px 90px rgba(0,0,0,0.9), 0 0 40px ${activeThemeObj.glowColor};
+      box-shadow: 0 35px 90px rgba(0,0,0,0.95), 0 0 30px rgba(0,0,0,0.8);
     }
-
     .card-face {
       position: absolute;
       inset: 0;
@@ -792,344 +562,251 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       -webkit-backface-visibility: hidden;
       transform-style: preserve-3d;
     }
-
-    .card-front {
-      transform: translateZ(8px);
-    }
-
-    .card-back {
-      transform: rotateY(180deg) translateZ(8px);
-    }
-
+    .card-front { transform: translateZ(8px); }
+    .card-back { transform: rotateY(180deg) translateZ(8px); }
     .card-inner {
       width: 100%;
       height: 100%;
       border-radius: 22px;
       background: ${activeThemeObj.gradCss};
-      padding: 24px 28px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      padding: 20px;
       position: relative;
+      overflow: hidden;
       transform-style: preserve-3d;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.18), inset 0 -1px 2px rgba(0,0,0,0.8);
     }
-
-    /* Holographic Light Flare Shader */
     .sheen {
       position: absolute;
       inset: 0;
       border-radius: 22px;
       pointer-events: none;
-      mix-blend-mode: color-dodge;
-      opacity: 0.65;
-      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.85) 0%, rgba(236,72,153,0.45) 25%, rgba(59,130,246,0.45) 50%, transparent 75%);
+      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0.02) 100%);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.15), inset 0 -1px 2px rgba(0,0,0,0.8);
       z-index: 30;
       transform: translateZ(2px);
     }
-
-    /* Parallax Floating 3D Depth Elements */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(255,255,255,0.12);
-      padding-bottom: 12px;
-      transform: translateZ(20px);
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 800;
-      font-size: 15px;
-      letter-spacing: 1px;
-    }
-    .header-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: rgba(245,158,11,0.25);
-      border: 1px solid rgba(245,158,11,0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #FBBF24;
-      font-size: 14px;
-    }
-    .badges {
+    .header-box {
+      position: absolute;
+      left: ${layout.header.x}%;
+      top: ${layout.header.y}%;
       display: flex;
       align-items: center;
       gap: 8px;
+      font-weight: 800;
+      font-size: 14px;
+      transform: scale(${layout.header.scale / 100}) translateZ(20px);
+      transform-origin: top left;
     }
-    .tier-badge {
-      padding: 4px 12px;
-      border-radius: 99px;
-      font-size: 11px;
-      font-weight: 900;
-      background: rgba(245,158,11,0.2);
-      border: 1px solid #FBBF24;
-      color: #FDE68A;
-      box-shadow: 0 4px 12px rgba(245,158,11,0.3);
-    }
-    .rank-badge {
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: #CBD5E1;
-    }
-    .body {
+    .badges-box {
+      position: absolute;
+      left: ${layout.badges.x}%;
+      top: ${layout.badges.y}%;
       display: flex;
       align-items: center;
-      gap: 24px;
-      margin: auto 0;
+      gap: 6px;
+      transform: scale(${layout.badges.scale / 100}) translateZ(20px);
+      transform-origin: top left;
     }
     .avatar-box {
-      width: 154px;
-      height: 154px;
+      position: absolute;
+      left: ${layout.avatar.x}%;
+      top: ${layout.avatar.y}%;
+      width: 140px;
+      height: 140px;
       border-radius: 20px;
-      background: rgba(0,0,0,0.75);
-      border: 1px solid rgba(255,255,255,0.2);
-      position: relative;
+      background: #080a0f;
+      border: 1px solid rgba(255,255,255,0.22);
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.85);
-      transform: translateZ(36px);
-      transform-style: preserve-3d;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.9), 0 15px 35px rgba(0,0,0,0.85);
+      transform: scale(${layout.avatar.scale / 100}) translateZ(36px);
+      transform-origin: top left;
     }
-    .avatar-img {
-      width: 88%;
-      height: 88%;
-      object-fit: contain;
-      image-rendering: pixelated;
-      transform: translateZ(12px);
-    }
-    .avatar-tag {
+    .chip-box {
       position: absolute;
-      top: 6px;
-      left: 6px;
-      background: rgba(0,0,0,0.9);
+      left: ${layout.chip.x}%;
+      top: ${layout.chip.y}%;
+      width: 38px;
+      height: 26px;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #FDE68A 0%, #D97706 50%, #B45309 100%);
+      border: 1px solid rgba(255,255,255,0.6);
+      transform: scale(${layout.chip.scale / 100}) translateZ(24px);
+      transform-origin: top left;
+    }
+    .genesis-tag {
+      position: absolute;
+      left: ${layout.genesisTag.x}%;
+      top: ${layout.genesisTag.y}%;
       padding: 2px 8px;
       border-radius: 5px;
       font-size: 10px;
       font-weight: 800;
-      border: 1px solid rgba(255,255,255,0.15);
-      transform: translateZ(16px);
+      background: rgba(245,158,11,0.15);
+      border: 1px solid rgba(245,158,11,0.35);
+      color: #FDE68A;
+      transform: scale(${layout.genesisTag.scale / 100}) translateZ(24px);
+      transform-origin: top left;
     }
-    .info {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      transform: translateZ(28px);
-    }
-    .handle {
-      font-size: 24px;
+    .handle-box {
+      position: absolute;
+      left: ${layout.ownerHandle.x}%;
+      top: ${layout.ownerHandle.y}%;
+      font-size: 20px;
       font-weight: 900;
       display: flex;
       align-items: center;
-      gap: 8px;
-      text-shadow: 0 4px 12px rgba(0,0,0,0.8);
+      gap: 6px;
+      transform: scale(${layout.ownerHandle.scale / 100}) translateZ(26px);
+      transform-origin: top left;
     }
-    .verified {
-      color: #38BDF8;
-      font-size: 18px;
-    }
-    .title-pill {
-      display: inline-block;
-      width: max-content;
-      padding: 3px 12px;
+    .pill-box {
+      position: absolute;
+      left: ${layout.badgePill.x}%;
+      top: ${layout.badgePill.y}%;
+      padding: 3px 10px;
       border-radius: 6px;
       background: rgba(245,158,11,0.25);
-      border: 1px solid rgba(245,158,11,0.45);
+      border: 1px solid rgba(245,158,11,0.5);
       color: #FDE68A;
       font-size: 11px;
       font-weight: 800;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transform: scale(${layout.badgePill.scale / 100}) translateZ(24px);
+      transform-origin: top left;
     }
-    .meta-rows {
+    .attr-box {
+      position: absolute;
+      left: ${layout.attributes.x}%;
+      top: ${layout.attributes.y}%;
       font-size: 12px;
       color: #94A3B8;
       display: flex;
       flex-direction: column;
       gap: 3px;
-      margin-top: 4px;
+      transform: scale(${layout.attributes.scale / 100}) translateZ(24px);
+      transform-origin: top left;
     }
-    .meta-rows strong { color: #F8FAFC; }
-    .footer {
-      border-top: 1px solid rgba(255,255,255,0.12);
-      padding-top: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .attr-box strong { color: #F8FAFC; }
+    .motto-box {
+      position: absolute;
+      left: ${layout.footerMotto.x}%;
+      top: ${layout.footerMotto.y}%;
       font-size: 11px;
       color: #94A3B8;
-      transform: translateZ(18px);
+      font-style: italic;
+      transform: scale(${layout.footerMotto.scale / 100}) translateZ(18px);
+      transform-origin: top left;
     }
-    .verified-stamp {
+    .ver-box {
+      position: absolute;
+      left: ${layout.footerVerified.x}%;
+      top: ${layout.footerVerified.y}%;
+      font-size: 11px;
       color: #FBBF24;
       font-weight: 900;
+      transform: scale(${layout.footerVerified.scale / 100}) translateZ(18px);
+      transform-origin: top left;
     }
-    .back-traits {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      width: 100%;
-      margin: 12px 0;
-      transform: translateZ(26px);
-    }
-    .trait-chip {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
-    .controls {
-      position: absolute;
-      bottom: 24px;
-      display: flex;
-      gap: 10px;
-      z-index: 100;
-    }
+    .controls { position: absolute; bottom: 20px; display: flex; gap: 8px; z-index: 100; }
     .btn {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #FFFFFF;
-      padding: 9px 18px;
-      border-radius: 14px;
-      font-size: 12px;
-      font-weight: 800;
-      cursor: pointer;
-      backdrop-filter: blur(12px);
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: #FFFFFF; padding: 8px 16px; border-radius: 12px; font-size: 12px;
+      font-weight: 800; cursor: pointer; backdrop-filter: blur(12px);
       transition: all 0.2s;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     }
     .btn:hover { background: rgba(255,255,255,0.22); transform: translateY(-2px); }
   </style>
 </head>
 <body>
-  <div class="hint">⚡ 物理惯性阻尼 • 鼠标 / 触屏任意拖拽 360° 自由翻滚 • 视差悬浮深度</div>
-
   <div class="stage" id="stage">
     <div class="card-wrap" id="cardWrap">
-      
-      <!-- Card Rim Extrusion -->
       <div class="card-rim"></div>
-
-      <!-- FRONT FACE -->
       <div class="card-face card-front">
         <div class="card-inner">
-          <div class="sheen" id="sheenFront"></div>
+          <div class="sheen"></div>
           
-          <div class="header">
-            <div class="header-left">
-              <div class="header-icon">⚡</div>
-              <span>${cardTitle}</span>
-            </div>
-            <div class="badges">
-              <div class="rank-badge">Rank #${currentMonke.rank || 'N/A'}</div>
-              <div class="tier-badge">${tier.label}</div>
-            </div>
-          </div>
+          ${layout.header.visible ? `
+          <div class="header-box">
+            <img src="${NODE_STRATEGY_LOGO}" alt="Logo" style="width:20px;height:20px;object-fit:contain;image-rendering:pixelated;">
+            <span>${cardTitle}</span>
+          </div>` : ''}
 
-          <div class="body">
-            <div class="avatar-box">
-              <div class="avatar-tag">#${currentMonke.id}</div>
-              <img src="${avatarBase64}" alt="NodeMonke" class="avatar-img">
-            </div>
-            <div class="info">
-              <div class="handle">
-                <span>${ownerHandle}</span>
-                ${showVerified ? '<span class="verified">✓</span>' : ''}
-              </div>
-              <div class="title-pill">${customTitle}</div>
-              <div class="meta-rows">
-                <div>Inscription: <strong>#${currentMonke.inscription}</strong></div>
-                <div>Block Height: <strong>#${currentMonke.block}</strong></div>
-                <div>Traits: <strong>${activeTraits.Count || 4} Parts</strong></div>
-              </div>
-            </div>
-          </div>
+          ${layout.badges.visible ? `
+          <div class="badges-box">
+            <span style="padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);font-size:10px;font-weight:bold;">Rank #${currentMonke.rank || 'N/A'}</span>
+            <span style="padding:2px 8px;border-radius:99px;background:rgba(245,158,11,0.25);border:1px solid #FBBF24;color:#FDE68A;font-size:10px;font-weight:900;">${tier.label}</span>
+          </div>` : ''}
 
-          <div class="footer">
-            <div>"${customMotto}"</div>
-            <div class="verified-stamp">ORDINALS VERIFIED</div>
-          </div>
+          ${layout.avatar.visible ? `
+          <div class="avatar-box">
+            <span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.9);padding:2px 6px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,0.2)">#${currentMonke.id}</span>
+            <img src="${avatarBase64}" alt="Avatar" style="width:85%;height:85%;object-fit:contain;image-rendering:pixelated;">
+          </div>` : ''}
+
+          ${layout.chip.visible ? '<div class="chip-box"></div>' : ''}
+          ${layout.genesisTag.visible ? '<div class="genesis-tag">GENESIS 10K</div>' : ''}
+
+          ${layout.ownerHandle.visible ? `
+          <div class="handle-box">
+            <span>${ownerHandle}</span>
+            ${showVerified ? '<span style="color:#38BDF8;font-size:16px;">✓</span>' : ''}
+          </div>` : ''}
+
+          ${layout.badgePill.visible ? `<div class="pill-box">${customTitle}</div>` : ''}
+
+          ${layout.attributes.visible ? `
+          <div class="attr-box">
+            <div>Inscription: <strong>#${currentMonke.inscription}</strong></div>
+            <div>Block Height: <strong>#${currentMonke.block}</strong></div>
+            <div>Traits: <strong>${activeTraits.Count || 4} Parts</strong></div>
+          </div>` : ''}
+
+          ${layout.qrCode.visible && qrDataUrl ? `
+          <div style="position:absolute;left:${layout.qrCode.x}%;top:${layout.qrCode.y}%;width:64px;border-radius:10px;background:rgba(0,0,0,0.85);border:1px solid rgba(245,158,11,0.4);display:flex;flex-direction:column;align-items:center;padding:5px;box-shadow:0 10px 25px rgba(0,0,0,0.8);transform:scale(${layout.qrCode.scale / 100}) translateZ(28px);transform-origin:top left;">
+            <img src="${qrDataUrl}" alt="QR" style="width:100%;aspect-ratio:1;object-fit:contain;">
+            <span style="font-size:6px;color:#FDE68A;font-weight:bold;margin-top:2px;">SCAN TO VERIFY</span>
+          </div>` : ''}
+
+          ${layout.footerMotto.visible ? `<div class="motto-box">"${customMotto}"</div>` : ''}
+          ${layout.footerVerified.visible ? `<div class="ver-box">ORDINALS VERIFIED</div>` : ''}
         </div>
       </div>
-
-      <!-- BACK FACE -->
       <div class="card-face card-back">
         <div class="card-inner">
-          <div class="sheen" id="sheenBack"></div>
-          
-          <div class="header">
-            <div class="header-left">
-              <span style="color: #FBBF24;">AUTHENTICATED ORDINALS INSCRIPTION</span>
-            </div>
-            <div style="font-size: 11px; color: #94A3B8;">SHA256: ${currentMonke.id.toString(16).padStart(8, '0')}...</div>
+          <div style="font-size:13px;font-weight:bold;color:#FBBF24;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">AUTHENTICATED ORDINALS INSCRIPTION</div>
+          <div style="margin:20px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+            <div style="background:rgba(255,255,255,0.06);padding:8px;border-radius:8px;">Body: <strong>${activeTraits.Body}</strong></div>
+            <div style="background:rgba(255,255,255,0.06);padding:8px;border-radius:8px;">Head: <strong>${activeTraits.Head}</strong></div>
+            <div style="background:rgba(255,255,255,0.06);padding:8px;border-radius:8px;">Eyes: <strong>${activeTraits.Eyes}</strong></div>
+            <div style="background:rgba(255,255,255,0.06);padding:8px;border-radius:8px;">Earring: <strong>${activeTraits.Earring}</strong></div>
           </div>
-
-          <div class="back-traits">
-            <div class="trait-chip"><span>Body:</span> <strong>${activeTraits.Body}</strong></div>
-            <div class="trait-chip"><span>Head:</span> <strong>${activeTraits.Head}</strong></div>
-            <div class="trait-chip"><span>Eyes:</span> <strong>${activeTraits.Eyes}</strong></div>
-            <div class="trait-chip"><span>Earring:</span> <strong>${activeTraits.Earring}</strong></div>
-          </div>
-
-          <div class="footer">
-            <div>GENESIS BLOCK #776487</div>
-            <div style="color: #34D399; font-weight: 800;">100% ON-CHAIN</div>
+          <div style="font-size:10px;color:#94A3B8;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;justify-content:space-between;">
+            <span>GENESIS BLOCK #776487</span>
+            <span style="color:#34D399;font-weight:bold;">100% ON-CHAIN</span>
           </div>
         </div>
       </div>
-
     </div>
     <div class="floor-shadow" id="floorShadow"></div>
   </div>
-
   <div class="controls">
-    <button class="btn" onclick="setAngle(0, 0)">🎯 正面</button>
-    <button class="btn" onclick="setAngle(0, 180)">🔄 背面</button>
-    <button class="btn" onclick="setAngle(15, 35)">📐 3D 俯瞰</button>
-    <button class="btn" onclick="flipAcrobatic()">💫 3D 翻滚</button>
-    <button class="btn" onclick="toggleAutoSpin()">🌀 360° 自动巡航</button>
+    <button class="btn" onclick="setAngle(0, 0)">🎯 ${t.passportAngleFront}</button>
+    <button class="btn" onclick="setAngle(0, 180)">🔄 ${t.passportAngleBack}</button>
+    <button class="btn" onclick="setAngle(15, 35)">📐 ${t.passportAngleTop}</button>
+    <button class="btn" onclick="flipAcrobatic()">💫 ${t.passportAngleFlip}</button>
+    <button class="btn" onclick="toggleAutoSpin()">🌀 ${t.passportAngleAuto}</button>
   </div>
-
   <script>
-    let rotX = 0;
-    let rotY = 0;
-    let vx = 0;
-    let vy = 0;
-    let lastX = 0;
-    let lastY = 0;
-    let lastTime = 0;
-    let isDragging = false;
-    let isAutoSpin = false;
-
+    let rotX = 0, rotY = 0, vx = 0, vy = 0, lastX = 0, lastY = 0, lastTime = 0, isDragging = false, isAutoSpin = false;
     const card = document.getElementById('cardWrap');
     const stage = document.getElementById('stage');
-    const sheenFront = document.getElementById('sheenFront');
-    const sheenBack = document.getElementById('sheenBack');
     const floorShadow = document.getElementById('floorShadow');
 
     function updateCard() {
-      card.style.transform = \`rotateX(\${rotX}deg) rotateY(\${rotY}deg)\`;
-      
-      const normY = ((rotY % 360) + 360) % 360;
-      const sheenX = (normY / 360) * 100;
-      sheenFront.style.background = \`radial-gradient(circle at \${sheenX}% 50%, rgba(255,255,255,0.85) 0%, rgba(236,72,153,0.45) 25%, rgba(59,130,246,0.45) 50%, transparent 75%)\`;
-      sheenBack.style.background = \`radial-gradient(circle at \${100 - sheenX}% 50%, rgba(255,255,255,0.85) 0%, rgba(236,72,153,0.45) 25%, rgba(59,130,246,0.45) 50%, transparent 75%)\`;
-
+      card.style.transform = "rotateX(" + rotX + "deg) rotateY(" + rotY + "deg)";
       const shadowScale = Math.abs(Math.cos(rotY * Math.PI / 180));
-      floorShadow.style.transform = \`rotateX(80deg) scale(\${0.5 + shadowScale * 0.5})\`;
+      floorShadow.style.transform = "rotateX(80deg) scale(" + (0.5 + shadowScale * 0.5) + ")";
     }
 
     function physicsLoop() {
@@ -1139,9 +816,9 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
           updateCard();
         } else if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
           rotY += vx;
-          rotX = Math.max(-65, Math.min(65, rotX - vy));
-          vx *= 0.93;
-          vy *= 0.93;
+          rotX = Math.max(-75, Math.min(75, rotX - vy));
+          vx *= 0.94;
+          vy *= 0.94;
           updateCard();
         }
       }
@@ -1149,82 +826,24 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
     }
     requestAnimationFrame(physicsLoop);
 
-    stage.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      isAutoSpin = false;
-      vx = 0;
-      vy = 0;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      lastTime = performance.now();
+    stage.addEventListener('mousedown', function(e) {
+      isDragging = true; isAutoSpin = false; vx = 0; vy = 0;
+      lastX = e.clientX; lastY = e.clientY; lastTime = performance.now();
     });
-
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('mousemove', function(e) {
       if (!isDragging) return;
       const now = performance.now();
       const dt = Math.max(1, now - lastTime);
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      rotY += dx * 0.5;
-      rotX = Math.max(-75, Math.min(75, rotX - dy * 0.5));
-      vx = (dx / dt) * 12;
-      vy = (dy / dt) * 12;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      lastTime = now;
+      const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+      rotY += dx * 0.45; rotX = Math.max(-75, Math.min(75, rotX - dy * 0.45));
+      vx = (dx / dt) * 10; vy = (dy / dt) * 10;
+      lastX = e.clientX; lastY = e.clientY; lastTime = now;
       updateCard();
     });
-
-    window.addEventListener('mouseup', () => { isDragging = false; });
-
-    // Touch Support
-    stage.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      isDragging = true;
-      isAutoSpin = false;
-      vx = 0;
-      vy = 0;
-      lastX = e.touches[0].clientX;
-      lastY = e.touches[0].clientY;
-      lastTime = performance.now();
-    });
-
-    window.addEventListener('touchmove', (e) => {
-      if (!isDragging || e.touches.length !== 1) return;
-      const now = performance.now();
-      const dt = Math.max(1, now - lastTime);
-      const dx = e.touches[0].clientX - lastX;
-      const dy = e.touches[0].clientY - lastY;
-      rotY += dx * 0.5;
-      rotX = Math.max(-75, Math.min(75, rotX - dy * 0.5));
-      vx = (dx / dt) * 12;
-      vy = (dy / dt) * 12;
-      lastX = e.touches[0].clientX;
-      lastY = e.touches[0].clientY;
-      lastTime = now;
-      updateCard();
-    });
-
-    window.addEventListener('touchend', () => { isDragging = false; });
-
-    function setAngle(x, y) {
-      isAutoSpin = false;
-      rotX = x;
-      rotY = y;
-      vx = 0;
-      vy = 0;
-      updateCard();
-    }
-
-    function flipAcrobatic() {
-      isAutoSpin = false;
-      vx = 14;
-      vy = 4;
-    }
-
-    function toggleAutoSpin() {
-      isAutoSpin = !isAutoSpin;
-    }
+    window.addEventListener('mouseup', function() { isDragging = false; });
+    function setAngle(x, y) { isAutoSpin = false; rotX = x; rotY = y; vx = 0; vy = 0; updateCard(); }
+    function flipAcrobatic() { isAutoSpin = false; vx = 16; vy = 4; }
+    function toggleAutoSpin() { isAutoSpin = !isAutoSpin; }
   </script>
 </body>
 </html>`;
@@ -1232,22 +851,22 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `NodeMonke_${currentMonke.id}_3D_Interactive_Card.html`;
+      link.download = `NodeMonke_${currentMonke.id}_3D_Custom_Passport.html`;
       link.href = url;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 100);
 
-      confetti({ particleCount: 70, spread: 70, origin: { y: 0.8 } });
-      onToast('3D 交互网页文件已保存！', `可直接双击打开 .html 文件，随时在浏览器中 360° 交互翻转！`, 'success');
+      confetti({ particleCount: 75, spread: 75, origin: { y: 0.8 } });
+      onToast(t.passportHtmlExportSuccess, t.passportHtmlExportSuccessDesc, 'success');
     } catch (e: any) {
       console.error('Export 3D HTML error:', e);
-      onToast('导出 3D 网页失败', e?.message || '请重试', 'error');
+      onToast(lang === 'zh' ? '导出 3D 网页失败' : 'Export 3D HTML Failed', e?.message || 'Please try again', 'error');
     } finally {
       setIsExporting(false);
     }
-  }, [cardTheme, cardTitle, currentMonke, tier, ownerHandle, showVerified, customTitle, customMotto, activeAvatarSrc, activeTraits, onToast]);
+  }, [cardTheme, cardTitle, currentMonke, tier, ownerHandle, showVerified, customTitle, customMotto, activeAvatarSrc, activeTraits, layout, qrDataUrl, t, lang, onToast]);
 
-  const activeThemeObj = THEMES.find((t) => t.id === cardTheme) || THEMES[0];
+  const activeThemeObj = THEMES.find((th) => th.id === cardTheme) || THEMES[0];
 
   return (
     <div className="min-h-[calc(100vh-140px)] w-full max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6 select-none">
@@ -1256,277 +875,508 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-mono text-base font-bold shadow-lg">
-              🎴
+            <div className="w-9 h-9 rounded-xl bg-black/60 border border-amber-500/40 flex items-center justify-center p-1.5 shadow-lg">
+              <img src={NODE_STRATEGY_LOGO} alt="Node Monke Logo" className="w-full h-full object-contain pixelated" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              3D Web3 极客卡片工坊 <span className="text-amber-400 text-lg font-sans">Card Studio</span>
+              {t.passportTitle}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400">
-            物理惯性阻尼 + <strong>真实 3D 多图层视差悬浮深度</strong> + 任意角度 360° 自由翻滚，一键导出 2K 高清正面图与<strong>独立 3D 交互网页 HTML 文件</strong>！
+            {t.passportSub}
           </p>
         </div>
 
-        {/* Dual Export Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={handleExportPng}
+            onClick={handleExport2DCardPng}
             disabled={isExporting}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs transition-all active:scale-95 border border-white/10 shadow-md"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:brightness-110 text-black font-mono font-extrabold text-xs transition-all active:scale-95 shadow-lg shadow-amber-500/20"
+            title={t.passportExportPng}
           >
-            <Download className="w-4 h-4 text-amber-400" />
-            <span>💾 导出正面图 PNG</span>
+            <Download className="w-4 h-4 text-black" />
+            <span>{t.passportExportPng}</span>
           </button>
 
           <button
             onClick={handleExport3DHtml}
             disabled={isExporting}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-600 to-amber-500 hover:brightness-110 text-white font-mono font-extrabold text-xs transition-all active:scale-95 shadow-lg shadow-purple-500/25"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs transition-all active:scale-95 border border-white/10 shadow-md"
+            title={t.passportExportHtml}
           >
             <FileCode className="w-4 h-4 text-amber-300" />
-            <span>🌐 导出 3D 交互网页 HTML</span>
+            <span>{t.passportExportHtml}</span>
           </button>
         </div>
       </div>
 
-      {/* Main Studio Grid: 3D Stage (Left 7 Cols) & Custom Canvas Editor (Right 5 Cols) */}
+      {/* Main Studio Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left 3D Stage Container */}
-        <div className="lg:col-span-7 flex flex-col items-center justify-center p-6 sm:p-10 rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-xl shadow-2xl relative min-h-[620px] overflow-hidden">
+        {/* Left Stage Container */}
+        <div 
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onMouseLeave={handleStageMouseUp}
+          className="lg:col-span-7 flex flex-col items-center justify-center p-6 sm:p-8 rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-xl shadow-2xl relative min-h-[620px] overflow-hidden"
+        >
           
-          {/* Ambient Studio Lighting */}
+          {/* Subtle Ambient Depth */}
           <div 
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[540px] h-[380px] rounded-full blur-[140px] pointer-events-none transition-colors duration-500" 
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[320px] rounded-full blur-[120px] pointer-events-none opacity-30 transition-colors duration-500" 
             style={{ backgroundColor: activeThemeObj.glowColor }}
           />
 
-          {/* Top Stage Badges & Angle Controls */}
+          {/* Mode Switch Bar */}
           <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 z-30">
-            <span className="text-[11px] font-mono text-slate-300 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>物理惯性阻尼 • 视差悬浮深度</span>
-            </span>
-
+            {/* View Mode Toggle */}
             <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-xl border border-white/10 text-xs font-mono">
               <button
-                onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(0); }}
-                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all', rotY === 0 ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white')}
+                onClick={() => { setViewMode('layout'); setRotX(0); setRotY(0); setIsAutoSpin(false); }}
+                className={clsx(
+                  'px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
+                  viewMode === 'layout' ? 'bg-amber-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                )}
               >
-                正面
+                <Move className="w-3.5 h-3.5" />
+                <span>{t.passportModeLayout}</span>
               </button>
               <button
-                onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(180); }}
-                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all', Math.abs(rotY % 360) === 180 ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white')}
+                onClick={() => { setViewMode('3d'); setRotX(15); setRotY(32); }}
+                className={clsx(
+                  'px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
+                  viewMode === '3d' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                )}
               >
-                背面
-              </button>
-              <button
-                onClick={() => { setIsAutoSpin(false); setRotX(15); setRotY(35); }}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white"
-              >
-                3D俯瞰
-              </button>
-              <button
-                onClick={handleAcrobaticFlip}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-amber-300 hover:bg-amber-500/20 transition-all flex items-center gap-1"
-                title="触发高阶 3D 空中翻滚特效"
-              >
-                <Zap className="w-3 h-3 text-amber-400" />
-                <span>翻滚</span>
-              </button>
-              <button
-                onClick={() => setIsAutoSpin((s) => !s)}
-                className={clsx('px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1', isAutoSpin ? 'bg-purple-500 text-white shadow-sm' : 'text-slate-400 hover:text-white')}
-              >
-                <RotateCw className={clsx('w-3 h-3', isAutoSpin ? 'animate-spin' : '')} />
-                <span>巡航</span>
+                <Compass className="w-3.5 h-3.5" />
+                <span>{t.passportMode3d}</span>
               </button>
             </div>
+
+            {/* 3D Angle Quick Toggles (If in 3D Mode) */}
+            {viewMode === '3d' ? (
+              <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-xl border border-white/10 text-xs font-mono">
+                <button
+                  onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(0); }}
+                  className={clsx('px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all', rotX === 0 && rotY === 0 ? 'bg-amber-500 text-black' : 'text-slate-400 hover:text-white')}
+                >
+                  {t.passportAngleFront}
+                </button>
+                <button
+                  onClick={() => { setIsAutoSpin(false); setRotX(0); setRotY(180); }}
+                  className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white"
+                >
+                  {t.passportAngleBack}
+                </button>
+                <button
+                  onClick={() => { setIsAutoSpin(false); setRotX(15); setRotY(35); }}
+                  className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white"
+                >
+                  {t.passportAngleTop}
+                </button>
+                <button
+                  onClick={handleAcrobaticFlip}
+                  className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-amber-300 hover:bg-amber-500/20 transition-all flex items-center gap-0.5"
+                >
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  <span>{t.passportAngleFlip}</span>
+                </button>
+                <button
+                  onClick={() => setIsAutoSpin((s) => !s)}
+                  className={clsx('px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-0.5', isAutoSpin ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white')}
+                >
+                  <RotateCw className={clsx('w-3 h-3', isAutoSpin ? 'animate-spin' : '')} />
+                  <span>{t.passportAngleAuto}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleResetLayout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white text-xs font-mono font-bold border border-white/10 transition-all active:scale-95"
+                title={t.passportResetLayout}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.passportResetLayout}</span>
+              </button>
+            )}
           </div>
 
-          {/* 360-Degree Free Orbit 3D Card with Parallax Depth */}
+          {/* Interactive Card Stage */}
           <div 
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUpOrLeave}
-            onMouseLeave={handleMouseUpOrLeave}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleMouseUpOrLeave}
-            className="relative perspective-[1400px] w-full max-w-[560px] aspect-[1.58/1] cursor-grab active:cursor-grabbing select-none my-auto mt-14 mb-8 flex items-center justify-center"
+            ref={cardContainerRef}
+            onMouseDown={handleStageMouseDown}
+            className={clsx(
+              'relative w-full max-w-[560px] aspect-[1.58/1] select-none my-auto mt-14 mb-8 flex items-center justify-center transition-all',
+              viewMode === '3d' ? 'perspective-[1400px] cursor-grab active:cursor-grabbing' : 'cursor-default'
+            )}
           >
-            {/* Dynamic Ground Shadow Platform */}
-            <div 
-              className="absolute -bottom-10 w-[80%] h-10 rounded-full blur-xl pointer-events-none transition-transform duration-100"
-              style={{
-                background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 80%)',
-                transform: `rotateX(80deg) scale(${0.5 + Math.abs(Math.cos(rotY * Math.PI / 180)) * 0.5})`,
-              }}
-            />
+            {/* Ground Shadow in 3D Mode */}
+            {viewMode === '3d' && (
+              <div 
+                className="absolute -bottom-10 w-[82%] h-10 rounded-full blur-xl pointer-events-none transition-transform duration-100"
+                style={{
+                  background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 80%)',
+                  transform: `rotateX(80deg) scale(${0.5 + Math.abs(Math.cos(rotY * Math.PI / 180)) * 0.5})`,
+                }}
+              />
+            )}
 
             <motion.div
               animate={{
-                rotateX: rotX,
-                rotateY: rotY,
+                rotateX: viewMode === '3d' ? rotX : 0,
+                rotateY: viewMode === '3d' ? rotY : 0,
               }}
               transition={{ duration: 0 }}
               style={{ transformStyle: 'preserve-3d' }}
               className="relative w-full h-full will-change-transform"
             >
               
-              {/* Card Physical Edge Rim Extrusion (Depth 8px) */}
-              <div 
-                className="absolute inset-0 rounded-[28px] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
-                style={{ 
-                  backgroundColor: activeThemeObj.rimColor,
-                  transform: 'translateZ(0px)',
-                  boxShadow: `0 30px 90px rgba(0,0,0,0.9), 0 0 35px ${activeThemeObj.glowColor}`
-                }}
-              />
+              {/* Card Physical Edge Rims in 3D */}
+              {viewMode === '3d' && (
+                <>
+                  <div 
+                    className="absolute inset-0 rounded-[28px]"
+                    style={{ 
+                      backgroundColor: activeThemeObj.rimColor,
+                      transform: 'translateZ(-4px)',
+                      boxShadow: `0 35px 95px rgba(0,0,0,0.95), 0 0 30px rgba(0,0,0,0.8)`
+                    }}
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-[28px]"
+                    style={{ 
+                      backgroundColor: activeThemeObj.rimColor,
+                      transform: 'translateZ(0px)'
+                    }}
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-[28px]"
+                    style={{ 
+                      backgroundColor: activeThemeObj.rimColor,
+                      transform: 'translateZ(4px)'
+                    }}
+                  />
+                </>
+              )}
 
-              {/* FRONT FACE (Parallax Depth Layer) */}
+              {/* FRONT FACE (Direct WYSIWYG Capture Target) */}
               <div 
-                className={clsx('absolute inset-0 rounded-[28px] p-1.5 bg-gradient-to-br', activeThemeObj.border)}
+                ref={cardFrontRef}
+                className={clsx('absolute inset-0 rounded-[28px] p-1.5 bg-gradient-to-br shadow-2xl', activeThemeObj.border)}
                 style={{ 
-                  transform: 'translateZ(8px)',
+                  transform: viewMode === '3d' ? 'translateZ(10px)' : 'none',
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden',
                   transformStyle: 'preserve-3d'
                 }}
               >
                 <div 
-                  className={clsx('w-full h-full rounded-[22px] p-5 sm:p-6 flex flex-col justify-between relative', activeThemeObj.bg)}
-                  style={{ transformStyle: 'preserve-3d' }}
+                  className={clsx('w-full h-full rounded-[22px] relative overflow-hidden', activeThemeObj.bg)}
+                  style={{ 
+                    transformStyle: 'preserve-3d',
+                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.18), inset 0 -1px 3px rgba(0,0,0,0.9), inset 0 0 40px rgba(0,0,0,0.6)'
+                  }}
                 >
                   
-                  {/* Holographic Sheen Layer */}
+                  {/* Subtle Satin Brushed Metal Reflection Layer */}
                   <div
-                    className="absolute inset-0 pointer-events-none mix-blend-color-dodge transition-opacity duration-300 z-20 rounded-[22px]"
+                    className="absolute inset-0 pointer-events-none rounded-[22px]"
                     style={{
-                      background: `radial-gradient(circle at ${((rotY % 360 + 360) % 360) / 360 * 100}% 50%, rgba(255,255,255,0.85) 0%, rgba(236,72,153,0.45) 25%, rgba(59,130,246,0.45) 50%, transparent 75%)`,
-                      opacity: sheenIntensity / 100,
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.02) 100%)',
                       transform: 'translateZ(2px)'
                     }}
                   />
 
-                  {/* Header (Floating at Z: 20px) */}
-                  <div 
-                    className="flex items-center justify-between border-b border-white/10 pb-3"
-                    style={{ transform: 'translateZ(20px)' }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 text-xs font-bold font-mono shadow-sm">
-                        ⚡
+                  {/* Header Divider Line */}
+                  <div className="absolute left-[4%] right-[4%] top-[14%] h-[1px] bg-white/10 pointer-events-none" />
+                  
+                  {/* Footer Divider Line */}
+                  <div className="absolute left-[4%] right-[4%] bottom-[12%] h-[1px] bg-white/10 pointer-events-none" />
+
+                  {/* 1. Header (Draggable & Deletable) */}
+                  {layout.header.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('header', e)}
+                      onClick={() => setSelectedLayer('header')}
+                      style={{ 
+                        left: `${layout.header.x}%`, 
+                        top: `${layout.header.y}%`,
+                        transform: `scale(${layout.header.scale / 100}) translateZ(20px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 flex items-center gap-2 cursor-move p-1 rounded-lg transition-all',
+                        selectedLayer === 'header' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-black/50 border border-amber-400/50 flex items-center justify-center p-0.5 shadow-sm overflow-hidden">
+                        <img src={NODE_STRATEGY_LOGO} alt="Node Monke Logo" className="w-full h-full object-contain pixelated pointer-events-none" />
                       </div>
-                      <span className="text-xs sm:text-sm font-extrabold text-white font-mono tracking-wider">
+                      <span className="text-xs sm:text-sm font-extrabold text-white font-mono tracking-wider whitespace-nowrap drop-shadow-sm">
                         {cardTitle}
                       </span>
                     </div>
+                  )}
 
-                    <div className="flex items-center gap-2">
-                      <span className={clsx('px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black border shadow-sm', tier.color)}>
-                        {tier.label}
-                      </span>
-                      <span className="text-[10px] font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                  {/* 2. Badges: Rank & Tier (Draggable & Deletable) */}
+                  {layout.badges.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('badges', e)}
+                      onClick={() => setSelectedLayer('badges')}
+                      style={{ 
+                        left: `${layout.badges.x}%`, 
+                        top: `${layout.badges.y}%`,
+                        transform: `scale(${layout.badges.scale / 100}) translateZ(20px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 flex items-center gap-1.5 cursor-move p-1 rounded-lg transition-all',
+                        selectedLayer === 'badges' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      <span className="text-[10px] font-mono text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/25 whitespace-nowrap shadow-sm">
                         Rank #{currentMonke.rank || 'N/A'}
                       </span>
+                      <span className={clsx('px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black border shadow-sm whitespace-nowrap', tier.color)}>
+                        {tier.label}
+                      </span>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Card Center Body (Parallax Floating Avatar at Z: 36px) */}
-                  <div className="grid grid-cols-12 gap-4 items-center my-auto">
-                    <div className="col-span-5 flex items-center justify-center">
-                      <div 
-                        style={{ 
-                          transform: `scale(${avatarScale / 100}) translateZ(36px)`,
-                          transformStyle: 'preserve-3d'
-                        }}
-                        className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-black/75 border border-white/20 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.85)] relative group overflow-hidden transition-transform"
-                      >
-                        <img
-                          src={activeAvatarSrc}
-                          alt={`NodeMonke #${currentMonke.id}`}
-                          style={{ transform: 'translateZ(12px)' }}
-                          className="w-full h-full object-contain pixelated filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
-                        />
-                        <div 
-                          style={{ transform: 'translateZ(16px)' }}
-                          className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/90 text-[9px] font-mono text-white font-bold border border-white/15"
-                        >
-                          #{currentMonke.id}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Owner Info (Floating at Z: 26px) */}
+                  {/* 3. Avatar Box (Draggable & Deletable) */}
+                  {layout.avatar.visible && (
                     <div 
-                      className="col-span-7 flex flex-col gap-1.5 font-mono"
-                      style={{ transform: 'translateZ(26px)' }}
+                      onMouseDown={(e) => startElementDrag('avatar', e)}
+                      onClick={() => setSelectedLayer('avatar')}
+                      style={{ 
+                        left: `${layout.avatar.x}%`, 
+                        top: `${layout.avatar.y}%`,
+                        transform: `scale(${layout.avatar.scale / 100}) translateZ(36px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-[#080a0f] border border-white/20 p-2 shadow-[inset_0_2px_8px_rgba(0,0,0,0.9),0_18px_40px_rgba(0,0,0,0.9)] cursor-move group overflow-hidden transition-all',
+                        selectedLayer === 'avatar' && viewMode === 'layout' ? 'ring-2 ring-amber-400' : 'hover:ring-1 hover:ring-white/40'
+                      )}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base sm:text-lg font-black text-white drop-shadow-md">
-                          {ownerHandle}
-                        </span>
-                        {showVerified && <CheckCircle2 className="w-4 h-4 text-sky-400 fill-sky-400/20" />}
-                      </div>
-
-                      <div className="inline-block">
-                        <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[11px] font-bold shadow-sm">
-                          {customTitle}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] text-slate-300 flex flex-col gap-0.5 mt-1">
-                        <span>Inscription: <strong className="text-white">#{currentMonke.inscription}</strong></span>
-                        <span>Block Height: <strong className="text-white">#{currentMonke.block}</strong></span>
-                        <span>Traits: <strong className="text-white">{activeTraits.Count || 4} Parts</strong></span>
+                      <img
+                        src={activeAvatarSrc}
+                        alt={`NodeMonke #${currentMonke.id}`}
+                        style={{ transform: 'translateZ(12px)' }}
+                        className="w-full h-full object-contain pixelated filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] pointer-events-none"
+                      />
+                      <div 
+                        style={{ transform: 'translateZ(16px)' }}
+                        className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/90 text-[9px] font-mono text-white font-bold border border-white/20"
+                      >
+                        #{currentMonke.id}
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Card Footer (Floating at Z: 18px) */}
-                  <div 
-                    className="border-t border-white/10 pt-2 flex items-center justify-between text-[10px] font-mono text-slate-400"
-                    style={{ transform: 'translateZ(18px)' }}
-                  >
-                    <span className="truncate max-w-[280px]">"{customMotto}"</span>
-                    <span className="text-amber-400 font-bold">ORDINALS VERIFIED</span>
-                  </div>
+                  {/* 4. 24K Gold Chip (Draggable & Deletable) */}
+                  {layout.chip.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('chip', e)}
+                      onClick={() => setSelectedLayer('chip')}
+                      style={{ 
+                        left: `${layout.chip.x}%`, 
+                        top: `${layout.chip.y}%`,
+                        transform: `scale(${layout.chip.scale / 100}) translateZ(24px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 w-9 h-6 rounded-md bg-gradient-to-br from-amber-200 via-amber-500 to-amber-700 border border-amber-200/60 shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.8)] cursor-move relative overflow-hidden transition-all',
+                        selectedLayer === 'chip' && viewMode === 'layout' ? 'ring-2 ring-amber-400' : 'hover:ring-1 hover:ring-white/40'
+                      )}
+                    >
+                      <div className="w-full h-[1px] bg-amber-900/70 absolute top-1/2 -translate-y-1/2" />
+                      <div className="h-full w-[1px] bg-amber-900/70 absolute left-1/3" />
+                      <div className="h-full w-[1px] bg-amber-900/70 absolute left-2/3" />
+                    </div>
+                  )}
+
+                  {/* 5. GENESIS 10K Tag (Draggable & Deletable) */}
+                  {layout.genesisTag.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('genesisTag', e)}
+                      onClick={() => setSelectedLayer('genesisTag')}
+                      style={{ 
+                        left: `${layout.genesisTag.x}%`, 
+                        top: `${layout.genesisTag.y}%`,
+                        transform: `scale(${layout.genesisTag.scale / 100}) translateZ(24px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 text-[9px] font-mono text-amber-400/90 font-bold border border-amber-400/30 px-2 py-0.5 rounded bg-amber-500/10 cursor-move whitespace-nowrap transition-all shadow-sm',
+                        selectedLayer === 'genesisTag' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/20' : 'hover:ring-1 hover:ring-white/40'
+                      )}
+                    >
+                      GENESIS 10K
+                    </div>
+                  )}
+
+                  {/* 6. Owner Handle (Draggable & Deletable) */}
+                  {layout.ownerHandle.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('ownerHandle', e)}
+                      onClick={() => setSelectedLayer('ownerHandle')}
+                      style={{ 
+                        left: `${layout.ownerHandle.x}%`, 
+                        top: `${layout.ownerHandle.y}%`,
+                        transform: `scale(${layout.ownerHandle.scale / 100}) translateZ(26px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 flex items-center gap-1.5 cursor-move p-0.5 rounded-lg whitespace-nowrap transition-all',
+                        selectedLayer === 'ownerHandle' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      <span className="text-sm sm:text-base font-black text-white font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                        {ownerHandle}
+                      </span>
+                      {showVerified && <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 fill-sky-400/20" />}
+                    </div>
+                  )}
+
+                  {/* 7. Custom Badge Pill (Draggable & Deletable) */}
+                  {layout.badgePill.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('badgePill', e)}
+                      onClick={() => setSelectedLayer('badgePill')}
+                      style={{ 
+                        left: `${layout.badgePill.x}%`, 
+                        top: `${layout.badgePill.y}%`,
+                        transform: `scale(${layout.badgePill.scale / 100}) translateZ(24px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 cursor-move transition-all',
+                        selectedLayer === 'badgePill' && viewMode === 'layout' ? 'ring-2 ring-amber-400 rounded-lg' : 'hover:ring-1 hover:ring-white/30 rounded-lg'
+                      )}
+                    >
+                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] sm:text-[11px] font-mono font-bold shadow-sm whitespace-nowrap">
+                        {customTitle}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 8. Attributes Rows (Draggable & Deletable) */}
+                  {layout.attributes.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('attributes', e)}
+                      onClick={() => setSelectedLayer('attributes')}
+                      style={{ 
+                        left: `${layout.attributes.x}%`, 
+                        top: `${layout.attributes.y}%`,
+                        transform: `scale(${layout.attributes.scale / 100}) translateZ(24px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 text-[10px] sm:text-[11px] font-mono text-slate-300 flex flex-col gap-0.5 cursor-move p-1 rounded-lg whitespace-nowrap transition-all',
+                        selectedLayer === 'attributes' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      <span className="drop-shadow-sm">Inscription: <strong className="text-white font-bold">#{currentMonke.inscription}</strong></span>
+                      <span className="drop-shadow-sm">Block Height: <strong className="text-white font-bold">#{currentMonke.block}</strong></span>
+                      <span className="drop-shadow-sm">Traits: <strong className="text-white font-bold">{activeTraits.Count || 4} Parts</strong></span>
+                    </div>
+                  )}
+
+                  {/* 9. On-Chain Ordinals QR Code Badge (Draggable & Deletable) */}
+                  {layout.qrCode.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('qrCode', e)}
+                      onClick={() => setSelectedLayer('qrCode')}
+                      style={{ 
+                        left: `${layout.qrCode.x}%`, 
+                        top: `${layout.qrCode.y}%`,
+                        transform: `scale(${layout.qrCode.scale / 100}) translateZ(28px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl bg-black/90 border border-amber-400/35 shadow-[0_10px_25px_rgba(0,0,0,0.85)] cursor-move transition-all group',
+                        selectedLayer === 'qrCode' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/15' : 'hover:ring-1 hover:ring-white/40'
+                      )}
+                      title={`https://ordinals.com/inscription/${currentMonke.inscription}`}
+                    >
+                      {qrDataUrl ? (
+                        <img
+                          src={qrDataUrl}
+                          alt="Ordinals Inscription QR"
+                          className="w-12 h-12 sm:w-14 sm:h-14 object-contain pointer-events-none rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/5 animate-pulse rounded" />
+                      )}
+                      <span className="text-[7px] sm:text-[8px] font-mono text-amber-300 font-bold mt-0.5 tracking-tight">
+                        SCAN TO VERIFY
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 10. Footer Motto (Draggable & Deletable) */}
+                  {layout.footerMotto.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('footerMotto', e)}
+                      onClick={() => setSelectedLayer('footerMotto')}
+                      style={{ 
+                        left: `${layout.footerMotto.x}%`, 
+                        top: `${layout.footerMotto.y}%`,
+                        transform: `scale(${layout.footerMotto.scale / 100}) translateZ(18px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 text-[10px] font-mono text-slate-400 italic cursor-move truncate max-w-[280px] p-0.5 rounded transition-all',
+                        selectedLayer === 'footerMotto' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      "{customMotto}"
+                    </div>
+                  )}
+
+                  {/* 11. Footer Verified (Draggable & Deletable) */}
+                  {layout.footerVerified.visible && (
+                    <div 
+                      onMouseDown={(e) => startElementDrag('footerVerified', e)}
+                      onClick={() => setSelectedLayer('footerVerified')}
+                      style={{ 
+                        left: `${layout.footerVerified.x}%`, 
+                        top: `${layout.footerVerified.y}%`,
+                        transform: `scale(${layout.footerVerified.scale / 100}) translateZ(18px)`,
+                        transformOrigin: 'top left'
+                      }}
+                      className={clsx(
+                        'absolute z-30 text-[10px] font-mono text-amber-400 font-bold cursor-move whitespace-nowrap p-0.5 rounded transition-all flex items-center gap-1',
+                        selectedLayer === 'footerVerified' && viewMode === 'layout' ? 'ring-2 ring-amber-400 bg-amber-400/10' : 'hover:ring-1 hover:ring-white/30'
+                      )}
+                    >
+                      <span>ORDINALS VERIFIED</span>
+                    </div>
+                  )}
+
                 </div>
               </div>
 
-              {/* BACK FACE (Parallax Depth Layer) */}
+              {/* BACK FACE */}
               <div 
-                className={clsx('absolute inset-0 rounded-[28px] p-1.5 bg-gradient-to-br', activeThemeObj.border)}
+                className={clsx('absolute inset-0 rounded-[28px] p-1.5 bg-gradient-to-br shadow-2xl', activeThemeObj.border)}
                 style={{ 
-                  transform: 'rotateY(180deg) translateZ(8px)',
+                  transform: 'rotateY(180deg) translateZ(10px)',
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden',
                   transformStyle: 'preserve-3d'
                 }}
               >
                 <div 
-                  className={clsx('w-full h-full rounded-[22px] p-5 sm:p-6 flex flex-col justify-between relative', activeThemeObj.bg)}
-                  style={{ transformStyle: 'preserve-3d' }}
+                  className={clsx('w-full h-full rounded-[22px] p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden', activeThemeObj.bg)}
+                  style={{ 
+                    transformStyle: 'preserve-3d',
+                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.18), inset 0 -1px 3px rgba(0,0,0,0.9)'
+                  }}
                 >
-                  
-                  {/* Holographic Sheen Layer */}
-                  <div
-                    className="absolute inset-0 pointer-events-none mix-blend-color-dodge transition-opacity duration-300 z-20 rounded-[22px]"
-                    style={{
-                      background: `radial-gradient(circle at ${((rotY % 360 + 360) % 360) / 360 * 100}% 50%, rgba(255,255,255,0.85) 0%, rgba(236,72,153,0.45) 25%, rgba(59,130,246,0.45) 50%, transparent 75%)`,
-                      opacity: sheenIntensity / 100,
-                      transform: 'translateZ(2px)'
-                    }}
-                  />
-
-                  {/* Header (Floating at Z: 20px) */}
-                  <div 
-                    className="flex items-center justify-between border-b border-white/10 pb-3"
-                    style={{ transform: 'translateZ(20px)' }}
-                  >
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3 z-10">
                     <span className="text-xs font-mono font-bold text-amber-400">
                       AUTHENTICATED ORDINALS INSCRIPTION
                     </span>
@@ -1534,12 +1384,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                       SHA256: {currentMonke.id.toString(16).padStart(8, '0')}...
                     </span>
                   </div>
-
-                  {/* Traits Grid (Floating at Z: 26px) */}
-                  <div 
-                    className="grid grid-cols-12 gap-4 items-center my-auto font-mono"
-                    style={{ transform: 'translateZ(26px)' }}
-                  >
+                  <div className="grid grid-cols-12 gap-4 items-center my-auto font-mono z-10">
                     <div className="col-span-8 flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/10 shadow-sm">
                         <span className="text-slate-400">Body:</span>
@@ -1558,20 +1403,15 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                         <span className="font-bold text-white">{activeTraits.Earring}</span>
                       </div>
                     </div>
-
                     <div className="col-span-4 flex flex-col items-center justify-center gap-1.5">
-                      <div className="w-20 h-20 bg-white p-2 rounded-2xl flex items-center justify-center shadow-xl">
-                        <QrCode className="w-full h-full text-black" />
+                      <div className="w-20 h-20 bg-amber-400/10 border border-amber-400/30 p-2 rounded-2xl flex flex-col items-center justify-center shadow-xl text-center">
+                        <img src={NODE_STRATEGY_LOGO} alt="Node Monke Logo" className="w-10 h-10 object-contain pixelated" />
+                        <span className="text-[8px] font-mono text-amber-300 font-bold mt-1">BITCOIN L1</span>
                       </div>
-                      <span className="text-[9px] font-mono text-slate-400 text-center font-bold">Scan Ordinals</span>
+                      <span className="text-[9px] font-mono text-slate-400 text-center font-bold">100% Immutable</span>
                     </div>
                   </div>
-
-                  {/* Footer (Floating at Z: 18px) */}
-                  <div 
-                    className="border-t border-white/10 pt-2 flex items-center justify-between text-[10px] font-mono text-slate-400"
-                    style={{ transform: 'translateZ(18px)' }}
-                  >
+                  <div className="border-t border-white/10 pt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 z-10">
                     <span>GENESIS BLOCK #776487</span>
                     <span className="text-emerald-400 font-bold">100% ON-CHAIN</span>
                   </div>
@@ -1581,25 +1421,157 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
             </motion.div>
           </div>
 
-          <span className="text-[11px] font-mono text-slate-400 mt-1 flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/5">
-            <Compass className="w-3.5 h-3.5 text-amber-400" />
-            <span>视角参数: X: {Math.round(rotX)}° | Y: {Math.round(rotY)}°</span>
-          </span>
+          <div className="text-[11px] font-mono text-slate-400 mt-1 flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+            {viewMode === 'layout' ? (
+              <span>{t.passportHintLayout}</span>
+            ) : (
+              <span><Compass className="w-3.5 h-3.5 text-amber-400 inline mr-1" />{t.passportHint3d} X: {Math.round(rotX)}° | Y: {Math.round(rotY)}°</span>
+            )}
+          </div>
         </div>
 
-        {/* Right Custom Canvas Editor Panel (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-4 p-6 rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-xl shadow-2xl max-h-[640px] overflow-y-auto pr-2 no-scrollbar">
+        {/* Right Editor Panel */}
+        <div className="lg:col-span-5 flex flex-col gap-4 p-6 rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-xl shadow-2xl max-h-[660px] overflow-y-auto pr-2 no-scrollbar">
           
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-            <Sliders className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-bold font-mono text-white">画布内容自定义编辑 (Custom Editor)</h2>
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-400" />
+              <h2 className="text-sm font-bold font-mono text-white">{t.passportEditorTitle}</h2>
+            </div>
+            <button
+              onClick={handleResetLayout}
+              className="text-[11px] font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{t.passportResetLayout}</span>
+            </button>
           </div>
+
+          {/* Layer Quick Toggles (1-Click Show/Hide/Delete Any Element) */}
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-200">
+              <span className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.passportLayersTitle}</span>
+              </span>
+              <span className="text-[10px] text-slate-400">{t.passportLayersSub}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(DEFAULT_LAYOUT) as (keyof CardLayoutState)[]).map((key) => {
+                const isVis = layout[key].visible;
+                const name = getLayerName(key);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => toggleLayerVisibility(key)}
+                    className={clsx(
+                      'px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all flex items-center gap-1 active:scale-95',
+                      isVis 
+                        ? 'bg-amber-500/20 border-amber-400/50 text-amber-300 shadow-sm'
+                        : 'bg-black/40 border-white/10 text-slate-500 line-through hover:text-slate-300'
+                    )}
+                    title={name}
+                  >
+                    {isVis ? <Eye className="w-3 h-3 text-amber-400" /> : <EyeOff className="w-3 h-3 text-slate-500" />}
+                    <span>{name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Layer Fine Tuning & Delete Action */}
+          {selectedLayer && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between text-xs font-mono font-bold text-amber-300">
+                <span className="flex items-center gap-1.5">
+                  <Move className="w-3.5 h-3.5" />
+                  <span>{t.passportSelected} <strong>{getLayerName(selectedLayer)}</strong></span>
+                </span>
+                
+                {/* 1-Click Delete / Hide Button for currently selected layer */}
+                <button
+                  onClick={() => toggleLayerVisibility(selectedLayer)}
+                  className={clsx(
+                    'px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-all flex items-center gap-1',
+                    layout[selectedLayer].visible
+                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
+                      : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'
+                  )}
+                >
+                  {layout[selectedLayer].visible ? <Trash2 className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{layout[selectedLayer].visible ? t.passportDeleteLayer : t.passportRestoreLayer}</span>
+                </button>
+              </div>
+
+              {layout[selectedLayer].visible && (
+                <>
+                  {/* Position Sliders */}
+                  <div className="grid grid-cols-2 gap-3 text-[11px] font-mono text-slate-300">
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span>{t.passportPosX}</span>
+                        <span className="text-amber-400">{layout[selectedLayer].x}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-5}
+                        max={95}
+                        value={layout[selectedLayer].x}
+                        onChange={(e) => setLayout((prev) => ({
+                          ...prev,
+                          [selectedLayer]: { ...prev[selectedLayer], x: parseInt(e.target.value, 10) }
+                        }))}
+                        className="w-full accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span>{t.passportPosY}</span>
+                        <span className="text-amber-400">{layout[selectedLayer].y}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-5}
+                        max={95}
+                        value={layout[selectedLayer].y}
+                        onChange={(e) => setLayout((prev) => ({
+                          ...prev,
+                          [selectedLayer]: { ...prev[selectedLayer], y: parseInt(e.target.value, 10) }
+                        }))}
+                        className="w-full accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Scale Slider */}
+                  <div className="text-[11px] font-mono text-slate-300">
+                    <div className="flex justify-between mb-1">
+                      <span>{t.passportScale}</span>
+                      <span className="text-amber-400">{layout[selectedLayer].scale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={50}
+                      max={160}
+                      value={layout[selectedLayer].scale}
+                      onChange={(e) => setLayout((prev) => ({
+                        ...prev,
+                        [selectedLayer]: { ...prev[selectedLayer], scale: parseInt(e.target.value, 10) }
+                      }))}
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* 1. Pick Monke ID */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Search className="w-3.5 h-3.5 text-amber-400" />
-              <span>目标神兽编号 (Monke ID)</span>
+              <span>{t.passportMonkeIdLabel}</span>
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -1612,16 +1584,39 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                 placeholder="ID (1-10000)"
               />
               <span className="text-xs font-mono text-slate-400">
-                NodeMonke #{currentMonke.id} ({tier.label})
+                NodeMonke #{currentMonke.id} ({lang === 'zh' ? '铭文' : 'Insc'} #{currentMonke.inscription})
               </span>
             </div>
           </div>
 
-          {/* 2. Card Material Theme */}
+          {/* 2. On-Chain Inscription QR Code Info */}
+          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono font-bold text-amber-300 flex items-center gap-1.5">
+                <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.passportQrLabel}</span>
+              </label>
+              <button
+                onClick={() => toggleLayerVisibility('qrCode')}
+                className={clsx(
+                  'text-[10px] font-mono px-2 py-0.5 rounded border transition-all flex items-center gap-1',
+                  layout.qrCode.visible ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                )}
+              >
+                {layout.qrCode.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>{layout.qrCode.visible ? t.passportQrShow : t.passportQrHide}</span>
+              </button>
+            </div>
+            <div className="text-[10px] font-mono text-slate-400 break-all bg-black/40 p-2 rounded-lg border border-white/5">
+              https://ordinals.com/inscription/{currentMonke.inscription}
+            </div>
+          </div>
+
+          {/* 3. Card Material Theme */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-purple-400" />
-              <span>卡片全息材质主题 (Card Finish)</span>
+              <span>{t.passportThemeLabel}</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {THEMES.map((th) => (
@@ -1636,17 +1631,17 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                   )}
                 >
                   <span>{th.icon}</span>
-                  <span className="truncate text-[11px]">{th.nameZh.split(' ')[1]}</span>
+                  <span className="truncate text-[11px]">{lang === 'zh' ? th.nameZh.split(' ')[1] : th.nameEn.split(' ')[1]}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 3. Card Title */}
+          {/* 4. Card Title */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Type className="w-3.5 h-3.5 text-amber-400" />
-              <span>卡片顶部主标题 (Header Title)</span>
+              <span>{t.passportTitleLabel}</span>
             </label>
             <input
               type="text"
@@ -1657,12 +1652,12 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
             />
           </div>
 
-          {/* 4. Owner Handle & Verified Checkmark */}
+          {/* 5. Owner Handle & Verified Checkmark */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-sky-400" />
-                <span>持有者推特 / 昵称 (Owner Handle)</span>
+                <span>{t.passportOwnerLabel}</span>
               </label>
               <label className="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
                 <input
@@ -1671,7 +1666,7 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
                   onChange={(e) => setShowVerified(e.target.checked)}
                   className="rounded border-white/20 text-sky-500"
                 />
-                <span>蓝标认证</span>
+                <span>{t.passportVerifiedLabel}</span>
               </label>
             </div>
             <input
@@ -1683,11 +1678,11 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
             />
           </div>
 
-          {/* 5. Custom Badge Pill */}
+          {/* 6. Custom Badge Pill */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span>个性身份头衔 (Badge Title)</span>
+              <span>{t.passportBadgeLabel}</span>
             </label>
             <div className="flex flex-wrap gap-1.5">
               {PRESET_BADGES.map((b) => (
@@ -1710,15 +1705,15 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value)}
               className="w-full px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all mt-1"
-              placeholder="自定义头衔..."
+              placeholder={t.passportCustomBadgePlaceholder}
             />
           </div>
 
-          {/* 6. Custom Motto */}
+          {/* 7. Custom Motto */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Quote className="w-3.5 h-3.5 text-rose-400" />
-              <span>底部个性签名 (Motto Slogan)</span>
+              <span>{t.passportMottoLabel}</span>
             </label>
             <input
               type="text"
@@ -1726,38 +1721,6 @@ export const PassportStudio: React.FC<PassportStudioProps> = ({
               onChange={(e) => setCustomMotto(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-all"
               placeholder="In Monkes We Trust..."
-            />
-          </div>
-
-          {/* 7. Avatar Scale Slider */}
-          <div className="flex flex-col gap-1.5 pt-2 border-t border-white/5">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-300 font-bold">
-              <span>头像缩放比例 (Avatar Scale)</span>
-              <span className="text-amber-400">{avatarScale}%</span>
-            </div>
-            <input
-              type="range"
-              min={70}
-              max={130}
-              value={avatarScale}
-              onChange={(e) => setAvatarScale(parseInt(e.target.value, 10))}
-              className="w-full accent-amber-500 cursor-pointer"
-            />
-          </div>
-
-          {/* 8. Sheen Intensity Slider */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-300 font-bold">
-              <span>全息光斑亮度 (Holo Sheen)</span>
-              <span className="text-purple-400">{sheenIntensity}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={sheenIntensity}
-              onChange={(e) => setSheenIntensity(parseInt(e.target.value, 10))}
-              className="w-full accent-purple-500 cursor-pointer"
             />
           </div>
 

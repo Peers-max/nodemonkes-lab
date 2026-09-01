@@ -5,10 +5,9 @@ import {
   Shuffle, 
   RefreshCw, 
   Check, 
-  CreditCard, 
   Palette,
   Sparkles,
-  ArrowRight
+  Ban
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -17,7 +16,6 @@ import { BODY_COLORS, PRESET_COLORS } from '../../utils/constants';
 import { useLanguage } from '../../utils/i18n';
 
 interface DiyStudioProps {
-  onOpenInPassport?: (avatarUrl?: string, traits?: { Body: string; Head: string; Eyes: string; Earring: string; Count: number }) => void;
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
 }
 
@@ -41,7 +39,6 @@ const BASE_URLS: Record<SeriesType, string> = {
 };
 
 const CATEGORIES: CategoryType[] = ['Body', 'Earring', 'Eyes', 'Head'];
-const SPECIAL_SERIES = ['Dog', 'Peer', 'Rabbit', 'Block'];
 
 const SERIES_COMPONENTS: Record<SeriesType, CategoryType[]> = {
   normal: ['Body', 'Earring', 'Eyes', 'Head'],
@@ -66,17 +63,29 @@ const RESOLUTION_OPTIONS = [
   { label: '4096px (4K)', value: 4096 },
 ];
 
+const diyImgCache = new Map<string, HTMLImageElement>();
+
 function loadCanvasImage(url: string): Promise<HTMLImageElement> {
+  if (diyImgCache.has(url)) {
+    return Promise.resolve(diyImgCache.get(url)!);
+  }
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      diyImgCache.set(url, img);
+      if ('decode' in img) {
+        img.decode().catch(() => {}).then(() => resolve(img));
+      } else {
+        resolve(img);
+      }
+    };
     img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-    img.src = `${url}?t=${Date.now()}`;
+    img.src = url;
   });
 }
 
-export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast }) => {
+export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
   const { lang, t } = useLanguage();
   const [activeSeries, setActiveSeries] = useState<SeriesType>('normal');
   const [activeCategory, setActiveCategory] = useState<CategoryType>('Body');
@@ -162,9 +171,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
             CATEGORIES.forEach((category) => {
               const value = item.attributes[category];
               if (value && value !== 'None') {
-                if (!(category === 'Head' && SPECIAL_SERIES.includes(value))) {
-                  uniqueComponents[category].add(value);
-                }
+                uniqueComponents[category].add(value);
               }
             });
           }
@@ -182,7 +189,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
           SERIES_COMPONENTS[series].forEach((category) => {
             const parts: TraitPart[] = Array.from(uniqueComponents[category]).map((value) => ({
               value,
-              url: `${BASE_URLS[series]}/${category.toLowerCase()}/${value}.png`,
+              url: `${BASE_URLS[series]}/${category.toLowerCase()}/${value}.png?v=2`,
             }));
 
             if (['Earring', 'Eyes'].includes(category) || (category === 'Head' && series === 'normal')) {
@@ -307,7 +314,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
     return canvas;
   };
 
-  // 1. Direct Save PNG
+  // Direct Save PNG
   const saveAvatar = async () => {
     setSaving(true);
     try {
@@ -341,30 +348,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
     }
   };
 
-  // 2. Open DIY Monke in 3D Passport Studio
-  const handleOpen3DCard = async () => {
-    try {
-      setSaving(true);
-      const canvas = await renderCompositeCanvas(600);
-      const avatarUrl = canvas.toDataURL('image/png');
-
-      if (onOpenInPassport) {
-        onOpenInPassport(avatarUrl, {
-          Body: traitNames.Body,
-          Head: traitNames.Head,
-          Eyes: traitNames.Eyes,
-          Earring: traitNames.Earring,
-          Count: traitNames.Count,
-        });
-      }
-    } catch (e: any) {
-      console.error('Failed to prepare DIY 3D Card:', e);
-      onToast('加载失败', e?.message || '请重试', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const currentParts = components[activeSeries][activeCategory] || [];
   const currentSeriesObj = SERIES_BUTTONS.find((s) => s.id === activeSeries);
   const activeSeriesLabel = currentSeriesObj ? (lang === 'zh' ? currentSeriesObj.zh : currentSeriesObj.en) : activeSeries;
@@ -379,30 +362,27 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       
-      {/* Title Header */}
-      <div className="text-center space-y-2 px-2">
-        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-semibold shadow-sm">
-          <Paintbrush className="w-3.5 h-3.5" />
-          <span>{t.diyBadge}</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+      {/* Header Banner */}
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans">
           {t.diyTitle}
         </h1>
-        <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto font-sans">
+        <p className="text-sm text-slate-400 max-w-2xl mx-auto">
           {t.diySub}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Studio Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Side: 4-Layer DOM Preview & Action Buttons */}
+        {/* Left Column: Avatar Canvas, Actions, Resolution, BG Color, Series Switcher */}
         <div className="lg:col-span-5 space-y-4">
           <div className="glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl space-y-4">
             
-            {/* Preview Container */}
+            {/* 1. Live Composite Preview Canvas */}
             <div 
-              className="relative w-full aspect-square rounded-2xl border border-white/10 overflow-hidden shadow-inner flex items-center justify-center transition-colors"
               style={{ backgroundColor: currentBgColor }}
+              className="relative aspect-square w-full rounded-2xl overflow-hidden border border-white/10 shadow-inner flex items-center justify-center transition-colors duration-200"
             >
               {currentBgColor === 'transparent' && (
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]" />
@@ -457,172 +437,50 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
               </div>
             </div>
 
-            {/* Quick Actions & 3D Card Jump */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2.5">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  type="button"
-                  onClick={randomize}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs transition-all shadow-md"
-                >
-                  <Shuffle className="w-4 h-4 text-emerald-400" />
-                  <span>{t.diyRandomBtn}</span>
-                </motion.button>
+            {/* 2. Action Buttons: Randomize & Save */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={randomize}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs transition-all shadow-md active:scale-95"
+              >
+                <Shuffle className="w-4 h-4 text-emerald-400" />
+                <span>{t.diyRandomBtn}</span>
+              </motion.button>
 
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  type="button"
-                  onClick={saveAvatar}
-                  disabled={loading || saving}
-                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 transition-all"
-                >
-                  {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  <span>{saving ? t.diySavingBtn : `${t.diySaveBtn} (${saveResolution}px)`}</span>
-                </motion.button>
-              </div>
-
-              {/* 3D Web3 Card Quick Studio Link Button */}
-              {onOpenInPassport && (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  type="button"
-                  onClick={handleOpen3DCard}
-                  disabled={loading || saving}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:brightness-110 text-white font-mono font-extrabold text-xs shadow-xl shadow-purple-500/20 transition-all border border-white/10"
-                >
-                  <CreditCard className="w-4 h-4 text-amber-300" />
-                  <span>🎴 制作 3D 极客卡片 / 通行证</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1 text-amber-300" />
-                </motion.button>
-              )}
-
-              {/* Resolution Options Selector */}
-              <div className="flex flex-wrap items-center justify-between gap-1 p-1 bg-slate-950/60 rounded-2xl border border-white/5 text-[11px] font-mono shadow-inner">
-                <span className="text-slate-400 px-2 font-medium">{t.diyResTitle}</span>
-                <div className="flex items-center gap-1">
-                  {RESOLUTION_OPTIONS.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setSaveResolution(r.value)}
-                      className={clsx(
-                        'px-2.5 py-1 rounded-xl transition-all font-semibold',
-                        saveResolution === r.value
-                          ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      )}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={saveAvatar}
+                disabled={loading || saving}
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 transition-all active:scale-95"
+              >
+                {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <span>{saving ? t.diySavingBtn : `${t.diySaveBtn} (${saveResolution}px)`}</span>
+              </motion.button>
             </div>
 
-          </div>
-        </div>
-
-        {/* Right Side: Trait Pickers */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl space-y-5">
-            
-            {/* 1. Series Switcher Tabs */}
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider block">
-                {t.diySeriesTitle}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {SERIES_BUTTONS.map((s) => (
+            {/* 3. Export Resolution Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-1 p-1.5 bg-slate-950/60 rounded-2xl border border-white/5 text-[11px] font-mono shadow-inner">
+              <span className="text-slate-400 px-2 font-medium">{t.diyResTitle}</span>
+              <div className="flex items-center gap-1">
+                {RESOLUTION_OPTIONS.map((r) => (
                   <button
-                    key={s.id}
+                    key={r.value}
                     type="button"
-                    onClick={() => setActiveSeriesHandler(s.id)}
+                    onClick={() => setSaveResolution(r.value)}
                     className={clsx(
-                      'flex-1 min-w-[70px] py-2 px-3 rounded-2xl text-xs font-mono font-bold transition-all border shadow-sm',
-                      activeSeries === s.id
-                        ? 'bg-emerald-500/20 border-emerald-400/80 text-emerald-300 shadow-emerald-500/10'
-                        : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
-                    )}
-                  >
-                    {lang === 'zh' ? s.zh : s.en}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 2. Trait Category Tabs */}
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider block">
-                {lang === 'zh' ? '部件类别' : 'Categories'}
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-1 bg-slate-950/60 rounded-2xl border border-white/5">
-                {SERIES_COMPONENTS[activeSeries].map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setActiveCategory(cat)}
-                    className={clsx(
-                      'flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all text-center',
-                      activeCategory === cat
-                        ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                      'px-2.5 py-1 rounded-xl transition-all font-semibold',
+                      saveResolution === r.value
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
                         : 'text-slate-400 hover:text-white'
                     )}
                   >
-                    {getCategoryLabel(cat)}
+                    {r.label}
                   </button>
                 ))}
-              </div>
-            </div>
-
-            {/* 3. Trait Items Grid Picker */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">{getCategoryLabel(activeCategory)} ({currentParts.length})</span>
-                <span className="text-emerald-400 font-semibold">{traitNames[activeCategory]}</span>
-              </div>
-
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5 max-h-[260px] overflow-y-auto pr-1 no-scrollbar">
-                {currentParts.map((item, idx) => {
-                  const isSelected = selectedParts[activeCategory] === item.url;
-                  const isNone = item.url === 'none';
-
-                  return (
-                    <motion.div
-                      key={`${item.value}-${idx}`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => selectPart(activeCategory, item.url)}
-                      className={clsx(
-                        'relative aspect-square rounded-2xl border flex flex-col items-center justify-center p-1.5 cursor-pointer transition-all',
-                        isSelected
-                          ? 'bg-emerald-500/20 border-emerald-400 shadow-md ring-2 ring-emerald-500/20'
-                          : 'bg-slate-900/60 border-white/5 hover:border-white/20 hover:bg-slate-800/60'
-                      )}
-                    >
-                      {isNone ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center">
-                          <span className="text-slate-500 text-lg">✕</span>
-                          <span className="text-[10px] font-mono text-slate-400 mt-1">{t.diyNoneOption}</span>
-                        </div>
-                      ) : (
-                        <img
-                          src={item.url}
-                          alt={item.value}
-                          className="w-full h-full object-contain pixelated"
-                          loading="lazy"
-                        />
-                      )}
-
-                      {isSelected && (
-                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center text-slate-950 shadow-sm">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
               </div>
             </div>
 
@@ -637,7 +495,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
                   type="button"
                   onClick={() => setBgMode('transparent')}
                   className={clsx(
-                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all',
+                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all text-center',
                     bgMode === 'transparent'
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                       : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
@@ -650,7 +508,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
                   type="button"
                   onClick={() => setBgMode('orange')}
                   className={clsx(
-                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all',
+                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all text-center',
                     bgMode === 'orange'
                       ? 'bg-amber-500/20 border-amber-400 text-amber-300'
                       : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
@@ -663,7 +521,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
                   type="button"
                   onClick={() => setBgMode('auto')}
                   className={clsx(
-                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all',
+                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all text-center',
                     bgMode === 'auto'
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                       : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
@@ -676,7 +534,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
                   type="button"
                   onClick={() => setBgMode('custom')}
                   className={clsx(
-                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all',
+                    'py-2 px-1 rounded-2xl text-[11px] font-mono font-bold border transition-all text-center',
                     bgMode === 'custom'
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                       : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
@@ -708,6 +566,122 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onOpenInPassport, onToast 
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* 5. Series Switcher Tabs */}
+            <div className="space-y-2 pt-2 border-t border-white/5">
+              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider block">
+                {t.diySeriesTitle}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {SERIES_BUTTONS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveSeriesHandler(s.id)}
+                    className={clsx(
+                      'flex-1 min-w-[58px] py-2 px-2.5 rounded-2xl text-xs font-mono font-bold transition-all border shadow-sm text-center',
+                      activeSeries === s.id
+                        ? 'bg-emerald-500/20 border-emerald-400/80 text-emerald-300 shadow-emerald-500/10'
+                        : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                    )}
+                  >
+                    {lang === 'zh' ? s.zh : s.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Right Column: Trait Categories and Grid Selector */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="glass-panel p-6 rounded-3xl border border-white/[0.08] shadow-2xl min-h-[580px] flex flex-col gap-5">
+            
+            {/* Top Trait Category Tabs */}
+            <div className="flex flex-wrap gap-2 p-1.5 bg-slate-950/60 rounded-2xl border border-white/5">
+              {SERIES_COMPONENTS[activeSeries].map((cat) => {
+                const isActive = activeCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={clsx(
+                      'flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all text-center',
+                      isActive
+                        ? 'bg-emerald-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    {getCategoryLabel(cat)}
+                  </button>
+                );
+              })}
+              
+              {/* Show Disabled Head Tab if current series doesn't support Head (e.g. Rabbit, Dog, Block, Peer) */}
+              {!SERIES_COMPONENTS[activeSeries].includes('Head') && (
+                <div className="flex-1 py-2.5 px-3 rounded-xl text-xs font-medium text-slate-600 text-center select-none cursor-not-allowed">
+                  {lang === 'zh' ? '头部 (无)' : 'Head (N/A)'}
+                </div>
+              )}
+            </div>
+
+            {/* Trait Items Grid Picker with Label Below Each Icon */}
+            <div className="flex-1 flex flex-col gap-3">
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 max-h-[520px] overflow-y-auto pr-1 no-scrollbar">
+                {currentParts.map((item, idx) => {
+                  const isSelected = selectedParts[activeCategory] === item.url;
+                  const isNone = item.url === 'none';
+
+                  return (
+                    <motion.div
+                      key={`${item.value}-${idx}`}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => selectPart(activeCategory, item.url)}
+                      className={clsx(
+                        'relative aspect-square rounded-2xl border flex flex-col items-center justify-between p-2 cursor-pointer transition-all',
+                        isSelected
+                          ? 'bg-emerald-500/15 border-emerald-400 shadow-md ring-2 ring-emerald-500/20'
+                          : 'bg-slate-900/60 border-white/5 hover:border-white/20 hover:bg-slate-800/60'
+                      )}
+                    >
+                      {/* Center Icon / Sprite */}
+                      <div className="w-full flex-1 flex items-center justify-center overflow-hidden">
+                        {isNone ? (
+                          <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-500">
+                            <Ban className="w-5 h-5 stroke-[1.5]" />
+                          </div>
+                        ) : (
+                          <img
+                            src={item.url}
+                            alt={item.value}
+                            className="w-14 h-14 object-contain pixelated pointer-events-none"
+                            loading="lazy"
+                          />
+                        )}
+                      </div>
+
+                      {/* Bottom Trait Value Label */}
+                      <span className={clsx(
+                        'text-[10px] font-mono truncate max-w-full text-center mt-1 leading-tight',
+                        isSelected ? 'text-emerald-300 font-bold' : 'text-slate-400'
+                      )}>
+                        {isNone ? (lang === 'zh' ? '无' : 'None') : item.value}
+                      </span>
+
+                      {/* Selected Top-Right Checkmark Badge */}
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center text-slate-950 shadow-sm">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
 
           </div>

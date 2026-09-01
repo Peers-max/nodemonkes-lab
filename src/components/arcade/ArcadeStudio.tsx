@@ -12,7 +12,11 @@ import {
   Sparkles, 
   Coins,
   Crown,
-  Flame
+  Flame,
+  ShieldCheck,
+  Zap,
+  Server,
+  Cpu
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
@@ -26,7 +30,79 @@ interface ArcadeStudioProps {
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
 }
 
-// Simple Web Audio 8-bit Sound Generator
+export type GameDifficulty = 'standard' | 'overclock' | 'halving';
+
+interface FloatingPopup {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  opacity: number;
+  vy: number;
+  life: number;
+}
+
+interface JumpSpark {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  size: number;
+  life: number;
+}
+
+const DIFFICULTY_PRESETS: Record<GameDifficulty, {
+  nameZh: string;
+  nameEn: string;
+  icon: string;
+  gap: number;
+  speed: number;
+  gravity: number;
+  jumpForce: number;
+  descZh: string;
+  descEn: string;
+  badgeColor: string;
+}> = {
+  standard: {
+    nameZh: '🟢 经典节点 (推荐)',
+    nameEn: '🟢 Standard Node',
+    icon: '⚡',
+    gap: 162,
+    speed: 1.85,
+    gravity: 0.25,
+    jumpForce: -5.1,
+    descZh: '经典节点矿机柱，手感均衡适度挑战',
+    descEn: 'Classic node servers with balanced challenge',
+    badgeColor: 'text-amber-300 bg-amber-500/20 border-amber-500/40'
+  },
+  overclock: {
+    nameZh: '🟡 超频矿机',
+    nameEn: '🟡 Overclocked',
+    icon: '🔥',
+    gap: 146,
+    speed: 2.25,
+    gravity: 0.28,
+    jumpForce: -5.5,
+    descZh: '超频矿机阵列，更紧凑通道与更高移速',
+    descEn: 'Faster overclocked server pillars & tighter gaps',
+    badgeColor: 'text-orange-300 bg-orange-500/20 border-orange-500/40'
+  },
+  halving: {
+    nameZh: '🔴 减半风暴',
+    nameEn: '🔴 Halving Storm',
+    icon: '⚡',
+    gap: 132,
+    speed: 2.75,
+    gravity: 0.32,
+    jumpForce: -6.0,
+    descZh: '极限手速考验，高频区块阻截与密集落点',
+    descEn: 'Insane halving storm challenge for elite degens',
+    badgeColor: 'text-rose-300 bg-rose-500/20 border-rose-500/40'
+  }
+};
+
+// Web Audio 8-bit Sound Generator
 class ArcadeSound {
   private ctx: AudioContext | null = null;
   public enabled = true;
@@ -48,14 +124,14 @@ class ArcadeSound {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(280, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(540, this.ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(520, this.ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.1);
+    osc.stop(this.ctx.currentTime + 0.08);
   }
 
   public playCoin() {
@@ -66,13 +142,13 @@ class ArcadeSound {
     const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(980, this.ctx.currentTime);
-    osc.frequency.setValueAtTime(1320, this.ctx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(1400, this.ctx.currentTime + 0.08);
     gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.25);
+    osc.stop(this.ctx.currentTime + 0.22);
   }
 
   public playScore() {
@@ -82,14 +158,14 @@ class ArcadeSound {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-    osc.frequency.setValueAtTime(800, this.ctx.currentTime + 0.05);
-    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(620, this.ctx.currentTime);
+    osc.frequency.setValueAtTime(860, this.ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.12);
+    osc.stop(this.ctx.currentTime + 0.1);
   }
 
   public playCrash() {
@@ -99,14 +175,14 @@ class ArcadeSound {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(180, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.35);
-    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+    osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.09, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.35);
+    osc.stop(this.ctx.currentTime + 0.3);
   }
 }
 
@@ -117,8 +193,9 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
   monkes,
   onToast,
 }) => {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const [selectedId, setSelectedId] = useState<number>(initialMonkeId);
+  const [difficulty, setDifficulty] = useState<GameDifficulty>('standard');
   const [gameState, setGameState] = useState<'ready' | 'playing' | 'gameover'>('ready');
   const [score, setScore] = useState<number>(0);
   const [highScore, setHighScore] = useState<number>(() => {
@@ -129,18 +206,20 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
 
-  // Game Engine Physics State
+  // Game Engine Physics & Particle State
   const gameRef = useRef({
-    birdY: 200,
+    birdY: 220,
     velocity: 0,
-    gravity: 0.38,
-    jumpForce: -6.8,
-    pipes: [] as { x: number; top: number; bottom: number; passed: boolean; hasCoin: boolean; coinTaken: boolean }[],
-    pipeSpeed: 2.6,
+    pipes: [] as { x: number; top: number; bottom: number; passed: boolean; hasCoin: boolean; coinTaken: boolean; id: number }[],
     pipeSpawnTimer: 0,
     monkeImg: null as HTMLImageElement | null,
     score: 0,
+    popups: [] as FloatingPopup[],
+    sparks: [] as JumpSpark[],
+    pipeCounter: 0,
   });
+
+  const diffConfig = DIFFICULTY_PRESETS[difficulty];
 
   const currentMonke = useMemo(() => {
     return monkes.find((m) => m.id === selectedId) || monkes[0] || {
@@ -175,13 +254,39 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
   const handleJump = useCallback(() => {
     if (gameState === 'ready') {
       setGameState('playing');
-      gameRef.current.velocity = gameRef.current.jumpForce;
+      gameRef.current.velocity = diffConfig.jumpForce;
       sounds.playJump();
     } else if (gameState === 'playing') {
-      gameRef.current.velocity = gameRef.current.jumpForce;
+      gameRef.current.velocity = diffConfig.jumpForce;
       sounds.playJump();
+
+      // Emit Pixel Jetpack Sparks
+      const birdX = 64;
+      const birdY = gameRef.current.birdY;
+      for (let i = 0; i < 4; i++) {
+        gameRef.current.sparks.push({
+          x: birdX + 8 + (Math.random() * 8),
+          y: birdY + 30 + (Math.random() * 4),
+          vx: -(1.5 + Math.random() * 2),
+          vy: 1.5 + Math.random() * 2,
+          color: Math.random() > 0.5 ? '#F59E0B' : '#38BDF8',
+          size: Math.random() > 0.5 ? 3 : 2,
+          life: 18,
+        });
+      }
+    } else if (gameState === 'gameover') {
+      // Quick restart on tap/space
+      gameRef.current.birdY = 220;
+      gameRef.current.velocity = 0;
+      gameRef.current.pipes = [];
+      gameRef.current.pipeSpawnTimer = 0;
+      gameRef.current.score = 0;
+      gameRef.current.popups = [];
+      gameRef.current.sparks = [];
+      setScore(0);
+      setGameState('ready');
     }
-  }, [gameState]);
+  }, [gameState, diffConfig]);
 
   // Restart Game
   const handleRestart = useCallback(() => {
@@ -190,190 +295,431 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
     gameRef.current.pipes = [];
     gameRef.current.pipeSpawnTimer = 0;
     gameRef.current.score = 0;
+    gameRef.current.popups = [];
+    gameRef.current.sparks = [];
     setScore(0);
     setGameState('ready');
   }, []);
 
-  // Main 60FPS Game Loop
+  // Global Keyboard Listener (Spacebar / ArrowUp / W)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+        e.preventDefault();
+        handleJump();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleJump]);
+
+  // Main 60FPS Game Loop with Cyber Node Server Columns
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.width = 440;
-    const height = canvas.height = 580;
+    // Retina Display scaling
+    const width = 420;
+    const height = 540;
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.scale(2, 2);
+
+    // Pre-create gradient for maximum render efficiency (zero per-frame allocations)
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, '#07090E');
+    bgGradient.addColorStop(0.65, '#0E131F');
+    bgGradient.addColorStop(1, '#05070B');
+
+    let localRunning = true;
 
     const loop = () => {
-      const g = gameRef.current;
+      if (!localRunning) return;
 
-      // 1. Draw Background Sky & Grid
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-      bgGrad.addColorStop(0, '#060B19');
-      bgGrad.addColorStop(0.7, '#0F172A');
-      bgGrad.addColorStop(1, '#1E1B4B');
-      ctx.fillStyle = bgGrad;
+      // 1. Draw Background (Cyber Bitcoin Blockchain Deep Grid)
+      ctx.fillStyle = bgGradient;
       ctx.fillRect(0, 0, width, height);
 
-      // Stars
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      for (let i = 0; i < 20; i++) {
-        ctx.fillRect((i * 47) % width, (i * 31) % height, 2, 2);
+      // Micro Starfield Matrix
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      for (let i = 0; i < 22; i++) {
+        const sx = ((i * 43) + (Date.now() * 0.015 * (i % 3 + 1))) % width;
+        const sy = (i * 27) % (height - 60);
+        ctx.fillRect(sx, sy, (i % 2) + 1, (i % 2) + 1);
       }
 
-      // City / Bitcoin Skyline
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
-      for (let b = 0; b < 10; b++) {
-        ctx.fillRect(b * 50, height - 100 - (b % 4) * 20, 42, 100 + (b % 4) * 20);
+      // Distant Grid Lines (Cyber Space)
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.04)';
+      ctx.lineWidth = 1;
+      for (let gy = 0; gy < height; gy += 45) {
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(width, gy);
+        ctx.stroke();
       }
 
       if (gameState === 'playing') {
-        // 2. Physics Update
-        g.velocity += g.gravity;
-        g.birdY += g.velocity;
+        // Physics: Apply Gravity & Clamp Fall Speed
+        gameRef.current.velocity += diffConfig.gravity;
+        gameRef.current.velocity = Math.min(6.8, gameRef.current.velocity);
+        gameRef.current.birdY += gameRef.current.velocity;
 
-        // Floor / Ceiling Collision
-        if (g.birdY > height - 60 || g.birdY < 0) {
+        // Soft Ceiling Bounce (Does not kill the player!)
+        if (gameRef.current.birdY < 12) {
+          gameRef.current.birdY = 12;
+          gameRef.current.velocity = 0.6;
+        }
+
+        // Floor Crash
+        const groundH = 45;
+        if (gameRef.current.birdY > height - groundH - 24) {
+          gameRef.current.birdY = height - groundH - 24;
           sounds.playCrash();
           setGameState('gameover');
-          if (g.score > highScore) {
-            setHighScore(g.score);
-            localStorage.setItem('nodemonkes_arcade_highscore', String(g.score));
-            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+          if (gameRef.current.score > highScore) {
+            setHighScore(gameRef.current.score);
+            localStorage.setItem('nodemonkes_arcade_highscore', String(gameRef.current.score));
+            confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 } });
           }
         }
 
-        // 3. Pipe Generation
-        g.pipeSpawnTimer++;
-        if (g.pipeSpawnTimer > 95) {
-          g.pipeSpawnTimer = 0;
-          const gap = 145;
-          const minPipe = 60;
-          const top = Math.floor(Math.random() * (height - gap - minPipe * 2)) + minPipe;
+        // Spawn Cyber Node Towers
+        gameRef.current.pipeSpawnTimer++;
+        const spawnThreshold = difficulty === 'standard' ? 135 : (difficulty === 'overclock' ? 120 : 105);
+        if (gameRef.current.pipeSpawnTimer > spawnThreshold) {
+          gameRef.current.pipeSpawnTimer = 0;
+          const gap = diffConfig.gap;
+          const minTop = 60;
+          const maxTop = height - gap - 110;
+          const top = Math.floor(minTop + Math.random() * (maxTop - minTop));
           const bottom = height - top - gap;
-          g.pipes.push({
+          gameRef.current.pipeCounter++;
+          gameRef.current.pipes.push({
             x: width,
             top,
             bottom,
             passed: false,
-            hasCoin: Math.random() > 0.5,
+            hasCoin: Math.random() > 0.35,
             coinTaken: false,
+            id: gameRef.current.pipeCounter,
           });
         }
 
-        // 4. Update & Draw Obstacles (Bitcoin Candlestick Pillars)
-        for (let i = g.pipes.length - 1; i >= 0; i--) {
-          const p = g.pipes[i];
-          p.x -= g.pipeSpeed;
+        // Move & Collide Pipes with Forgiving Core Hitbox
+        const pipeSpeed = diffConfig.speed;
+        for (let i = gameRef.current.pipes.length - 1; i >= 0; i--) {
+          const p = gameRef.current.pipes[i];
+          p.x -= pipeSpeed;
 
-          // Green Bullish Candle (Top)
-          const topGrad = ctx.createLinearGradient(p.x, 0, p.x + 52, 0);
-          topGrad.addColorStop(0, '#15803D');
-          topGrad.addColorStop(0.5, '#22C55E');
-          topGrad.addColorStop(1, '#166534');
-          ctx.fillStyle = topGrad;
-          ctx.fillRect(p.x, 0, 52, p.top);
-          ctx.fillStyle = '#4ADE80';
-          ctx.fillRect(p.x - 3, p.top - 14, 58, 14); // Pipe Cap
+          // Monke Core Hitbox (8px buffer from sprite borders)
+          const mx = 64;
+          const my = gameRef.current.birdY;
+          const towerWidth = 50;
 
-          // Red Bearish Candle (Bottom)
-          const btmY = height - p.bottom;
-          const btmGrad = ctx.createLinearGradient(p.x, 0, p.x + 52, 0);
-          btmGrad.addColorStop(0, '#B91C1C');
-          btmGrad.addColorStop(0.5, '#EF4444');
-          btmGrad.addColorStop(1, '#991B1B');
-          ctx.fillStyle = btmGrad;
-          ctx.fillRect(p.x, btmY, 52, p.bottom);
-          ctx.fillStyle = '#F87171';
-          ctx.fillRect(p.x - 3, btmY, 58, 14); // Pipe Cap
+          const hitPaddingX = 8;
+          const hitPaddingY = 6;
+          const monkeHitLeft = mx + hitPaddingX;
+          const monkeHitRight = mx + 36 - hitPaddingX;
+          const monkeHitTop = my + hitPaddingY;
+          const monkeHitBottom = my + 36 - hitPaddingY;
 
-          // Golden Satoshi Coin
-          if (p.hasCoin && !p.coinTaken) {
-            const coinY = p.top + (height - p.bottom - p.top) / 2;
-            ctx.fillStyle = '#F59E0B';
-            ctx.beginPath();
-            ctx.arc(p.x + 26, coinY, 11, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#FEF3C7';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.fillStyle = '#78350F';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText('₿', p.x + 22, coinY + 4);
+          const inTowerX = monkeHitRight > p.x && monkeHitLeft < p.x + towerWidth;
+          const inTopTowerY = monkeHitTop < p.top;
+          const inBottomTowerY = monkeHitBottom > height - p.bottom;
 
-            // Coin Collision
-            if (
-              80 + 38 > p.x + 15 &&
-              80 < p.x + 37 &&
-              g.birdY + 38 > coinY - 11 &&
-              g.birdY < coinY + 11
-            ) {
-              p.coinTaken = true;
-              g.score += 5;
-              setScore(g.score);
-              sounds.playCoin();
-            }
-          }
-
-          // Pipe Collision
-          if (
-            80 + 34 > p.x &&
-            80 + 4 < p.x + 52 &&
-            (g.birdY + 4 < p.top || g.birdY + 34 > btmY)
-          ) {
+          if (inTowerX && (inTopTowerY || inBottomTowerY)) {
             sounds.playCrash();
             setGameState('gameover');
-            if (g.score > highScore) {
-              setHighScore(g.score);
-              localStorage.setItem('nodemonkes_arcade_highscore', String(g.score));
-              confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+            if (gameRef.current.score > highScore) {
+              setHighScore(gameRef.current.score);
+              localStorage.setItem('nodemonkes_arcade_highscore', String(gameRef.current.score));
+              confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 } });
             }
           }
 
-          // Score passing
-          if (!p.passed && p.x + 52 < 80) {
-            p.passed = true;
-            g.score += 1;
-            setScore(g.score);
-            sounds.playScore();
+          // Check Coin Grab (+5 Satoshi Bonus)
+          if (p.hasCoin && !p.coinTaken) {
+            const coinX = p.x + towerWidth / 2;
+            const coinY = p.top + (height - p.top - p.bottom) / 2;
+            const dist = Math.hypot(mx + 18 - coinX, my + 18 - coinY);
+            if (dist < 32) {
+              p.coinTaken = true;
+              gameRef.current.score += 5;
+              setScore(gameRef.current.score);
+              sounds.playCoin();
+
+              // Add floating +5 popup
+              gameRef.current.popups.push({
+                x: coinX,
+                y: coinY,
+                text: '+5 ₿',
+                color: '#FDE68A',
+                opacity: 1,
+                vy: -1.2,
+                life: 30,
+              });
+            }
           }
 
-          // Remove off-screen pipes
-          if (p.x < -60) {
-            g.pipes.splice(i, 1);
+          // Score Pass
+          if (!p.passed && p.x + towerWidth < mx) {
+            p.passed = true;
+            gameRef.current.score += 1;
+            setScore(gameRef.current.score);
+            sounds.playScore();
+
+            // Add floating +1 popup
+            gameRef.current.popups.push({
+              x: mx + 20,
+              y: my - 10,
+              text: '+1',
+              color: '#38BDF8',
+              opacity: 0.9,
+              vy: -1.4,
+              life: 25,
+            });
+          }
+
+          // Remove Off-Screen Pipes
+          if (p.x < -towerWidth - 20) {
+            gameRef.current.pipes.splice(i, 1);
           }
         }
       }
 
-      // 5. Draw Ground Floor
-      ctx.fillStyle = '#0F172A';
-      ctx.fillRect(0, height - 45, width, 45);
-      ctx.fillStyle = '#F59E0B';
-      ctx.fillRect(0, height - 45, width, 3); // Neon Orange Border
+      // 2. Render Cyber Node Server Pillars (节点矿机数据机柜)
+      gameRef.current.pipes.forEach((p) => {
+        const towerWidth = 50;
 
-      // 6. Draw Player Monke Sprite
-      const birdX = 80;
-      const birdY = g.birdY;
-      const tilt = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (g.velocity * 0.08)));
+        // TOP TOWER (Ceiling Down)
+        // -------------------------
+        // Main Server Chassis Body
+        const topGrad = ctx.createLinearGradient(p.x, 0, p.x + towerWidth, 0);
+        topGrad.addColorStop(0, '#0F172A');
+        topGrad.addColorStop(0.3, '#1E293B');
+        topGrad.addColorStop(0.8, '#0F172A');
+        topGrad.addColorStop(1, '#080D1A');
+        ctx.fillStyle = topGrad;
+        ctx.fillRect(p.x, 0, towerWidth, p.top);
+
+        // Server Rack Outer Border & Neon Bevel
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(p.x, 0, towerWidth, p.top);
+
+        // Neon Amber Data Traces (Side Accent)
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(p.x + 2, 0, 2, p.top);
+
+        // Server Horizontal Ventilation Slats & LED Blinking Lights
+        const slatSpacing = 16;
+        for (let sy = 12; sy < p.top - 18; sy += slatSpacing) {
+          // Vent Slat
+          ctx.fillStyle = '#090D16';
+          ctx.fillRect(p.x + 8, sy, towerWidth - 16, 5);
+          ctx.fillStyle = '#1E293B';
+          ctx.fillRect(p.x + 8, sy + 4, towerWidth - 16, 1);
+
+          // LED Status Lights (Blinking)
+          const time = Date.now() * 0.003;
+          const isLed1 = Math.sin(time + p.id + sy) > 0;
+          const isLed2 = Math.cos(time * 1.5 + sy) > 0;
+          ctx.fillStyle = isLed1 ? '#22C55E' : '#14532D'; // Green LED
+          ctx.fillRect(p.x + towerWidth - 12, sy + 1, 3, 3);
+          ctx.fillStyle = isLed2 ? '#38BDF8' : '#0369A1'; // Cyan LED
+          ctx.fillRect(p.x + towerWidth - 7, sy + 1, 3, 3);
+        }
+
+        // Top Terminal Emitter Cap (Gold Terminal Bevel)
+        const capH = 14;
+        const capGrad = ctx.createLinearGradient(p.x - 3, p.top - capH, p.x + towerWidth + 3, p.top);
+        capGrad.addColorStop(0, '#D97706');
+        capGrad.addColorStop(0.5, '#FDE68A');
+        capGrad.addColorStop(1, '#B45309');
+        ctx.fillStyle = capGrad;
+        ctx.fillRect(p.x - 3, p.top - capH, towerWidth + 6, capH);
+        ctx.strokeStyle = '#FBBF24';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(p.x - 3, p.top - capH, towerWidth + 6, capH);
+
+        // L1 Inscription Chip Badge on Cap
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡NODE', p.x + towerWidth / 2, p.top - 4);
+
+
+        // BOTTOM TOWER (Ground Up)
+        // -------------------------
+        const btmY = height - p.bottom;
+
+        // Bottom Main Server Chassis Body
+        ctx.fillStyle = topGrad;
+        ctx.fillRect(p.x, btmY, towerWidth, p.bottom);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(p.x, btmY, towerWidth, p.bottom);
+
+        // Neon Amber Data Traces (Side Accent)
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(p.x + 2, btmY, 2, p.bottom);
+
+        // Bottom Terminal Emitter Cap
+        ctx.fillStyle = capGrad;
+        ctx.fillRect(p.x - 3, btmY, towerWidth + 6, capH);
+        ctx.strokeStyle = '#FBBF24';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(p.x - 3, btmY, towerWidth + 6, capH);
+
+        // Bottom Inscription Chip Badge on Cap
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡BTC', p.x + towerWidth / 2, btmY + 10);
+
+        // Server Horizontal Ventilation Slats & LED Blinking Lights
+        for (let sy = btmY + capH + 10; sy < height - 55; sy += slatSpacing) {
+          ctx.fillStyle = '#090D16';
+          ctx.fillRect(p.x + 8, sy, towerWidth - 16, 5);
+          ctx.fillStyle = '#1E293B';
+          ctx.fillRect(p.x + 8, sy + 4, towerWidth - 16, 1);
+
+          const time = Date.now() * 0.003;
+          const isLed1 = Math.sin(time * 0.8 + p.id + sy) > 0;
+          const isLed2 = Math.cos(time * 1.2 + sy) > 0;
+          ctx.fillStyle = isLed1 ? '#F59E0B' : '#78350F'; // Amber LED
+          ctx.fillRect(p.x + towerWidth - 12, sy + 1, 3, 3);
+          ctx.fillStyle = isLed2 ? '#22C55E' : '#14532D'; // Green LED
+          ctx.fillRect(p.x + towerWidth - 7, sy + 1, 3, 3);
+        }
+
+
+        // Render Floating Satoshi ₿ Inscription Coin
+        if (p.hasCoin && !p.coinTaken) {
+          const coinX = p.x + towerWidth / 2;
+          const coinY = p.top + (height - p.top - p.bottom) / 2;
+          const bob = Math.sin(Date.now() * 0.008 + p.id) * 4;
+
+          ctx.save();
+          // Halo Glow
+          ctx.shadowColor = 'rgba(245, 158, 11, 0.8)';
+          ctx.shadowBlur = 10;
+
+          ctx.beginPath();
+          ctx.arc(coinX, coinY + bob, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#F59E0B';
+          ctx.fill();
+          ctx.strokeStyle = '#FDE68A';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#000000';
+          ctx.font = 'black 13px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('₿', coinX, coinY + bob);
+          ctx.restore();
+        }
+      });
+
+      // 3. Render Sparks & Jetpack Particles
+      for (let i = gameRef.current.sparks.length - 1; i >= 0; i--) {
+        const s = gameRef.current.sparks[i];
+        s.x += s.vx;
+        s.y += s.vy;
+        s.life--;
+        ctx.fillStyle = s.color;
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+        if (s.life <= 0) {
+          gameRef.current.sparks.splice(i, 1);
+        }
+      }
+
+      // 4. Render Ground (Bitcoin Cyber Platform)
+      const groundH = 45;
+      const groundGrad = ctx.createLinearGradient(0, height - groundH, 0, height);
+      groundGrad.addColorStop(0, '#0E1726');
+      groundGrad.addColorStop(1, '#05070B');
+      ctx.fillStyle = groundGrad;
+      ctx.fillRect(0, height - groundH, width, groundH);
+
+      // Cyber Neon Ground Rail
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(0, height - groundH, width, 3);
+      ctx.fillStyle = '#38BDF8';
+      ctx.fillRect(0, height - groundH + 3, width, 1);
+
+      // Micro Blocks on Ground
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      for (let gx = 0; gx < width; gx += 28) {
+        ctx.fillRect(gx, height - groundH + 10, 18, 2);
+      }
+
+      // 5. Render Player Sprite (NodeMonke)
+      const birdSize = 36;
+      const birdX = 64;
+      const birdY = gameRef.current.birdY;
 
       ctx.save();
-      ctx.translate(birdX + 20, birdY + 20);
+      ctx.translate(birdX + birdSize / 2, birdY + birdSize / 2);
+
+      // Dynamic tilt based on velocity
+      const tilt = Math.max(-0.35, Math.min(0.45, gameRef.current.velocity * 0.06));
       ctx.rotate(tilt);
-      if (g.monkeImg) {
+
+      if (gameRef.current.monkeImg) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(g.monkeImg, -20, -20, 40, 40);
+        ctx.drawImage(
+          gameRef.current.monkeImg,
+          -birdSize / 2,
+          -birdSize / 2,
+          birdSize,
+          birdSize
+        );
       } else {
-        ctx.fillStyle = '#38BDF8';
-        ctx.fillRect(-18, -18, 36, 36);
+        // Fallback pixel box
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(-birdSize / 2, -birdSize / 2, birdSize, birdSize);
       }
       ctx.restore();
 
-      // 7. HUD Score on Canvas
+      // 6. Render Floating Score Popups
+      for (let i = gameRef.current.popups.length - 1; i >= 0; i--) {
+        const pop = gameRef.current.popups[i];
+        pop.y += pop.vy;
+        pop.life--;
+        pop.opacity = Math.max(0, pop.life / 30);
+
+        ctx.save();
+        ctx.fillStyle = pop.color;
+        ctx.globalAlpha = pop.opacity;
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(pop.text, pop.x, pop.y);
+        ctx.restore();
+
+        if (pop.life <= 0) {
+          gameRef.current.popups.splice(i, 1);
+        }
+      }
+
+      // 7. In-Game Live HUD Score Display
       if (gameState === 'playing') {
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 36px monospace';
+        ctx.font = 'black 40px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(String(g.score), width / 2, 70);
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(String(gameRef.current.score), width / 2, 58);
+        ctx.shadowBlur = 0;
       }
 
       rafRef.current = requestAnimationFrame(loop);
@@ -382,12 +728,13 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
     rafRef.current = requestAnimationFrame(loop);
 
     return () => {
+      localRunning = false;
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [gameState, highScore]);
+  }, [gameState, highScore, diffConfig, difficulty]);
 
   // Export Score Share Card
   const handleExportScore = useCallback(() => {
@@ -419,7 +766,7 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
 
       ctx.fillStyle = '#F59E0B';
       ctx.font = 'bold 44px monospace';
-      ctx.fillText('🕹️ FLAPPY NODEMONKE 战绩', 60, 80);
+      ctx.fillText(lang === 'zh' ? '🕹️ FLAPPY NODEMONKE 战绩' : '🕹️ FLAPPY NODEMONKE SCORE', 60, 80);
 
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 36px monospace';
@@ -443,12 +790,12 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
       link.download = `FlappyMonke_${currentMonke.id}_Score_${score}.png`;
       link.href = url;
       link.click();
-      onToast('战绩海报已保存！', `得分 ${score} 高清战报已导出`, 'success');
+      onToast(t.arcadeScoreCardSuccess, t.arcadeScoreCardSuccessDesc, 'success');
     };
-  }, [score, highScore, currentMonke, onToast]);
+  }, [score, highScore, currentMonke, lang, t, onToast]);
 
   return (
-    <div className="min-h-[calc(100vh-140px)] w-full max-w-6xl mx-auto px-4 py-6 flex flex-col gap-6">
+    <div className="min-h-[calc(100vh-140px)] w-full max-w-6xl mx-auto px-4 py-6 flex flex-col gap-6 select-none">
       
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
@@ -458,22 +805,22 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
               🕹️
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              Flappy Monke <span className="text-purple-400 text-lg font-sans">像素跳跃街机</span>
+              {t.arcadeTitle}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400">
-            操控你的 NodeMonke 穿越比特币链上 K 线柱子与减半区块，收集 Satoshi 金币，刷新最高连击纪录！
+            {lang === 'zh' ? '操控你的 NodeMonke 穿越比特币赛博节点矿机阵列，收集 Satoshi 金币，刷新最高连击纪录！' : t.arcadeSub}
           </p>
         </div>
 
-        {/* Sound Toggle */}
+        {/* Sound & Mode Status */}
         <div className="flex items-center gap-2">
           <button
             onClick={toggleSound}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white border border-white/10 text-xs font-mono font-bold transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white border border-white/10 text-xs font-mono font-bold transition-all active:scale-95"
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
-            <span>{soundEnabled ? '音效开启' : '静音'}</span>
+            <span>{soundEnabled ? t.arcadeSoundOn : t.arcadeSoundOff}</span>
           </button>
         </div>
       </div>
@@ -499,16 +846,23 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 text-3xl mb-3 shadow-lg animate-bounce">
                   🕹️
                 </div>
-                <h2 className="text-2xl font-black text-white font-mono mb-1">READY TO FLY?</h2>
-                <p className="text-xs text-slate-300 font-mono mb-5">
-                  点击屏幕 / 按空格键起飞，躲避比特币 K 线柱！
+                <h2 className="text-2xl font-black text-white font-mono mb-1">{t.arcadeReadyTitle}</h2>
+                <p className="text-xs text-slate-300 font-mono mb-4">
+                  {lang === 'zh' ? '点击屏幕 / 按空格键起飞，穿梭比特币节点矿机柱！' : t.arcadeReadySub}
                 </p>
+
+                {/* Difficulty Pill on Screen */}
+                <div className={clsx('px-3 py-1 rounded-full text-xs font-mono font-bold border mb-5 shadow-md flex items-center gap-1.5', diffConfig.badgeColor)}>
+                  <span>{diffConfig.icon}</span>
+                  <span>{lang === 'zh' ? diffConfig.nameZh : diffConfig.nameEn}</span>
+                </div>
+
                 <button
                   onClick={handleJump}
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black font-mono font-extrabold text-sm transition-all active:scale-95 shadow-lg flex items-center gap-2"
                 >
-                  <Play className="w-4 h-4" />
-                  <span>START GAME</span>
+                  <Play className="w-4 h-4 fill-black" />
+                  <span>{t.arcadeStartBtn}</span>
                 </button>
               </div>
             )}
@@ -523,16 +877,16 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
                 <div className="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 text-2xl mb-2 shadow-lg">
                   💥
                 </div>
-                <h2 className="text-2xl font-black text-white font-mono mb-1">GAME OVER</h2>
+                <h2 className="text-2xl font-black text-white font-mono mb-1">{t.arcadeGameOverTitle}</h2>
                 
                 <div className="flex items-center gap-6 my-4 bg-white/5 p-3 rounded-xl border border-white/10 font-mono">
                   <div className="text-center">
-                    <span className="text-[10px] text-slate-400 block">本局得分</span>
+                    <span className="text-[10px] text-slate-400 block">{t.arcadeCurrentScore}</span>
                     <span className="text-2xl font-black text-amber-400">{score}</span>
                   </div>
                   <div className="w-[1px] h-8 bg-white/10" />
                   <div className="text-center">
-                    <span className="text-[10px] text-slate-400 block">历史最高</span>
+                    <span className="text-[10px] text-slate-400 block">{t.arcadeBestScore}</span>
                     <span className="text-2xl font-black text-emerald-400">{highScore}</span>
                   </div>
                 </div>
@@ -543,7 +897,7 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
                     className="px-5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-mono font-bold text-xs transition-all active:scale-95 flex items-center gap-1.5"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>再玩一次</span>
+                    <span>{t.arcadeRetryBtn}</span>
                   </button>
 
                   <button
@@ -551,26 +905,70 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
                     className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black font-mono font-extrabold text-xs transition-all active:scale-95 shadow-lg flex items-center gap-1.5"
                   >
                     <Download className="w-4 h-4" />
-                    <span>导出战绩</span>
+                    <span>{t.arcadeExportScoreBtn}</span>
                   </button>
                 </div>
               </motion.div>
             )}
           </div>
 
-          <span className="text-[11px] font-mono text-slate-500 mt-4">
-            💡 点击游戏窗口或按空格键跳跃 • 吃到 ₿ 金币额外 +5 分
+          <span className="text-[11px] font-mono text-slate-400 mt-4 text-center">
+            {t.arcadeHint} • <span className="text-amber-400 font-bold">{lang === 'zh' ? '支持空格键 / W / ↑ 直接起飞' : 'Press Space / W / ↑ to flap'}</span>
           </span>
         </div>
 
-        {/* Right Arcade Settings & Monke Picker (5 Cols) */}
+        {/* Right Arcade Settings & Controls (5 Cols) */}
         <div className="lg:col-span-5 flex flex-col gap-5 p-6 rounded-3xl bg-slate-950/70 border border-white/10 backdrop-blur-xl shadow-2xl">
           
-          {/* Pick Monke Sprite */}
+          {/* 1. Difficulty Level Selector */}
+          <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono font-bold text-amber-300 flex items-center gap-1.5">
+                <Server className="w-4 h-4 text-amber-400" />
+                <span>{lang === 'zh' ? '节点模式选择 (Difficulty)' : 'Difficulty Setting'}</span>
+              </label>
+              <span className="text-[10px] font-mono text-slate-400">{diffConfig.gap}px 间距</span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              {(Object.keys(DIFFICULTY_PRESETS) as GameDifficulty[]).map((dKey) => {
+                const conf = DIFFICULTY_PRESETS[dKey];
+                const isActive = difficulty === dKey;
+                return (
+                  <button
+                    key={dKey}
+                    type="button"
+                    onClick={() => {
+                      setDifficulty(dKey);
+                      handleRestart();
+                    }}
+                    className={clsx(
+                      'p-2 rounded-xl text-xs font-mono font-bold border transition-all text-center flex flex-col items-center gap-1 active:scale-95',
+                      isActive
+                        ? `${conf.badgeColor} shadow-md ring-2 ring-amber-400/20`
+                        : 'bg-black/40 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    <span className="text-sm">{conf.icon}</span>
+                    <span className="truncate text-[11px]">
+                      {lang === 'zh' 
+                        ? (dKey === 'standard' ? '经典节点' : dKey === 'overclock' ? '超频矿机' : '减半风暴')
+                        : (dKey === 'standard' ? 'Standard' : dKey === 'overclock' ? 'Overclock' : 'Halving')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] font-mono text-slate-400 mt-1 leading-relaxed">
+              💡 {lang === 'zh' ? diffConfig.descZh : diffConfig.descEn}
+            </p>
+          </div>
+
+          {/* 2. Pick Monke Sprite */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
               <Search className="w-3.5 h-3.5 text-amber-400" />
-              <span>更换参赛神兽主角 (Choose Monke)</span>
+              <span>{t.arcadeChooseMonke}</span>
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -595,37 +993,37 @@ export const ArcadeStudio: React.FC<ArcadeStudioProps> = ({
             </div>
           </div>
 
-          {/* Arcade Stats Card */}
+          {/* 3. Arcade Stats Card */}
           <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-3 font-mono">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400 flex items-center gap-1.5">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                <span>最高分纪录 (Best High Score)</span>
+                <span>{t.arcadeHighScoreLabel}</span>
               </span>
               <span className="text-lg font-black text-amber-400">{highScore} PTS</span>
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-400 border-t border-white/10 pt-2.5">
-              <span>当前选手评级</span>
+              <span>{t.arcadeRankLabel}</span>
               <span className="text-emerald-300 font-bold">Rank #{currentMonke.rank || 'N/A'}</span>
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>铭文序号</span>
+              <span>{t.arcadeInscriptionLabel}</span>
               <span className="text-slate-200">#{currentMonke.inscription}</span>
             </div>
           </div>
 
-          {/* Tips Card */}
+          {/* 4. Tips Card */}
           <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs font-mono text-purple-200 flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5 font-bold text-purple-300">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <span>街机挑战规则</span>
+              <span>{t.arcadeRulesTitle}</span>
             </div>
             <p className="text-[11px] text-purple-200/80 leading-relaxed">
-              • 每穿过一组 K 线柱得 1 分<br />
-              • 收集空中的金色 ₿ 符文金币单次额外获得 +5 分<br />
-              • 触碰顶部天花板、底部地板或柱身立即结束游戏
+              {lang === 'zh' ? '• 每穿过一组赛博节点矿机柱得 1 分' : t.arcadeRule1}<br />
+              {t.arcadeRule2}<br />
+              {lang === 'zh' ? '• 触碰矿机机柜或触底将中断连击并结算成绩' : t.arcadeRule3}
             </p>
           </div>
 

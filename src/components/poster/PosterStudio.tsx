@@ -202,7 +202,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       if (typeof event.target?.result === 'string') {
         setCustomBgImage(event.target.result);
         setTheme('custom');
-        onToast('背景图已上传', '已加载自定义背景壁纸', 'success');
+        onToast(lang === 'zh' ? '背景图已上传' : 'Background Uploaded', lang === 'zh' ? '已加载自定义背景壁纸' : 'Custom wallpaper loaded', 'success');
       }
     };
     reader.readAsDataURL(file);
@@ -379,7 +379,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     };
     setLayers((prev) => [newLayer, ...prev]);
     setSelectedIds([newLayer.id]);
-    onToast(t.posterAddMonke, `已添加 NodeMonke #${newId}`, 'success');
+    onToast(t.posterAddMonke, lang === 'zh' ? `已添加 NodeMonke #${newId}` : `Added NodeMonke #${newId}`, 'success');
   };
 
   const handleDeleteSelected = () => {
@@ -1049,7 +1049,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           )}
         >
           <Type className="w-3 h-3 text-purple-400" />
-          <span>文案排版 (Text)</span>
+          <span>{t.posterLayerText}</span>
         </button>
 
         {/* Monke Layer Chips in order */}
@@ -1082,7 +1082,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 className="w-4 h-4 rounded-md pixelated bg-black/50"
               />
               <span>#{l.monkeId}</span>
-              {index === 0 && <span className="text-[9px] text-amber-400/80 font-normal">(顶层)</span>}
+              {index === 0 && <span className="text-[9px] text-amber-400/80 font-normal">{t.posterTopLayer}</span>}
             </button>
           );
         })}
@@ -1113,14 +1113,14 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 <div className="w-[1px] h-4 bg-white/15" />
                 <button
                   onClick={() => handleBatchScale(-30)}
-                  title="批量缩小"
+                  title={t.posterBatchScaleDown}
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleBatchScale(30)}
-                  title="批量放大"
+                  title={t.posterBatchScaleUp}
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
                 >
                   <ZoomIn className="w-4 h-4" />
@@ -1131,11 +1131,11 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 text-xs font-mono"
                 >
                   <FlipHorizontal className="w-4 h-4" />
-                  <span>翻转</span>
+                  <span>{lang === 'zh' ? '翻转' : 'Flip'}</span>
                 </button>
                 <button
                   onClick={handleBatchBringToFront}
-                  title="批量置顶"
+                  title={t.posterBatchBringFront}
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
                 >
                   <ChevronsUp className="w-4 h-4" />
@@ -1149,7 +1149,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 </button>
                 <button
                   onClick={() => setSelectedIds([])}
-                  title="取消全选"
+                  title={t.posterDeselectAllTip}
                   className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white"
                 >
                   <X className="w-4 h-4" />
@@ -1162,7 +1162,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-white/15 shadow-2xl flex items-center gap-2 z-20">
                 <button
                   onClick={() => handleBatchScale(-30)}
-                  title="缩小"
+                  title={t.posterBatchScaleDown}
                   className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
                 >
                   <ZoomOut className="w-4 h-4" />
@@ -1172,7 +1172,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 </span>
                 <button
                   onClick={() => handleBatchScale(30)}
-                  title="放大"
+                  title={t.posterBatchScaleUp}
                   className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
                 >
                   <ZoomIn className="w-4 h-4" />
@@ -1257,9 +1257,9 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
                 <span className="text-xs font-bold text-purple-300 font-mono flex items-center gap-1.5">
                   <Type className="w-4 h-4" />
-                  <span>文案排版设置 (Text Layer)</span>
+                  <span>{t.posterTextSettings}</span>
                 </span>
-                <span className="text-[10px] font-mono text-slate-400">画布可拖拽</span>
+                <span className="text-[10px] font-mono text-slate-400">{t.posterDraggableOnCanvas}</span>
               </div>
 
               <div>
@@ -1300,7 +1300,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[11px] font-mono text-slate-400">对齐方式:</span>
+                <span className="text-[11px] font-mono text-slate-400">{t.posterTextAlign}</span>
                 <div className="flex items-center gap-1">
                   {(['left', 'center', 'right'] as const).map((al) => (
                     <button
@@ -1324,14 +1324,14 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             <div className="glass-panel p-4 rounded-3xl border border-purple-500/40 space-y-3.5 shadow-2xl bg-purple-950/20">
               <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
                 <span className="text-xs font-bold text-purple-300 font-mono">
-                  已多选 {selectedMonkeLayers.length} 只 NodeMonkes
+                  {t.posterMultiSelected.replace('{n}', String(selectedMonkeLayers.length))}
                 </span>
                 <button
                   onClick={handleDeleteSelected}
                   className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-mono flex items-center gap-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>批量删除</span>
+                  <span>{t.posterBatchDelete}</span>
                 </button>
               </div>
 
@@ -1349,26 +1349,26 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                   className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-white border border-white/10 flex items-center justify-center gap-1.5"
                 >
                   <Copy className="w-4 h-4" />
-                  <span>批量复制</span>
+                  <span>{t.posterBatchDuplicate}</span>
                 </button>
                 <button
                   onClick={handleBatchBringToFront}
                   className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-white border border-white/10 flex items-center justify-center gap-1.5"
                 >
                   <ChevronsUp className="w-4 h-4" />
-                  <span>批量置顶</span>
+                  <span>{t.posterBatchBringFront}</span>
                 </button>
                 <button
                   onClick={handleBatchSendToBack}
                   className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-white border border-white/10 flex items-center justify-center gap-1.5"
                 >
                   <ChevronsDown className="w-4 h-4" />
-                  <span>批量置底</span>
+                  <span>{t.posterBatchSendBack}</span>
                 </button>
               </div>
 
               <div className="text-[11px] font-mono text-slate-400 pt-1">
-                💡 可以在画布上按住任意一只选中的猴子，整体同步平移或缩放。
+                {t.posterMultiSelectHint}
               </div>
             </div>
           ) : primarySelectedMonke ? (
@@ -1405,7 +1405,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
               {/* ID Input */}
               <div className="flex items-center justify-between gap-2">
-                <label className="text-[11px] font-mono text-slate-400">更换猴子 ID:</label>
+                <label className="text-[11px] font-mono text-slate-400">{t.posterChangeId}</label>
                 <input
                   type="number"
                   min={1}
@@ -1499,7 +1499,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             </div>
           ) : (
             <div className="glass-panel p-4 rounded-3xl border border-white/5 text-center py-5 space-y-2">
-              <span className="text-xs font-mono text-slate-400 block">在画布上拖拽框选多个猴子，或点击单个猴子编辑</span>
+              <span className="text-xs font-mono text-slate-400 block">{t.posterCanvasEmptyHint}</span>
             </div>
           )}
 
@@ -1570,7 +1570,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             {customBgImage && (
               <div className="space-y-1 pt-2 border-t border-white/[0.06]">
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>背景压暗蒙版</span>
+                  <span>{t.posterBgDimMask}</span>
                   <span className="text-white">{bgDim}%</span>
                 </div>
                 <input

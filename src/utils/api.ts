@@ -2,7 +2,9 @@ import type { Monke, ColorInfo } from '../types';
 import { METADATA_URL, CDN_BASE_URL } from './constants';
 
 let cachedMonkes: Monke[] | null = null;
+const monkeIdMap = new Map<number, Monke>();
 const colorCache = new Map<number, ColorInfo[]>();
+const preloadedImageUrls = new Set<string>();
 
 export async function fetchMonkes(): Promise<Monke[]> {
   if (cachedMonkes && cachedMonkes.length > 0) {
@@ -24,11 +26,22 @@ export async function fetchMonkes(): Promise<Monke[]> {
     const data = await response.json();
     const list: Monke[] = Array.isArray(data) ? data : data.nodemonkes || [];
     cachedMonkes = list;
+    
+    // Build fast in-memory ID map
+    monkeIdMap.clear();
+    for (let i = 0; i < list.length; i++) {
+      monkeIdMap.set(list[i].id, list[i]);
+    }
+
     return list;
   } catch (error) {
     console.error('Error fetching monkes data:', error);
     throw error;
   }
+}
+
+export function getMonkeById(id: number): Monke | undefined {
+  return monkeIdMap.get(id);
 }
 
 export function getMonkeImageUrl(id: number): string {
@@ -37,6 +50,49 @@ export function getMonkeImageUrl(id: number): string {
 
 export function getSantaMonkeImageUrl(id: number): string {
   return `https://raw.githubusercontent.com/supercrypto1984/santa-nodemonkes/main/public/assets/merged/${id}.png`;
+}
+
+/**
+ * High-performance asynchronous image preloader with browser-level decode()
+ */
+export function preloadImage(url: string): Promise<void> {
+  if (preloadedImageUrls.has(url)) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      preloadedImageUrls.add(url);
+      if ('decode' in img) {
+        img.decode().catch(() => {}).then(() => resolve());
+      } else {
+        resolve();
+      }
+    };
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
+
+/**
+ * Preload batch of Monke avatar images asynchronously in the background
+ */
+export function preloadMonkeImages(ids: number[]) {
+  if (!ids || ids.length === 0) return;
+  // Use requestIdleCallback or setTimeout to avoid blocking user interactions
+  const runPreload = () => {
+    ids.forEach((id) => {
+      preloadImage(getMonkeImageUrl(id));
+    });
+  };
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(runPreload, { timeout: 1500 });
+  } else {
+    setTimeout(runPreload, 100);
+  }
 }
 
 export async function getImageColors(imageUrl: string, monkeId?: number): Promise<ColorInfo[]> {

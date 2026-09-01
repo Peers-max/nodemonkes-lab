@@ -25,9 +25,8 @@
   background-image: 
     radial-gradient(at 15% 15%, rgba(245, 158, 11, 0.07) 0px, transparent 55%),
     radial-gradient(at 85% 20%, rgba(244, 63, 94, 0.05) 0px, transparent 50%),
-    radial-gradient(at 50% 85%, rgba(16, 185, 129, 0.05) 0px, transparent 60%),
-    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 24px 24px;
+    radial-gradient(at 50% 85%, rgba(16, 185, 129, 0.05) 0px, transparent 60%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
 }
 
 /* Glassmorphism Pro Panels */

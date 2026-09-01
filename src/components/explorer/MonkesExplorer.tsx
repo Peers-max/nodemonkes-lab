@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   LayoutGrid, 
@@ -18,7 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
-import { getMonkeImageUrl } from '../../utils/api';
+import { getMonkeImageUrl, preloadMonkeImages } from '../../utils/api';
 import { MonkeDetailModal } from './MonkeDetailModal';
 import { TheatreModal } from './TheatreModal';
 import { ParallaxCard } from '../ui/ParallaxCard';
@@ -191,6 +191,16 @@ export const MonkesExplorer: React.FC<MonkesExplorerProps> = ({
     const start = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedMonkes.slice(start, start + itemsPerPage);
   }, [filteredAndSortedMonkes, currentPage, itemsPerPage]);
+
+  // Proactive Next-Page Preloader (Async background decode for zero-delay pagination)
+  useEffect(() => {
+    if (currentPage < totalPages) {
+      const nextStart = currentPage * itemsPerPage;
+      const nextMonkes = filteredAndSortedMonkes.slice(nextStart, nextStart + itemsPerPage);
+      const nextIds = nextMonkes.map((m) => m.id);
+      preloadMonkeImages(nextIds);
+    }
+  }, [currentPage, totalPages, itemsPerPage, filteredAndSortedMonkes]);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
