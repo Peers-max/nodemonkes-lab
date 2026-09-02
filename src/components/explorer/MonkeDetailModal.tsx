@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, Check, Sparkles, Gift, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Monke, ColorInfo } from '../../types';
@@ -42,10 +43,12 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
 
   const attrs = monke?.attributes;
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {monke && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-3 sm:pt-5 md:pt-6 pb-6 p-3 sm:p-4 overflow-y-auto pointer-events-auto">
           
           {/* Backdrop Blur with Fade */}
           <motion.div
@@ -56,19 +59,19 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
             className="fixed inset-0 bg-black/80 backdrop-blur-md"
           />
 
-          {/* Modal Card with Spring Scale */}
+          {/* Modal Card with Spring Scale - Anchored Upper-Middle */}
           <motion.div 
-            initial={{ opacity: 0, scale: 0.93, y: 16 }}
+            initial={{ opacity: 0, scale: 0.93, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.93, y: 16 }}
+            exit={{ opacity: 0, scale: 0.93, y: 8 }}
             transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-            className="relative w-full max-w-2xl bg-[#0C101A] border border-white/[0.12] rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[90vh] z-10"
+            className="relative w-full max-w-2xl bg-[#0C101A] border border-white/[0.12] rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[88vh] z-10 my-0 mb-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] bg-white/[0.02]">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-white font-mono flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold text-white font-mono flex items-center gap-2">
                   <span>NodeMonke #{monke.id}</span>
                 </h2>
                 {monke.rank && (
@@ -81,18 +84,18 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
               </motion.button>
             </div>
 
             {/* Content Body */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                 
                 {/* Image Preview */}
-                <div className="relative aspect-square rounded-2xl bg-black/60 border border-white/10 p-4 flex items-center justify-center overflow-hidden shadow-inner group">
+                <div className="relative aspect-square rounded-2xl bg-black/60 border border-white/10 p-3 sm:p-4 flex items-center justify-center overflow-hidden shadow-inner group">
                   <img
                     src={getMonkeImageUrl(monke.id)}
                     alt={`NodeMonke #${monke.id}`}
@@ -246,6 +249,7 @@ export const MonkeDetailModal: React.FC<MonkeDetailModalProps> = ({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
