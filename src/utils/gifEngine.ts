@@ -357,18 +357,6 @@ export function drawActionFrame(
     const rocketX = rocketBaseX + Math.cos(angleToMoon) * boostOffset;
     const rocketY = rocketBaseY + Math.sin(angleToMoon) * boostOffset;
 
-    // Speed Lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 2 * scale;
-    for (let i = 0; i < 4; i++) {
-      const sx = ((progress * 400 + i * 110) % 460) * scale;
-      const sy = ((progress * 400 + i * 110) % 460) * scale;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx - 40 * scale, sy + 40 * scale);
-      ctx.stroke();
-    }
-
     ctx.save();
     ctx.translate(rocketX, rocketY);
     ctx.rotate(rocketRotAngle);
