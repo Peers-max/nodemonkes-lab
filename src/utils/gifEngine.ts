@@ -236,13 +236,6 @@ export function drawActionFrame(
     const headRot = Math.sin(progress * Math.PI * 2) * 0.2;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
-    ctx.beginPath();
-    ctx.ellipse(size / 2, size * 0.85, (90 + Math.abs(downOffset) * 2) * (size / 400), 14 * (size / 400), 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
     ctx.imageSmoothingEnabled = false;
     safeDraw(ctx, lowerImg, monkeImg, 0, downOffset * 0.35, size, size);
     ctx.restore();
@@ -264,13 +257,6 @@ export function drawActionFrame(
     const weaveX = weavePhase * 24 * (size / 400);
     const weaveY = Math.abs(weavePhase) * 22 * (size / 400);
     const rollTilt = weavePhase * 0.15;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(size / 2 + weaveX * 0.4, size * 0.86, 65 * (size / 400), 10 * (size / 400), 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
