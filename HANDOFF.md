@@ -1,8 +1,17 @@
 # NodeMonkes Lab — AI Agent & Suite Version Handoff Document
 
-> **版本定位**：v1.1.0-agent (含 10,000 神兽专属 ReAct AI 智能体宇宙 + 现代拖拽导航栏 + 像素对齐)  
+> **版本定位**：v1.1.0-agent (含 10,000 神兽专属 ReAct AI 智能体宇宙 + 现代拖拽导航栏 + 8大黄金GIF动图工坊)  
 > **更新时间**：2026-09-02  
 > **Git 仓库**：`https://github.com/Peers-max/nodemonkes-lab.git`
+
+---
+
+## 🛑 【最高工作纪律 · STRICT DISCIPLINE】
+
+> **⚠️ 严禁擅自同步老仓库（生产仓库 `nodemonkes-suite`）**：
+> 1. **默认规则**：除非用户在对话中**明确、主动发出明确指令**（例如：“更新到老仓库”、“同步到生产库”），否则 AI 智能体**绝对禁止自作主张**将任何代码复制、同步、提交或推送到 `nodemonkes-suite`！
+> 2. **日常开发边界**：所有日常开发、功能迭代、修复、测试与 Git 提交，**100% 仅在当前开发仓库 `nodemonkes-lab` 中进行**。
+> 3. **严守纪律**：任何跨仓库复制与部署操作必须等待用户指令后方可执行。
 
 ---
 
