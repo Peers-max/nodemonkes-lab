@@ -1,4 +1,4 @@
-export type TabType = 'explorer' | 'gif' | 'diy' | 'santa' | 'poster' | 'passport' | 'arcade';
+export type TabType = 'explorer' | 'gif' | 'diy' | 'santa' | 'poster' | 'passport' | 'arcade' | 'agent';
 
 export interface MonkeAttributes {
   [key: string]: string | number | undefined;

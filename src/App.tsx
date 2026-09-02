@@ -11,6 +11,7 @@ import { SantaStudio } from './components/santa/SantaStudio';
 import { PosterStudio } from './components/poster/PosterStudio';
 import { PassportStudio } from './components/passport/PassportStudio';
 import { ArcadeStudio } from './components/arcade/ArcadeStudio';
+import { MonkeAgentStudio } from './components/agent/MonkeAgentStudio';
 import { ToastContainer } from './components/ui/Toast';
 import { LanguageProvider, useLanguage } from './utils/i18n';
 
@@ -26,7 +27,7 @@ const AppContent: React.FC = () => {
   const getInitialTab = (): TabType => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') as TabType;
-    if (['explorer', 'gif', 'diy', 'santa', 'poster', 'passport', 'arcade'].includes(tab)) {
+    if (['explorer', 'gif', 'diy', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
       return tab;
     }
     return 'explorer';
@@ -78,7 +79,7 @@ const AppContent: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab') as TabType;
-      if (tab && ['explorer', 'gif', 'diy', 'santa', 'poster', 'passport', 'arcade'].includes(tab)) {
+      if (tab && ['explorer', 'gif', 'diy', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
         setActiveTab(tab);
       }
       const id = parseInt(params.get('id') || '209', 10);
@@ -268,6 +269,23 @@ const AppContent: React.FC = () => {
               exit="exit"
             >
               <ArcadeStudio
+                initialMonkeId={targetMonkeId}
+                monkes={monkes}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
+
+          {/* Tab 8: 10,000 Autonomous Monkes AI Agent & Persona Hub */}
+          {activeTab === 'agent' && (
+            <motion.div
+              key="agent"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <MonkeAgentStudio
                 initialMonkeId={targetMonkeId}
                 monkes={monkes}
                 onToast={addToast}

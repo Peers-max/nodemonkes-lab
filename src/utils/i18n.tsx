@@ -12,6 +12,7 @@ export interface Translations {
   tabPoster: string;
   tabPassport: string;
   tabArcade: string;
+  tabAgent: string;
   badge10k: string;
   badgeStudio: string;
   badgeCreator: string;
@@ -391,6 +392,7 @@ export const translations: Record<Language, Translations> = {
     tabPoster: '海报工坊',
     tabPassport: '3D 通行证',
     tabArcade: '像素小游戏',
+    tabAgent: '神兽 AI 智能体',
     badge10k: '1万',
     badgeStudio: '工坊',
     badgeCreator: '创作',
@@ -768,6 +770,7 @@ export const translations: Record<Language, Translations> = {
     tabPoster: 'Poster Studio',
     tabPassport: '3D Passport',
     tabArcade: 'Arcade Game',
+    tabAgent: 'Monke AI Agent',
     badge10k: '10K',
     badgeStudio: 'Studio',
     badgeCreator: 'Creator',
