@@ -73,24 +73,49 @@ const RESOLUTION_OPTIONS = [
   { label: '4096px (4K)', value: 4096 },
 ];
 
+export const PRESET_BODIES = [
+  { id: 209, nameZh: '🍊 经典橙皮', nameEn: 'Classic Orange', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/209.png' },
+  { id: 868, nameZh: '👑 纯金金猴', nameEn: 'Pure Gold', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/868.png' },
+  { id: 1000, nameZh: '👽 异星天青', nameEn: 'Alien Cyan', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/1000.png' },
+  { id: 4000, nameZh: '🧟 僵尸绿皮', nameEn: 'Zombie Green', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/4000.png' },
+  { id: 5000, nameZh: '🤖 机械灰钛', nameEn: 'Cyborg Gray', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/5000.png' },
+  { id: 2332, nameZh: '🟣 赛博暗紫', nameEn: 'Cyber Purple', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/2332.png' },
+  { id: 6000, nameZh: '💎 钻石白皮', nameEn: 'Diamond White', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/6000.png' },
+  { id: 7000, nameZh: '🟥 赤红战神', nameEn: 'Crimson Red', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/7000.png' },
+  { id: 8000, nameZh: '🔵 深海湛蓝', nameEn: 'Ocean Blue', url: 'https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/8000.png' },
+];
+
 const diyImgCache = new Map<string, HTMLImageElement>();
 
 function loadCanvasImage(url: string): Promise<HTMLImageElement> {
+  if (!url || url === 'none') {
+    return Promise.reject(new Error('Empty url'));
+  }
   if (diyImgCache.has(url)) {
-    return Promise.resolve(diyImgCache.get(url)!);
+    const cached = diyImgCache.get(url)!;
+    if (cached.complete && cached.naturalWidth > 0) {
+      return Promise.resolve(cached);
+    }
   }
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       diyImgCache.set(url, img);
-      if ('decode' in img) {
-        img.decode().catch(() => {}).then(() => resolve(img));
-      } else {
-        resolve(img);
-      }
+      resolve(img);
     };
-    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+    img.onerror = () => {
+      // Fallback: try direct image without crossOrigin
+      const fallback = new Image();
+      fallback.onload = () => {
+        diyImgCache.set(url, fallback);
+        resolve(fallback);
+      };
+      fallback.onerror = () => {
+        reject(new Error(`Failed to load image: ${url}`));
+      };
+      fallback.src = url;
+    };
     img.src = url;
   });
 }
@@ -102,13 +127,15 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
   const [activeCategory, setActiveCategory] = useState<CategoryType>('Head');
   const [activeCustomCategory, setActiveCustomCategory] = useState<CustomCategoryType>('Head');
   const [showRulers, setShowRulers] = useState(false);
+  const [customMonkeInput, setCustomMonkeInput] = useState<string>('209');
 
   const [selectedParts, setSelectedParts] = useState<Record<CategoryType, string>>({
-    Body: '',
+    Body: PRESET_BODIES[0].url,
     Earring: '',
     Eyes: '',
     Head: '',
   });
+
 
   const [activeCustomTraits, setActiveCustomTraits] = useState<Record<CustomCategoryType, string | null>>({
     Head: 'btc_crown',
@@ -886,26 +913,77 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 </div>
 
                 {/* Base Body Selector */}
-                <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="pt-3 border-t border-white/10 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400 uppercase font-bold">{lang === 'zh' ? '更换底猴身体 (Base Body):' : 'Select Base Body:'}</span>
+                    <span className="text-amber-300 uppercase font-bold flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5" />
+                      {lang === 'zh' ? '选择底猴身体 (Base Body & Monke):' : 'Select Base Body / Monke ID:'}
+                    </span>
                   </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {components.normal.Body.filter(b => b.url !== 'none').slice(0, 12).map((body, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => selectPart('Body', body.url)}
-                        className={clsx(
-                          'w-12 h-12 rounded-xl border flex-shrink-0 p-1 transition-all',
-                          selectedParts.Body === body.url
-                            ? 'border-amber-400 bg-amber-500/20 ring-1 ring-amber-400'
-                            : 'border-white/10 bg-slate-900/60 hover:border-white/20'
-                        )}
-                      >
-                        <img src={body.url} alt={body.value} className="w-full h-full object-contain pixelated" />
-                      </button>
-                    ))}
+
+                  {/* 1. Curated Preset Clean Bodies */}
+                  <div className="flex gap-2 overflow-x-auto pb-1.5 custom-scrollbar">
+                    {PRESET_BODIES.map((body) => {
+                      const isSelected = selectedParts.Body === body.url;
+                      return (
+                        <button
+                          key={body.id}
+                          type="button"
+                          onClick={() => {
+                            selectPart('Body', body.url);
+                            setCustomMonkeInput(String(body.id));
+                          }}
+                          className={clsx(
+                            'flex items-center gap-2 px-2.5 py-1.5 rounded-xl border flex-shrink-0 transition-all text-xs font-mono',
+                            isSelected
+                              ? 'border-amber-400 bg-amber-500/20 text-amber-200 ring-1 ring-amber-400 font-bold'
+                              : 'border-white/10 bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+                          )}
+                        >
+                          <img src={body.url} alt={body.nameZh} className="w-6 h-6 object-contain pixelated rounded" />
+                          <span>{lang === 'zh' ? body.nameZh : body.nameEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 2. Custom Monke ID Direct Loader */}
+                  <div className="flex items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/5 text-xs font-mono">
+                    <span className="text-slate-400 flex-shrink-0">
+                      {lang === 'zh' ? '神兽编号 #' : 'Monke #'}
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={customMonkeInput}
+                      onChange={(e) => setCustomMonkeInput(e.target.value)}
+                      placeholder="1~10000"
+                      className="w-20 px-2 py-1 bg-slate-900 border border-white/10 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = parseInt(customMonkeInput);
+                        if (id >= 1 && id <= 10000) {
+                          selectPart('Body', `https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/${id}.png`);
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition-all"
+                    >
+                      {lang === 'zh' ? '加载底猴' : 'Load'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const randomId = Math.floor(Math.random() * 10000) + 1;
+                        setCustomMonkeInput(String(randomId));
+                        selectPart('Body', `https://raw.githubusercontent.com/supercrypto1984/nodemonkes-gallery/main/images/${randomId}.png`);
+                      }}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-all ml-auto"
+                    >
+                      🎲 {lang === 'zh' ? '随机神兽' : 'Random #'}
+                    </button>
                   </div>
                 </div>
 
