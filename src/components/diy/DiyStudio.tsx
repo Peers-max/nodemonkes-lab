@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Paintbrush, 
   Download, 
@@ -14,7 +14,6 @@ import confetti from 'canvas-confetti';
 import { clsx } from 'clsx';
 import { BODY_COLORS, PRESET_COLORS } from '../../utils/constants';
 import { useLanguage } from '../../utils/i18n';
-import { getCustomTraitParts } from '../../utils/customTraits';
 
 interface DiyStudioProps {
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
@@ -67,36 +66,21 @@ const RESOLUTION_OPTIONS = [
 const diyImgCache = new Map<string, HTMLImageElement>();
 
 function loadCanvasImage(url: string): Promise<HTMLImageElement> {
-  if (!url || url === 'none') {
-    return Promise.reject(new Error('Empty url'));
-  }
   if (diyImgCache.has(url)) {
-    const cached = diyImgCache.get(url)!;
-    if (cached.complete && cached.naturalWidth > 0) {
-      return Promise.resolve(cached);
-    }
+    return Promise.resolve(diyImgCache.get(url)!);
   }
   return new Promise((resolve, reject) => {
     const img = new Image();
-    if (!url.startsWith('data:')) {
-      img.crossOrigin = 'anonymous';
-    }
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       diyImgCache.set(url, img);
-      resolve(img);
+      if ('decode' in img) {
+        img.decode().catch(() => {}).then(() => resolve(img));
+      } else {
+        resolve(img);
+      }
     };
-    img.onerror = () => {
-      // Fallback without crossOrigin
-      const fallback = new Image();
-      fallback.onload = () => {
-        diyImgCache.set(url, fallback);
-        resolve(fallback);
-      };
-      fallback.onerror = () => {
-        reject(new Error(`Failed to load image: ${url}`));
-      };
-      fallback.src = url;
-    };
+    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
     img.src = url;
   });
 }
@@ -104,7 +88,7 @@ function loadCanvasImage(url: string): Promise<HTMLImageElement> {
 export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
   const { lang, t } = useLanguage();
   const [activeSeries, setActiveSeries] = useState<SeriesType>('normal');
-  const [activeCategory, setActiveCategory] = useState<CategoryType>('Head');
+  const [activeCategory, setActiveCategory] = useState<CategoryType>('Body');
 
   const [selectedParts, setSelectedParts] = useState<Record<CategoryType, string>>({
     Body: '',
@@ -132,7 +116,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
   const traitNames = useMemo(() => {
     const getTraitName = (url: string) => {
       if (!url || url === 'none') return 'None';
-      if (url.startsWith('data:')) return 'Custom Trait';
       const file = url.split('/').pop()?.replace('.png', '') || 'None';
       return decodeURIComponent(file);
     };
@@ -209,20 +192,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
               url: `${BASE_URLS[series]}/${category.toLowerCase()}/${value}.png?v=2`,
             }));
 
-            // Insert New Custom Remix Accessories directly into normal series
-            if (series === 'normal') {
-              if (category === 'Head') {
-                const customHats = getCustomTraitParts('Head', lang);
-                parts.unshift(...customHats);
-              } else if (category === 'Eyes') {
-                const customEyes = getCustomTraitParts('Eyes', lang);
-                parts.unshift(...customEyes);
-              } else if (category === 'Earring') {
-                const customMouth = getCustomTraitParts('Earring', lang);
-                parts.unshift(...customMouth);
-              }
-            }
-
             if (['Earring', 'Eyes'].includes(category) || (category === 'Head' && series === 'normal')) {
               parts.unshift({ value: 'None', url: 'none' });
             }
@@ -245,16 +214,9 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
           const parts = newComponents.normal[cat];
           const valid = parts.filter((p) => p.url !== 'none');
           if (valid.length > 0) {
-            if (cat === 'Body') {
+            if (cat === 'Body' || Math.random() > 0.3) {
               const rand = valid[Math.floor(Math.random() * valid.length)];
               initialParts[cat] = rand.url;
-            } else if (cat === 'Head') {
-              // Default to one of the custom new hats to showcase immediately
-              const customHat = valid.find(p => p.value.includes('✨'));
-              initialParts[cat] = customHat ? customHat.url : valid[0].url;
-            } else if (cat === 'Eyes') {
-              const customEye = valid.find(p => p.value.includes('✨'));
-              initialParts[cat] = customEye ? customEye.url : 'none';
             } else {
               initialParts[cat] = 'none';
             }
@@ -274,7 +236,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
     return () => {
       mounted = false;
     };
-  }, [lang]);
+  }, []);
 
   const selectPart = (category: CategoryType, src: string) => {
     setSelectedParts((prev) => ({
@@ -392,7 +354,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
 
   const getCategoryLabel = (cat: CategoryType) => {
     if (cat === 'Body') return t.diyCatBody;
-    if (cat === 'Earring') return `${t.diyCatEarring} / 饰品`;
+    if (cat === 'Earring') return t.diyCatEarring;
     if (cat === 'Eyes') return t.diyCatEyes;
     return t.diyCatHead;
   };
@@ -426,7 +388,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]" />
               )}
 
-              {/* Layer 1: Body (1T Blank Base Monke) */}
+              {/* Layer 1: Body */}
               {selectedParts.Body && selectedParts.Body !== 'none' && (
                 <img
                   src={selectedParts.Body}
@@ -435,7 +397,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 />
               )}
 
-              {/* Layer 2: Earring / Mouth Custom Traits */}
+              {/* Layer 2: Earring */}
               {selectedParts.Earring && selectedParts.Earring !== 'none' && (
                 <img
                   src={selectedParts.Earring}
@@ -453,7 +415,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 />
               )}
 
-              {/* Layer 4: Head (Hats & Crowns) */}
+              {/* Layer 4: Head */}
               {selectedParts.Head && selectedParts.Head !== 'none' && (
                 <img
                   src={selectedParts.Head}
@@ -658,7 +620,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                 );
               })}
               
-              {/* Show Disabled Head Tab if current series doesn't support Head */}
+              {/* Show Disabled Head Tab if current series doesn't support Head (e.g. Rabbit, Dog, Block, Peer) */}
               {!SERIES_COMPONENTS[activeSeries].includes('Head') && (
                 <div className="flex-1 py-2.5 px-3 rounded-xl text-xs font-medium text-slate-600 text-center select-none cursor-not-allowed">
                   {lang === 'zh' ? '头部 (无)' : 'Head (N/A)'}
@@ -666,13 +628,12 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
               )}
             </div>
 
-            {/* Trait Items Grid Picker */}
+            {/* Trait Items Grid Picker with Label Below Each Icon */}
             <div className="flex-1 flex flex-col gap-3">
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 max-h-[520px] overflow-y-auto pr-1 no-scrollbar">
                 {currentParts.map((item, idx) => {
                   const isSelected = selectedParts[activeCategory] === item.url;
                   const isNone = item.url === 'none';
-                  const isCustomTrait = item.value.startsWith('✨');
 
                   return (
                     <motion.div
@@ -684,8 +645,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                         'relative aspect-square rounded-2xl border flex flex-col items-center justify-between p-2 cursor-pointer transition-all',
                         isSelected
                           ? 'bg-emerald-500/15 border-emerald-400 shadow-md ring-2 ring-emerald-500/20'
-                          : isCustomTrait
-                          ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-500/20'
                           : 'bg-slate-900/60 border-white/5 hover:border-white/20 hover:bg-slate-800/60'
                       )}
                     >
@@ -708,11 +667,7 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                       {/* Bottom Trait Value Label */}
                       <span className={clsx(
                         'text-[10px] font-mono truncate max-w-full text-center mt-1 leading-tight',
-                        isSelected 
-                          ? 'text-emerald-300 font-bold' 
-                          : isCustomTrait 
-                          ? 'text-amber-300 font-semibold' 
-                          : 'text-slate-400'
+                        isSelected ? 'text-emerald-300 font-bold' : 'text-slate-400'
                       )}>
                         {isNone ? (lang === 'zh' ? '无' : 'None') : item.value}
                       </span>
@@ -722,11 +677,6 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
                         <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center text-slate-950 shadow-sm">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                         </div>
-                      )}
-
-                      {/* New Trait Badge */}
-                      {!isSelected && isCustomTrait && (
-                        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                       )}
                     </motion.div>
                   );
