@@ -302,3 +302,26 @@ export const CUSTOM_TRAITS: Record<CustomTraitCategory, CustomTraitItem[]> = {
     }
   ]
 };
+
+export function getCustomTraitParts(category: 'Head' | 'Eyes' | 'Earring', lang: 'zh' | 'en' = 'zh'): Array<{ value: string; url: string }> {
+  if (typeof document === 'undefined') return [];
+  const catKey = category === 'Earring' ? 'Mouth' : category;
+  const items = CUSTOM_TRAITS[catKey as 'Head' | 'Eyes' | 'Mouth'] || [];
+  
+  return items.map((item) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 28;
+    canvas.height = 28;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      item.render(ctx, 28);
+    }
+    const cleanName = lang === 'zh' ? item.nameZh.replace(/^[^\s]+\s*/, '') : item.nameEn;
+    return {
+      value: `✨ ${cleanName}`,
+      url: canvas.toDataURL('image/png'),
+    };
+  });
+}
+
