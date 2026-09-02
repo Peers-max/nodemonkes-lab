@@ -30,6 +30,19 @@
 
 ---
 
+## 🔑 现行 API 接口与密钥清单 (交接专用 · 免反复询问)
+
+| 服务名称 | 接入地址 (Endpoint) | API Key / 凭据 | 默认模型 / 参数 | 用途说明 | 代码引用文件 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **硅基流动 (SiliconFlow)** | `https://api.siliconflow.cn/v1/chat/completions` | `sk-crtlkliqnbbbzhisstlwdwmqegasipwdgghrekgvhrkddion` | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B`<br>*(备用: THUDM/GLM-Z1-9B-0414, Qwen2.5-7B)* | 核心免费无限量 DeepSeek R1 深度推理大模型引擎（心声对话、日记、推特生成） | [`src/components/agent/aiClient.ts`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/src/components/agent/aiClient.ts) |
+| **DRPC 全链去中心化 RPC** | `https://lb.drpc.org/ogrpc?network={network}&dkey=...` | `AifCUrEbwEL6kh1531Q6rUrsP_6co1YR8bNemp9cv0wK` | 支持 `bitcoin`, `ethereum`, `base`, `arbitrum`, `polygon` | 智能体链上探针：查询实时区块高度、钱包余额、Gas 与链上状态 | [`src/components/agent/drpcClient.ts`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/src/components/agent/drpcClient.ts) |
+| **SatFlow Ordinals 行情** | `https://backend.satflow.com/trpc/collectionStats.collectionMemflow,collections.get` | 公共免 Key | 集合标识: `nodemonkes` | 实时抓取 NodeMonkes 官方主网地板价（BTC & Sats）、交易量与挂单数 | [`src/components/agent/agentHarness.ts`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/src/components/agent/agentHarness.ts) |
+| **Mempool.space BTC 探针** | `https://mempool.space/api/v1/fees/recommended`<br>`https://mempool.space/api/blocks/tip/height` | 公共免 Key | 纯 REST 响应 | 实时抓取比特币 L1 最速手续费、半小时确认费率及当前区块高度 | [`src/components/agent/agentHarness.ts`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/src/components/agent/agentHarness.ts) |
+| **Binance / 现货行情** | `https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT` | 公共免 Key | 交易对: `BTCUSDT` | 实时获取比特币法币美元价格与 24 小时涨跌幅 | [`src/components/agent/agentHarness.ts`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/src/components/agent/agentHarness.ts) |
+| **Cloudflare Workers AI (备用)** | `https://nodemonkes-ai.superjohnson1984.workers.dev/api/ai/chat` | CF Worker Gateway | `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b` | 备用网关通道与跨域 SatFlow 代理 | [`cf-ai-worker/worker.js`](file:///c:/Users/cai/Documents/antigravity/wise-hertz/nodemonkes-lab/cf-ai-worker/worker.js) |
+
+---
+
 ## 🗂️ 文件目录结构清单 (AI 模块相关)
 
 ```text
