@@ -6,114 +6,19 @@ import { clsx } from 'clsx';
 import type { Monke } from '../../types';
 import { BODY_COLORS, PRESET_COLORS } from '../../utils/constants';
 import { useLanguage } from '../../utils/i18n';
+import {
+  GIF_ACTION_PRESETS,
+  GifActionType,
+  drawActionFrame,
+  generateMasterGif,
+  getSplitImageUrls,
+  getFallbackSplitImageUrls,
+} from '../../utils/gifEngine';
 
 interface GifStudioProps {
   initialMonkeId?: number;
   monkes: Monke[];
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'error') => void;
-}
-
-function easeInOutQuad(t: number): number {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
-function reduceColorDepth(data: Uint8ClampedArray) {
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.round(data[i] / 8) * 8;
-    data[i + 1] = Math.round(data[i + 1] / 8) * 8;
-    data[i + 2] = Math.round(data[i + 2] / 8) * 8;
-  }
-}
-
-function drawOriginalFrame(
-  ctx: CanvasRenderingContext2D,
-  upperImg: HTMLImageElement,
-  lowerImg: HTMLImageElement,
-  progress: number,
-  size: number,
-  bgColor: string | null
-) {
-  const PARAMS = {
-    rotationRange: 0.045,
-    pressDownStrength: 50,
-    insertionStrength: 30,
-    insertionAngle: 0.045,
-    squashStrength: 0.12,
-  };
-
-  ctx.clearRect(0, 0, size, size);
-  if (bgColor && bgColor !== 'transparent') {
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, size, size);
-  }
-
-  const rotation = Math.sin(progress * Math.PI * 2) * PARAMS.rotationRange;
-  const isRaising = rotation < 0;
-
-  const pressDownPhase = Math.max(0, Math.sin(progress * Math.PI * 2));
-  const pressDownOffset = pressDownPhase * PARAMS.pressDownStrength;
-  const insertionOffset = pressDownPhase * PARAMS.insertionStrength;
-  const insertionRotation = pressDownPhase * PARAMS.insertionAngle;
-  const compressionFactor = pressDownPhase * PARAMS.squashStrength;
-
-  const smoothCompression = easeInOutQuad(compressionFactor);
-
-  ctx.save();
-  const scaleY = 1 - smoothCompression;
-  const scaleX = 1 + smoothCompression * 0.2;
-
-  ctx.translate(size / 2, size);
-  ctx.scale(scaleX, scaleY);
-  ctx.translate(-size / 2, -size);
-  ctx.drawImage(lowerImg, 0, pressDownOffset, size, size);
-  ctx.restore();
-
-  ctx.save();
-  if (isRaising) {
-    const raisePivotX = Math.floor((size * 3) / 7);
-    const pivotY = size - Math.floor((size * 2) / 9);
-    ctx.translate(raisePivotX, pivotY + pressDownOffset);
-    ctx.rotate(rotation);
-    ctx.translate(-raisePivotX, -(pivotY + pressDownOffset));
-    ctx.drawImage(upperImg, 0, pressDownOffset, size, size);
-  } else {
-    const pivotX = Math.floor((size * 2) / 7);
-    const pivotY = size - Math.floor((size * 2) / 9);
-    ctx.translate(pivotX, pivotY + pressDownOffset);
-    ctx.rotate(insertionRotation);
-    ctx.translate(-pivotX, -(pivotY + pressDownOffset));
-    ctx.drawImage(upperImg, 0, pressDownOffset + insertionOffset, size, size);
-  }
-  ctx.restore();
-}
-
-async function loadImagePromise(src: string): Promise<HTMLImageElement> {
-  try {
-    const res = await fetch(src, { mode: 'cors' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve(img);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Decode error'));
-      };
-      img.src = objectUrl;
-    });
-  } catch {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-      img.src = src.includes('?') ? `${src}&t=${Date.now()}` : `${src}?t=${Date.now()}`;
-    });
-  }
 }
 
 export const GifStudio: React.FC<GifStudioProps> = ({
@@ -124,6 +29,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
   const { lang, t } = useLanguage();
   const [idInput, setIdInput] = useState(String(initialMonkeId));
   const [currentId, setCurrentId] = useState(initialMonkeId);
+  const [action, setAction] = useState<GifActionType>('masternod');
   const [mode, setMode] = useState<'normal' | 'santa'>('normal');
   const [resolution, setResolution] = useState(600);
   const [bgMode, setBgMode] = useState<'transparent' | 'auto' | 'custom'>('transparent');
@@ -133,31 +39,19 @@ export const GifStudio: React.FC<GifStudioProps> = ({
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
 
-  const [images, setImages] = useState<{ upper: string | null; lower: string | null }>({
+  const [images, setImages] = useState<{ upper: string | null; lower: string | null; full?: string }>({
     upper: null,
     lower: null,
   });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const outputCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationRef = useRef<number>();
   const upperImgRef = useRef<HTMLImageElement | null>(null);
   const lowerImgRef = useRef<HTMLImageElement | null>(null);
+  const monkeImgRef = useRef<HTMLImageElement | null>(null);
   const progressRef = useRef(0);
   const lastTimeRef = useRef(0);
 
-  const getImageUrls = (imageId: number, m: 'normal' | 'santa') => {
-    if (m === 'santa') {
-      return {
-        upper: `https://pub-048d93bb0a5a448783aecb63c784ccbf.r2.dev/santaupperbody/${imageId}.png`,
-        lower: `https://pub-048d93bb0a5a448783aecb63c784ccbf.r2.dev/santalowerbody/${imageId}.png`,
-      };
-    }
-    return {
-      upper: `https://pub-b4dd93b94d3b4b3a93fa599c57a78615.r2.dev/upperbody/${imageId}.png`,
-      lower: `https://pub-b4dd93b94d3b4b3a93fa599c57a78615.r2.dev/lowerbody/${imageId}.png`,
-    };
-  };
 
   const getAutoBackground = (imageId: number) => {
     const item = monkes.find((m) => m.id === imageId);
@@ -172,7 +66,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
 
   const loadPreview = useCallback(async (monkeId: number, m: 'normal' | 'santa') => {
     setStatusText(lang === 'zh' ? `正在加载 #${monkeId}...` : `Loading #${monkeId}...`);
-    const urls = getImageUrls(monkeId, m);
+    const urls = getSplitImageUrls(monkeId, m);
     setImages(urls);
     setCurrentId(monkeId);
   }, [lang]);
@@ -191,11 +85,11 @@ export const GifStudio: React.FC<GifStudioProps> = ({
     canvasRef.current.height = resolution;
 
     let imagesLoaded = 0;
-    const totalImages = 2;
+    const totalImages = images.full ? 3 : 2;
 
     const onImageLoad = () => {
       imagesLoaded++;
-      if (imagesLoaded === totalImages) {
+      if (imagesLoaded >= 2) {
         if (animationRef.current) cancelAnimationFrame(animationRef.current);
         progressRef.current = 0;
         lastTimeRef.current = 0;
@@ -207,16 +101,30 @@ export const GifStudio: React.FC<GifStudioProps> = ({
     const upperImg = new Image();
     upperImg.crossOrigin = 'anonymous';
     upperImg.onload = onImageLoad;
-    upperImg.onerror = () => setStatusText(lang === 'zh' ? `加载上半身失败: #${currentId}` : `Error loading upper #${currentId}`);
+    upperImg.onerror = () => {
+      const fb = getFallbackSplitImageUrls(currentId, mode);
+      if (upperImg.src !== fb.upper) upperImg.src = fb.upper;
+    };
     upperImg.src = images.upper;
     upperImgRef.current = upperImg;
 
     const lowerImg = new Image();
     lowerImg.crossOrigin = 'anonymous';
     lowerImg.onload = onImageLoad;
-    lowerImg.onerror = () => setStatusText(lang === 'zh' ? `加载下半身失败: #${currentId}` : `Error loading lower #${currentId}`);
+    lowerImg.onerror = () => {
+      const fb = getFallbackSplitImageUrls(currentId, mode);
+      if (lowerImg.src !== fb.lower) lowerImg.src = fb.lower;
+    };
     lowerImg.src = images.lower;
     lowerImgRef.current = lowerImg;
+
+    if (images.full) {
+      const fullImg = new Image();
+      fullImg.crossOrigin = 'anonymous';
+      fullImg.onload = onImageLoad;
+      fullImg.src = images.full;
+      monkeImgRef.current = fullImg;
+    }
 
     function animate(currentTime?: number) {
       if (!currentTime) {
@@ -236,10 +144,12 @@ export const GifStudio: React.FC<GifStudioProps> = ({
 
       const c = canvasRef.current?.getContext('2d');
       if (c && upperImgRef.current && lowerImgRef.current) {
-        drawOriginalFrame(
+        drawActionFrame(
           c,
           upperImgRef.current,
           lowerImgRef.current,
+          monkeImgRef.current,
+          action,
           progressRef.current,
           resolution,
           bgColor
@@ -254,7 +164,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [images, bgColor, resolution, speed, currentId, t.gifReady, lang]);
+  }, [images, bgColor, resolution, speed, currentId, action, t.gifReady, lang, mode]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,89 +188,37 @@ export const GifStudio: React.FC<GifStudioProps> = ({
     setProgress(0);
 
     try {
-      let GIFConstructor = (window as any).GIF;
-      if (!GIFConstructor) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Failed to load gif.js'));
-          document.head.appendChild(script);
-        });
-        GIFConstructor = (window as any).GIF;
-      }
-
-      const effectiveBg = bgColor || '#FFFFFF';
-
-      const gif = new GIFConstructor({
-        workers: 2,
-        quality: 10,
-        width: resolution,
-        height: resolution,
-        dither: false,
-        transparent: null,
-        background: effectiveBg,
-        repeat: 0,
-        workerScript: './gif.worker.js',
+      const blob = await generateMasterGif({
+        upperUrl: images.upper,
+        lowerUrl: images.lower,
+        fullUrl: images.full,
+        action,
+        backgroundColor: bgColor,
+        speed,
+        resolution,
+        onProgress: (p) => setProgress(Math.round(p * 100)),
       });
 
-      gif.on('progress', (p: number) => {
-        setProgress(Math.round(p * 100));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `nodemonke_${currentId}_${action}_${mode}_${resolution}px_${speed.toFixed(1)}x.gif`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+
+      // Celebratory Confetti Burst
+      confetti({
+        particleCount: 75,
+        spread: 60,
+        origin: { y: 0.65 },
+        colors: ['#F59E0B', '#F97316', '#EF4444', '#10B981'],
       });
 
-      const cycleDurationMs = 1200 / speed;
-      const maxPossibleFrames = Math.floor(cycleDurationMs / 20);
-      const numFrames = Math.max(12, Math.min(36, maxPossibleFrames));
-      const frameDelay = Math.max(20, Math.round(cycleDurationMs / numFrames));
-
-      if (!outputCanvasRef.current) {
-        outputCanvasRef.current = document.createElement('canvas');
-      }
-      outputCanvasRef.current.width = resolution;
-      outputCanvasRef.current.height = resolution;
-
-      const ctx = outputCanvasRef.current.getContext('2d', { willReadFrequently: true });
-      if (!ctx) throw new Error('Canvas not available');
-
-      const upperImg = await loadImagePromise(images.upper);
-      const lowerImg = await loadImagePromise(images.lower);
-
-      for (let i = 0; i < numFrames; i++) {
-        const p = i / numFrames;
-        drawOriginalFrame(ctx, upperImg, lowerImg, p, resolution, effectiveBg);
-
-        const imageData = ctx.getImageData(0, 0, resolution, resolution);
-        reduceColorDepth(imageData.data);
-        ctx.putImageData(imageData, 0, 0);
-
-        gif.addFrame(ctx.canvas, { copy: true, delay: frameDelay });
-        await new Promise((r) => setTimeout(r, 5));
-      }
-
-      gif.on('finished', (blob: Blob) => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `nodemonke_${currentId}_${mode}_${resolution}px_${speed.toFixed(1)}x.gif`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-
-        // Celebratory Confetti Burst
-        confetti({
-          particleCount: 75,
-          spread: 60,
-          origin: { y: 0.65 },
-          colors: ['#F59E0B', '#F97316', '#EF4444', '#10B981'],
-        });
-
-        onToast(t.gifSuccess, `${t.gifSuccessDesc} (${resolution}px • ${speed.toFixed(1)}x)`, 'success');
-        setProgress(0);
-        setIsGenerating(false);
-      });
-
-      gif.render();
+      onToast(t.gifSuccess, `${t.gifSuccessDesc} (${resolution}px • ${speed.toFixed(1)}x)`, 'success');
+      setProgress(0);
+      setIsGenerating(false);
     } catch (err: any) {
       console.error('GIF export error:', err);
       onToast(lang === 'zh' ? '导出失败' : 'Export failed', err.message || (lang === 'zh' ? '请重试' : 'Please retry'), 'error');
@@ -370,6 +228,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
   };
 
   const modeLabel = mode === 'normal' ? (lang === 'zh' ? '普通版' : 'NORMAL') : (lang === 'zh' ? '圣诞版' : 'SANTA');
+  const currentActionMeta = GIF_ACTION_PRESETS.find((p) => p.id === action) || GIF_ACTION_PRESETS[0];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -406,7 +265,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
 
             <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] sm:text-[11px] font-mono text-slate-300 shadow-md">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>#{currentId} ({modeLabel}) • {speed.toFixed(1)}x • {resolution}px</span>
+              <span>#{currentId} ({modeLabel}) • {currentActionMeta.icon} {lang === 'zh' ? currentActionMeta.nameZh : currentActionMeta.nameEn} • {speed.toFixed(1)}x</span>
             </div>
           </div>
 
@@ -445,8 +304,47 @@ export const GifStudio: React.FC<GifStudioProps> = ({
         {/* Right Side: Pro Controls Console */}
         <div className="lg:col-span-6 space-y-4 glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl">
           
-          {/* 1. Mode Switcher */}
+          {/* 1. Master Action Selector */}
           <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block">
+                {lang === 'zh' ? '动作特效预设' : 'ACTION PRESET'}
+              </span>
+              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                {currentActionMeta.icon} {lang === 'zh' ? currentActionMeta.nameZh : currentActionMeta.nameEn}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+              {GIF_ACTION_PRESETS.map((p) => {
+                const isActive = action === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setAction(p.id)}
+                    className={clsx(
+                      'py-2 px-2.5 rounded-2xl border text-left transition-all',
+                      isActive
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-md'
+                        : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span>{p.icon}</span>
+                      <span className="truncate">{lang === 'zh' ? p.nameZh : p.nameEn}</span>
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-normal mt-0.5 truncate">
+                      {lang === 'zh' ? p.descZh : p.descEn}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Mode Switcher */}
+          <div className="space-y-2 pt-3 border-t border-white/[0.06]">
             <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block">
               {t.gifModeTitle}
             </span>
@@ -482,6 +380,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
               </motion.button>
             </div>
           </div>
+
 
           {/* 2. Background Controls */}
           <div className="space-y-2 pt-3 border-t border-white/[0.06]">
