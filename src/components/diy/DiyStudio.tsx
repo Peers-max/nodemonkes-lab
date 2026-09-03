@@ -166,12 +166,17 @@ export const DiyStudio: React.FC<DiyStudioProps> = ({ onToast }) => {
           Head: new Set(),
         };
 
+const SPECIAL_SERIES = ['Dog', 'Peer', 'Rabbit', 'Block'];
+
         metadataList.forEach((item) => {
           if (item.attributes) {
             CATEGORIES.forEach((category) => {
               const value = item.attributes[category];
               if (value && value !== 'None') {
-                uniqueComponents[category].add(value);
+                // Exclude special series species identifiers from Head category
+                if (!(category === 'Head' && SPECIAL_SERIES.includes(value))) {
+                  uniqueComponents[category].add(value);
+                }
               }
             });
           }
