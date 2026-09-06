@@ -32,6 +32,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
   const [action, setAction] = useState<GifActionType>('masternod');
   const [mode, setMode] = useState<'normal' | 'santa'>('normal');
   const [resolution, setResolution] = useState(600);
+  const [antiAlias, setAntiAlias] = useState(true);
   const [bgMode, setBgMode] = useState<'transparent' | 'auto' | 'custom'>('transparent');
   const [customColor, setCustomColor] = useState('#FFFFFF');
   const [speed, setSpeed] = useState(1.0);
@@ -152,7 +153,8 @@ export const GifStudio: React.FC<GifStudioProps> = ({
           action,
           progressRef.current,
           resolution,
-          bgColor
+          bgColor,
+          antiAlias
         );
       }
 
@@ -164,7 +166,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [images, bgColor, resolution, speed, currentId, action, t.gifReady, lang, mode]);
+  }, [images, bgColor, resolution, antiAlias, speed, currentId, action, t.gifReady, lang, mode]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,6 +198,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
         backgroundColor: bgColor,
         speed,
         resolution,
+        antiAlias,
         onProgress: (p) => setProgress(Math.round(p * 100)),
       });
 
@@ -260,12 +263,15 @@ export const GifStudio: React.FC<GifStudioProps> = ({
               ref={canvasRef}
               width={resolution}
               height={resolution}
-              className="w-full h-full object-contain pixelated relative z-10"
+              className={clsx(
+                'w-full h-full object-contain relative z-10 transition-all',
+                !antiAlias && 'pixelated'
+              )}
             />
 
             <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] sm:text-[11px] font-mono text-slate-300 shadow-md">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>#{currentId} ({modeLabel}) • {currentActionMeta.icon} {lang === 'zh' ? currentActionMeta.nameZh : currentActionMeta.nameEn} • {speed.toFixed(1)}x</span>
+              <span>#{currentId} ({modeLabel}) • {currentActionMeta.icon} {lang === 'zh' ? currentActionMeta.nameZh : currentActionMeta.nameEn} • {speed.toFixed(1)}x • {resolution}px • {antiAlias ? (lang === 'zh' ? '✨平滑' : '✨Smooth') : (lang === 'zh' ? '👾硬边' : '👾Retro')}</span>
             </div>
           </div>
 
@@ -532,10 +538,10 @@ export const GifStudio: React.FC<GifStudioProps> = ({
 
             <div className="grid grid-cols-5 gap-1.5 pt-1">
               {[
-                { label: '200px', val: 200 },
+                { label: lang === 'zh' ? '200 (轻量)' : '200 (Lite)', val: 200 },
                 { label: '400px', val: 400 },
-                { label: '600px', val: 600 },
-                { label: '800px', val: 800 },
+                { label: lang === 'zh' ? '600 (高清)' : '600 (HD)', val: 600 },
+                { label: lang === 'zh' ? '800 (超清)' : '800 (Ultra)', val: 800 },
                 { label: '1200px', val: 1200 },
               ].map((r) => (
                 <button
@@ -543,7 +549,7 @@ export const GifStudio: React.FC<GifStudioProps> = ({
                   type="button"
                   onClick={() => setResolution(r.val)}
                   className={clsx(
-                    'py-1.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-mono transition-all text-center',
+                    'py-1.5 px-0.5 rounded-xl text-[10px] sm:text-[11px] font-mono transition-all text-center truncate',
                     resolution === r.val
                       ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 shadow-sm'
                       : 'bg-slate-950/40 text-slate-400 border border-white/5 hover:text-white'
@@ -553,6 +559,56 @@ export const GifStudio: React.FC<GifStudioProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 5. Motion Anti-Aliasing Control */}
+          <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block">
+                {t.gifAntiAliasTitle}
+              </span>
+              <span className={clsx(
+                "text-[10px] font-mono px-2 py-0.5 rounded-md border transition-all",
+                antiAlias
+                  ? "text-amber-300 bg-amber-500/10 border-amber-500/30 font-bold"
+                  : "text-slate-400 bg-slate-900 border-white/10"
+              )}>
+                {antiAlias ? t.gifAntiAliasSmooth : t.gifAntiAliasRetro}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setAntiAlias(true)}
+                className={clsx(
+                  'py-2.5 px-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all',
+                  antiAlias
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-sm ring-1 ring-amber-400/40'
+                    : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.gifAntiAliasSmooth}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAntiAlias(false)}
+                className={clsx(
+                  'py-2.5 px-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all',
+                  !antiAlias
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-sm ring-1 ring-amber-400/40'
+                    : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white'
+                )}
+              >
+                <span className="text-xs">👾</span>
+                <span>{t.gifAntiAliasRetro}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+              {t.gifAntiAliasHint}
+            </p>
           </div>
 
           {/* Export Button with Tactile Physics */}

@@ -8,6 +8,7 @@ export interface Translations {
   tabExplorer: string;
   tabGif: string;
   tabDiy: string;
+  tabDiyGif: string;
   tabSanta: string;
   tabPoster: string;
   tabPassport: string;
@@ -119,6 +120,10 @@ export interface Translations {
   gifSpeedUltra: string;
   gifSpeedExtreme: string;
   gifResTitle: string;
+  gifAntiAliasTitle: string;
+  gifAntiAliasSmooth: string;
+  gifAntiAliasRetro: string;
+  gifAntiAliasHint: string;
   gifSaveBtn: string;
   gifSavingBtn: string;
   gifSuccess: string;
@@ -388,6 +393,7 @@ export const translations: Record<Language, Translations> = {
     tabExplorer: '全量图库',
     tabGif: 'GIF 动图',
     tabDiy: 'DIY 工坊',
+    tabDiyGif: '综合动态',
     tabSanta: '圣诞版',
     tabPoster: '海报工坊',
     tabPassport: '3D 通行证',
@@ -499,6 +505,10 @@ export const translations: Record<Language, Translations> = {
     gifSpeedUltra: '3.5x 极速',
     gifSpeedExtreme: '5.0x 狂暴',
     gifResTitle: '4. 导出分辨率',
+    gifAntiAliasTitle: '5. 动作抗锯齿平滑',
+    gifAntiAliasSmooth: '✨ 平滑抗锯齿 (推荐)',
+    gifAntiAliasRetro: '👾 原始像素硬边缘',
+    gifAntiAliasHint: '旋转与微动时启用双线性亚像素采样，保持内部方块清晰的同时消除旋转边缘锯齿。',
     gifSaveBtn: '导出 GIF 动图',
     gifSavingBtn: '正在导出 GIF...',
     gifSuccess: 'GIF 导出成功！',
@@ -766,6 +776,7 @@ export const translations: Record<Language, Translations> = {
     tabExplorer: 'Explorer',
     tabGif: 'Make GIF',
     tabDiy: 'DIY Studio',
+    tabDiyGif: 'Motion DIY',
     tabSanta: 'Santa Monkes',
     tabPoster: 'Poster Studio',
     tabPassport: '3D Passport',
@@ -877,6 +888,10 @@ export const translations: Record<Language, Translations> = {
     gifSpeedUltra: '3.5x Ultra',
     gifSpeedExtreme: '5.0x Extreme',
     gifResTitle: '4. Output Resolution',
+    gifAntiAliasTitle: '5. Motion Anti-Aliasing',
+    gifAntiAliasSmooth: '✨ Smooth (Recommended)',
+    gifAntiAliasRetro: '👾 Retro Pixel Edge',
+    gifAntiAliasHint: 'Enables sub-pixel interpolation during rotation, removing jagged stair-steps while preserving crisp pixel grids.',
     gifSaveBtn: 'Export GIF',
     gifSavingBtn: 'Exporting GIF...',
     gifSuccess: 'GIF Exported Successfully!',

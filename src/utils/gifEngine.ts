@@ -5,6 +5,7 @@ export interface GifImages {
 }
 
 export type GifActionType = 
+  | 'static'
   | 'masternod' 
   | 'nod' 
   | 'headbang' 
@@ -107,6 +108,7 @@ export interface GifOptions {
   backgroundColor: string | null; // null for transparent, or hex string
   speed?: number; // 1 = normal, 0.5 = slow, 2 = fast
   resolution?: number; // e.g. 400 or 600
+  antiAlias?: boolean; // Anti-aliasing switch (default true)
   onProgress?: (progress: number) => void;
 }
 
@@ -116,22 +118,63 @@ export function easeInOutQuad(t: number): number {
 
 function safeDraw(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | null,
-  fallbackImg: HTMLImageElement | null,
+  img: CanvasImageSource | null,
+  fallbackImg: CanvasImageSource | null,
   dx: number,
   dy: number,
   dw: number,
   dh: number
 ): boolean {
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, dx, dy, dw, dh);
-    return true;
+  if (img) {
+    if (img instanceof HTMLCanvasElement && img.width > 0) {
+      ctx.drawImage(img, dx, dy, dw, dh);
+      return true;
+    }
+    if ((img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0) {
+      ctx.drawImage(img, dx, dy, dw, dh);
+      return true;
+    }
   }
-  if (fallbackImg && fallbackImg.complete && fallbackImg.naturalWidth > 0) {
-    ctx.drawImage(fallbackImg, dx, dy, dw, dh);
-    return true;
+  if (fallbackImg) {
+    if (fallbackImg instanceof HTMLCanvasElement && fallbackImg.width > 0) {
+      ctx.drawImage(fallbackImg, dx, dy, dw, dh);
+      return true;
+    }
+    if ((fallbackImg as HTMLImageElement).complete && (fallbackImg as HTMLImageElement).naturalWidth > 0) {
+      ctx.drawImage(fallbackImg, dx, dy, dw, dh);
+      return true;
+    }
   }
   return false;
+}
+
+// Cache for pre-rendered crisp integer-scale textures (prevents nearest-neighbor distortion while enabling sub-pixel rotation anti-aliasing)
+const crispCanvasCache = new WeakMap<CanvasImageSource, Map<number, HTMLCanvasElement>>();
+
+export function getCrispSource(img: CanvasImageSource | null, targetSize: number): CanvasImageSource | null {
+  if (!img) return null;
+  if (img instanceof HTMLCanvasElement && img.width >= targetSize) {
+    return img;
+  }
+  let sizeMap = crispCanvasCache.get(img);
+  if (!sizeMap) {
+    sizeMap = new Map();
+    crispCanvasCache.set(img, sizeMap);
+  }
+  const cached = sizeMap.get(targetSize);
+  if (cached && cached.width === targetSize && cached.height === targetSize) {
+    return cached;
+  }
+  const cvs = document.createElement('canvas');
+  cvs.width = targetSize;
+  cvs.height = targetSize;
+  const c = cvs.getContext('2d');
+  if (c) {
+    c.imageSmoothingEnabled = false;
+    c.drawImage(img, 0, 0, targetSize, targetSize);
+  }
+  sizeMap.set(targetSize, cvs);
+  return cvs;
 }
 
 // Pre-seeded stars for To The Moon
@@ -143,23 +186,47 @@ const SPACE_STARS = Array.from({ length: 35 }, (_, i) => ({
 }));
 
 /**
- * Universal Master Action Drawing Engine
+ * Universal Master Action Drawing Engine with Adaptive Motion Anti-Aliasing
  */
 export function drawActionFrame(
   ctx: CanvasRenderingContext2D,
-  upperImg: HTMLImageElement | null,
-  lowerImg: HTMLImageElement | null,
-  monkeImg: HTMLImageElement | null,
+  upperImg: CanvasImageSource | null,
+  lowerImg: CanvasImageSource | null,
+  monkeImg: CanvasImageSource | null,
   action: GifActionType,
   progress: number, // 0 to 1
   size: number,
-  bgColor: string | null
+  bgColor: string | null,
+  antiAlias: boolean = true
 ) {
   ctx.clearRect(0, 0, size, size);
 
   if (bgColor && bgColor !== 'transparent') {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, size, size);
+  }
+
+  const setSmoothing = (targetCtx: CanvasRenderingContext2D, smooth: boolean) => {
+    targetCtx.imageSmoothingEnabled = smooth;
+    if (smooth) {
+      targetCtx.imageSmoothingQuality = 'high';
+    }
+  };
+
+  // When anti-aliasing is enabled, upscale small 28x28 assets to target resolution using nearest-neighbor FIRST,
+  // then apply bilinear rotation to the high-res buffer. This keeps internal pixel grids crisp while eliminating rotated stair-step jaggies.
+  const effUpper = antiAlias ? getCrispSource(upperImg, size) : upperImg;
+  const effLower = antiAlias ? getCrispSource(lowerImg, size) : lowerImg;
+  const effMonke = antiAlias ? getCrispSource(monkeImg, size) : monkeImg;
+
+  // ================= 0. STATIC (PURE ACCESSORY FX, STILL BODY) =================
+  if (action === 'static') {
+    ctx.save();
+    setSmoothing(ctx, false);
+    safeDraw(ctx, lowerImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    ctx.restore();
+    return;
   }
 
   // ================= 1. MASTER LAYERED NOD =================
@@ -170,23 +237,23 @@ export function drawActionFrame(
     const lowerSquash = pressDown * 0.12;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const scaleY = 1 - easeInOutQuad(lowerSquash);
     const scaleX = 1 + easeInOutQuad(lowerSquash) * 0.2;
     ctx.translate(size / 2, size);
     ctx.scale(scaleX, scaleY);
     ctx.translate(-size / 2, -size);
-    safeDraw(ctx, lowerImg, monkeImg, 0, headOffset * 0.3, size, size);
+    safeDraw(ctx, effLower, effMonke, 0, headOffset * 0.3, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const pivotX = Math.floor(size * 0.43);
     const pivotY = size - Math.floor(size * 0.22);
     ctx.translate(pivotX, pivotY + headOffset);
     ctx.rotate(nodPhase * 0.04);
     ctx.translate(-pivotX, -(pivotY + headOffset));
-    safeDraw(ctx, upperImg, monkeImg, 0, headOffset, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, headOffset, size, size);
     ctx.restore();
   }
 
@@ -206,26 +273,26 @@ export function drawActionFrame(
     ctx.translate(size / 2, size);
     ctx.scale(scaleX, scaleY);
     ctx.translate(-size / 2, -size);
-    ctx.imageSmoothingEnabled = false;
-    safeDraw(ctx, lowerImg, monkeImg, 0, pressDownOffset, size, size);
+    setSmoothing(ctx, antiAlias);
+    safeDraw(ctx, effLower, effMonke, 0, pressDownOffset, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     if (isRaising) {
       const raisePivotX = Math.floor((size * 3) / 7);
       const pivotY = size - Math.floor((size * 2) / 9);
       ctx.translate(raisePivotX, pivotY + pressDownOffset);
       ctx.rotate(rotation);
       ctx.translate(-raisePivotX, -(pivotY + pressDownOffset));
-      safeDraw(ctx, upperImg, monkeImg, 0, pressDownOffset, size, size);
+      safeDraw(ctx, effUpper, effMonke, 0, pressDownOffset, size, size);
     } else {
       const pivotX = Math.floor((size * 2) / 7);
       const pivotY = size - Math.floor((size * 2) / 9);
       ctx.translate(pivotX, pivotY + pressDownOffset);
       ctx.rotate(0.045 * pressDownPhase);
       ctx.translate(-pivotX, -(pivotY + pressDownOffset));
-      safeDraw(ctx, upperImg, monkeImg, 0, pressDownOffset + 20 * (size / 400) * pressDownPhase, size, size);
+      safeDraw(ctx, effUpper, effMonke, 0, pressDownOffset + 20 * (size / 400) * pressDownPhase, size, size);
     }
     ctx.restore();
   }
@@ -236,18 +303,18 @@ export function drawActionFrame(
     const headRot = Math.sin(progress * Math.PI * 2) * 0.2;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    safeDraw(ctx, lowerImg, monkeImg, 0, downOffset * 0.35, size, size);
+    setSmoothing(ctx, antiAlias);
+    safeDraw(ctx, effLower, effMonke, 0, downOffset * 0.35, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const pivotX = size * 0.45;
     const pivotY = size * 0.65;
     ctx.translate(pivotX, pivotY + downOffset);
     ctx.rotate(headRot);
     ctx.translate(-pivotX, -pivotY);
-    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, 0, size, size);
     ctx.restore();
   }
 
@@ -259,12 +326,12 @@ export function drawActionFrame(
     const rollTilt = weavePhase * 0.15;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     ctx.translate(size / 2 + weaveX, size / 2 + weaveY);
     ctx.rotate(rollTilt);
     ctx.translate(-size / 2, -size / 2);
-    safeDraw(ctx, lowerImg, monkeImg, 0, 0, size, size);
-    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effLower, effMonke, 0, 0, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, 0, size, size);
     ctx.restore();
   }
 
@@ -274,20 +341,20 @@ export function drawActionFrame(
     const headTilt = Math.sin(progress * Math.PI * 2) * 0.08;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     ctx.translate(size / 2, size / 2 + bopY * 0.5);
     ctx.translate(-size / 2, -size / 2);
-    safeDraw(ctx, lowerImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effLower, effMonke, 0, 0, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const pivotX = Math.floor(size * 0.45);
     const pivotY = Math.floor(size * 0.65);
     ctx.translate(pivotX, pivotY + bopY);
     ctx.rotate(headTilt);
     ctx.translate(-pivotX, -(pivotY + bopY));
-    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, 0, size, size);
     ctx.restore();
   }
 
@@ -299,20 +366,20 @@ export function drawActionFrame(
     const headAngle = pumpForward * 0.05;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     ctx.translate(size / 2 - headX * 0.2, size / 2);
     ctx.translate(-size / 2, -size / 2);
-    safeDraw(ctx, lowerImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effLower, effMonke, 0, 0, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const pivotX = Math.floor(size * 0.43);
     const pivotY = Math.floor(size * 0.68);
     ctx.translate(pivotX + headX, pivotY + headDrop);
     ctx.rotate(headAngle);
     ctx.translate(-pivotX, -(pivotY + headDrop));
-    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, 0, size, size);
     ctx.restore();
   }
 
@@ -441,10 +508,10 @@ export function drawActionFrame(
     ctx.clip();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     ctx.translate(winX, winY + 4 * scale);
     ctx.rotate(gForceLean);
-    safeDraw(ctx, upperImg, monkeImg, -68 * scale, -70 * scale, 135 * scale, 135 * scale);
+    safeDraw(ctx, effUpper, effMonke, -68 * scale, -70 * scale, 135 * scale, 135 * scale);
     ctx.restore();
 
     ctx.save();
@@ -488,20 +555,20 @@ export function drawActionFrame(
     const rollTilt = Math.sin(angle) * 0.12;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     ctx.translate(size / 2 - circleX * 0.3, size / 2);
     ctx.translate(-size / 2, -size / 2);
-    safeDraw(ctx, lowerImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effLower, effMonke, 0, 0, size, size);
     ctx.restore();
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    setSmoothing(ctx, antiAlias);
     const pivotX = Math.floor(size * 0.43);
     const pivotY = Math.floor(size * 0.68);
     ctx.translate(pivotX + circleX, pivotY + circleY);
     ctx.rotate(rollTilt);
     ctx.translate(-pivotX, -(pivotY + circleY));
-    safeDraw(ctx, upperImg, monkeImg, 0, 0, size, size);
+    safeDraw(ctx, effUpper, effMonke, 0, 0, size, size);
     ctx.restore();
   }
 }
@@ -514,7 +581,6 @@ export function getSplitImageUrls(imageId: number, mode: 'normal' | 'santa' = 'n
     return {
       upper: `https://pub-048d93bb0a5a448783aecb63c784ccbf.r2.dev/santaupperbody/${imageId}.png`,
       lower: `https://pub-048d93bb0a5a448783aecb63c784ccbf.r2.dev/santalowerbody/${imageId}.png`,
-      full: `https://pub-048d93bb0a5a448783aecb63c784ccbf.r2.dev/santa/${imageId}.png`,
     };
   }
   return {
@@ -529,7 +595,6 @@ export function getFallbackSplitImageUrls(imageId: number, mode: 'normal' | 'san
     return {
       upper: `https://santamonkes.138148178.xyz/santaupperbody/${imageId}.png`,
       lower: `https://santamonkes.138148178.xyz/santalowerbody/${imageId}.png`,
-      full: `https://santamonkes.138148178.xyz/santa/${imageId}.png`,
     };
   }
   return {
@@ -552,6 +617,44 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+export function calculateAdaptiveGifBudget(
+  baseFrameCount: number,
+  resolution: number,
+  cycleDurationMs: number = 1200,
+  speed: number = 1.0
+): { frameCount: number; frameDelay: number } {
+  const safeSpeed = Math.max(0.2, speed);
+  const effectiveDuration = cycleDurationMs / safeSpeed;
+
+  let targetFps: number;
+  if (resolution <= 200) {
+    targetFps = 30; // ~33ms delay
+  } else if (resolution <= 400) {
+    targetFps = 20; // 50ms delay
+  } else if (resolution <= 600) {
+    targetFps = 16.66; // 60ms delay
+  } else if (resolution <= 800) {
+    targetFps = 15; // ~66ms delay
+  } else {
+    // 1200px and higher
+    targetFps = 12.5; // 80ms delay
+  }
+
+  let frames = Math.round((effectiveDuration / 1000) * targetFps);
+  frames = Math.max(8, Math.min(baseFrameCount, frames));
+
+  // If baseFrameCount is low (e.g. 16 for headbang or static), scale gracefully
+  if (baseFrameCount < 24) {
+    if (resolution > 800) frames = Math.max(8, Math.round(baseFrameCount * 0.625));
+    else if (resolution > 600) frames = Math.max(10, Math.round(baseFrameCount * 0.75));
+    else if (resolution > 400) frames = Math.max(12, Math.round(baseFrameCount * 0.875));
+    else frames = baseFrameCount;
+  }
+
+  const delay = Math.max(20, Math.round(effectiveDuration / frames));
+  return { frameCount: frames, frameDelay: delay };
+}
+
 /**
  * Generate high quality GIF with gif.js using any of the 8 master actions
  */
@@ -564,6 +667,7 @@ export async function generateMasterGif(options: GifOptions): Promise<Blob> {
     backgroundColor,
     speed = 1,
     resolution = 400,
+    antiAlias = true,
     onProgress,
   } = options;
 
@@ -611,13 +715,14 @@ export async function generateMasterGif(options: GifOptions): Promise<Blob> {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Canvas context not available');
 
-  const totalFrames = meta.frameCount;
-  const baseFrameDelay = Math.round(1200 / totalFrames);
-  const frameDelay = Math.max(20, Math.round(baseFrameDelay / speed));
+  const cycleDuration = action === 'headbang' ? 800 : 1200;
+  const budget = calculateAdaptiveGifBudget(meta.frameCount, resolution, cycleDuration, speed);
+  const totalFrames = budget.frameCount;
+  const frameDelay = budget.frameDelay;
 
   for (let i = 0; i < totalFrames; i++) {
     const progress = i / totalFrames;
-    drawActionFrame(ctx, upperImg, lowerImg, fullImg, action, progress, resolution, backgroundColor);
+    drawActionFrame(ctx, upperImg, lowerImg, fullImg, action, progress, resolution, backgroundColor, antiAlias);
     gif.addFrame(ctx, { copy: true, delay: frameDelay });
     await new Promise((r) => setTimeout(r, 4));
   }
