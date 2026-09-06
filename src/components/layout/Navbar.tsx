@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Search, Sparkles, Paintbrush, Layers, Gift, CreditCard, Gamepad2, Image as ImageIcon, Bot, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Sparkles, Paintbrush, Layers, Crosshair, Gift, CreditCard, Gamepad2, Image as ImageIcon, Bot, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import type { TabType } from '../../types';
@@ -33,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'gif' as TabType, label: t.tabGif, icon: Sparkles, badge: t.badgeStudio },
     { id: 'diy' as TabType, label: t.tabDiy, icon: Paintbrush, badge: t.badgeCreator },
     { id: 'diy_gif' as TabType, label: t.tabDiyGif, icon: Layers, badge: 'PRO' },
+    { id: 'zombie' as TabType, label: t.tabZombie, icon: Crosshair, badge: 'NEW' },
     { id: 'santa' as TabType, label: t.tabSanta, icon: Gift, badge: t.badgeSpecial },
     { id: 'agent' as TabType, label: t.tabAgent, icon: Bot, badge: 'AI' },
     { id: 'poster' as TabType, label: t.tabPoster, icon: ImageIcon, badge: t.badgePoster },

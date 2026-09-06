@@ -9,6 +9,7 @@ export interface Translations {
   tabGif: string;
   tabDiy: string;
   tabDiyGif: string;
+  tabZombie: string;
   tabSanta: string;
   tabPoster: string;
   tabPassport: string;
@@ -394,6 +395,7 @@ export const translations: Record<Language, Translations> = {
     tabGif: 'GIF 动图',
     tabDiy: 'DIY 工坊',
     tabDiyGif: '综合动态',
+    tabZombie: '僵尸突围',
     tabSanta: '圣诞版',
     tabPoster: '海报工坊',
     tabPassport: '3D 通行证',
@@ -777,6 +779,7 @@ export const translations: Record<Language, Translations> = {
     tabGif: 'Make GIF',
     tabDiy: 'DIY Studio',
     tabDiyGif: 'Motion DIY',
+    tabZombie: 'Zombie Horde',
     tabSanta: 'Santa Monkes',
     tabPoster: 'Poster Studio',
     tabPassport: '3D Passport',

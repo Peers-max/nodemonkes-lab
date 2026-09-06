@@ -8,6 +8,7 @@ import { MonkesExplorer } from './components/explorer/MonkesExplorer';
 import { GifStudio } from './components/gif/GifStudio';
 import { DiyStudio } from './components/diy/DiyStudio';
 import { DiyGifStudio } from './components/diy_gif/DiyGifStudio';
+import { ZombieStudio } from './components/zombie/ZombieStudio';
 import { SantaStudio } from './components/santa/SantaStudio';
 import { PosterStudio } from './components/poster/PosterStudio';
 import { PassportStudio } from './components/passport/PassportStudio';
@@ -28,7 +29,7 @@ const AppContent: React.FC = () => {
   const getInitialTab = (): TabType => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') as TabType;
-    if (['explorer', 'gif', 'diy', 'diy_gif', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
+    if (['explorer', 'gif', 'diy', 'diy_gif', 'zombie', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
       return tab;
     }
     return 'explorer';
@@ -80,7 +81,7 @@ const AppContent: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab') as TabType;
-      if (tab && ['explorer', 'gif', 'diy', 'diy_gif', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
+      if (tab && ['explorer', 'gif', 'diy', 'diy_gif', 'zombie', 'santa', 'poster', 'passport', 'arcade', 'agent'].includes(tab)) {
         setActiveTab(tab);
       }
       const id = parseInt(params.get('id') || '209', 10);
@@ -221,6 +222,23 @@ const AppContent: React.FC = () => {
                 initialMonkeId={targetMonkeId}
                 monkes={monkes}
                 onToast={addToast} 
+              />
+            </motion.div>
+          )}
+
+          {/* Tab 3.8: Zombie Defense Game */}
+          {activeTab === 'zombie' && (
+            <motion.div
+              key="zombie"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <ZombieStudio
+                initialMonkeId={targetMonkeId}
+                monkes={monkes}
+                onToast={addToast}
               />
             </motion.div>
           )}
