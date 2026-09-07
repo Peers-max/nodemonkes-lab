@@ -601,3 +601,167 @@ export const MOTION_ACTION_PRESETS: MotionActionMeta[] = [
     frameCount: 40,
   },
 ];
+
+export const BODY_FX_LIST: FxOption[] = [
+  {
+    id: 'none',
+    name: '🚫 静态无特效',
+    nameEn: '🚫 Static (No FX)',
+    category: '原生状态',
+    categoryEn: 'Original',
+    desc: '保持身体原始像素质感，无动态流光',
+    descEn: 'Keep native body texture, no dynamic effects'
+  },
+  {
+    id: 'vertical_shimmer',
+    name: '✨ 纵向金属流光',
+    nameEn: '✨ Vertical Metallic Sheen',
+    category: '金属奢华',
+    categoryEn: 'Metallic',
+    desc: '纯正银白金属纵向光束自左向右匀速扫过全身',
+    descEn: 'Clean metallic vertical gleam passing smoothly from left to right'
+  },
+  {
+    id: 'diagonal_glint',
+    name: '⚡ 45° 奢华斜切光瀑',
+    nameEn: '⚡ 45° Luxury Diagonal Glint',
+    category: '金属奢华',
+    categoryEn: 'Metallic',
+    desc: '45度斜向切割高光流瀑倾泻，奢华 VIP 质感',
+    descEn: 'Crisp 45-degree diagonal specular sheen across torso and head'
+  },
+  {
+    id: 'pure_gold',
+    name: '👑 24K 纯金尊贵流光',
+    nameEn: '👑 24K Pure Gold Glow',
+    category: '金属奢华',
+    categoryEn: 'Metallic',
+    desc: '高纯度温润流金在躯干与面部如液体黄金般涌动',
+    descEn: 'Rich 24K molten liquid gold sheen cascading over the body'
+  },
+  {
+    id: 'cyber_neon',
+    name: '🔮 赛博霓虹双轨脉冲',
+    nameEn: '🔮 Cyber Neon Dual Pulse',
+    category: '赛博科技',
+    categoryEn: 'Cyber',
+    desc: '电光青与洋红霓虹波纹自上而下交替律动流转',
+    descEn: 'Alternating electric cyan and magenta cyber pulses'
+  },
+  {
+    id: 'holo_prism',
+    name: '🌈 全息棱镜彩虹幻彩',
+    nameEn: '🌈 Holo Prism Rainbow',
+    category: '炫彩流行',
+    categoryEn: 'Vibrant',
+    desc: '完整 RGB 全息棱镜光谱如水波波纹在身体表面循环流动',
+    descEn: 'Full spectrum chromatic prism waves sweeping across body'
+  },
+  {
+    id: 'molten_lava',
+    name: '🌋 地心熔岩暗涌',
+    nameEn: '🌋 Molten Lava Glow',
+    category: '元素爆发',
+    categoryEn: 'Elemental',
+    desc: '炽热赤红与熔金余烬在地表下如岩浆律动暗涌',
+    descEn: 'Underground magma and crimson embers pulsating within the skin'
+  },
+  {
+    id: 'deep_aurora',
+    name: '🌌 幽邃极光宇宙',
+    nameEn: '🌌 Deep Aurora Undulation',
+    category: '炫彩流行',
+    categoryEn: 'Vibrant',
+    desc: '极光翡翠绿与深空紫气交织如梦似幻在机体表面起伏',
+    descEn: 'Harmonious auroral emerald and void purple flowing undulating waves'
+  },
+  {
+    id: 'overheat_tactical',
+    name: '🚨 战力超频红温',
+    nameEn: '🚨 Tactical Overdrive Red Strobe',
+    category: '元素爆发',
+    categoryEn: 'Elemental',
+    desc: '机体高能超载，急促双重红温警报脉冲与散热波浪',
+    descEn: 'Critical core overdrive: rapid warning red strobes with heat diffusion'
+  },
+  {
+    id: 'glitch_tear',
+    name: '👾 赛博故障微抖',
+    nameEn: '👾 Cyber Glitch Jitter',
+    category: '赛博科技',
+    categoryEn: 'Cyber',
+    desc: '瞬时 RGB 色道分离与像素错位撕裂，纯正赛博黑客风',
+    descEn: 'Instantaneous RGB channel split and subtle pixel glitch displacement'
+  },
+  {
+    id: 'ghost_aura',
+    name: '👻 灵能幽魂虚化',
+    nameEn: '👻 Phantom Ghost Aura',
+    category: '神性超凡',
+    categoryEn: 'Mystic',
+    desc: '身体透明度与冷蓝幽魂光芒规律起伏虚化，神秘飘渺',
+    descEn: 'Ethereal opacity phasing with cool spirit glow'
+  },
+  {
+    id: 'vitality_pulse',
+    name: '💓 核心生命共鸣呼吸',
+    nameEn: '💓 Vitality Core Pulse',
+    category: '神性超凡',
+    categoryEn: 'Mystic',
+    desc: '如心脏与呼吸同频的明暗起伏，赋予大猴鲜活生命力',
+    descEn: 'Deep heartbeat-synced luminescent breathing rhythm'
+  },
+  {
+    id: 'toxic_slime',
+    name: '🧪 毒性生化荧光',
+    nameEn: '🧪 Toxic Bio-Luminescence',
+    category: '炫彩流行',
+    categoryEn: 'Vibrant',
+    desc: '荧光毒绿与青黄光泽如生化液体在体表缓慢涌动',
+    descEn: 'Fluorescent toxic sludge glow undulating slowly through body'
+  },
+  {
+    id: 'starlight_glimmer',
+    name: '✨ 银河璀璨星芒',
+    nameEn: '✨ Galactic Star Sparkle',
+    category: '神性超凡',
+    categoryEn: 'Mystic',
+    desc: '身体各处随机微小星芒十字高光闪耀，璀璨夺目',
+    descEn: 'Cross-star sparkles blinking randomly across the body surface'
+  },
+  {
+    id: 'sunset_vapor',
+    name: '🌅 蒸汽波落日余晖',
+    nameEn: '🌅 Vaporwave Sunset Sheen',
+    category: '炫彩流行',
+    categoryEn: 'Vibrant',
+    desc: '80年代复古落日金粉与紫罗兰渐变横向流动',
+    descEn: 'Retro 80s dusk golden-pink to violet gradient sweeping laterally'
+  },
+  {
+    id: 'abyssal_void',
+    name: '🌑 深渊虚空暗蚀',
+    nameEn: '🌑 Abyssal Void Eclipse',
+    category: '神性超凡',
+    categoryEn: 'Mystic',
+    desc: '深邃暗影流光自下而上侵蚀律动，神秘冷峻',
+    descEn: 'Deep shadow void energy creeping from bottom upwards in dark waves'
+  }
+];
+
+export const BODY_TRAITS = [
+  'Albino', 'Alien', 'Beak', 'Binary', 'Boned', 'Bot', 'Brown', 'DOS', 
+  'Dark', 'Deathbot', 'Gold', 'Green', 'Grey', 'Hyena', 'Ion', 'Light', 
+  'Medium', 'Mempool', 'Moon', 'Patriot', 'Pepe', 'Pink', 'Purple', 'Rainbow', 
+  'Red', 'Safemode', 'Striped', 'Underlord', 'VHS', 'White', 'Wrapped', 'Zombie'
+] as const;
+
+export function detectMonkeSpecies(traits?: { head?: string; body?: string } | null): SeriesType {
+  if (!traits) return 'normal';
+  if (traits.head === 'Block' || traits.body === 'Block') return 'block';
+  if (traits.head === 'Dog' || traits.body === 'Dog') return 'dog';
+  if (traits.head === 'Peer' || traits.body === 'Peer') return 'peer';
+  if (traits.head === 'Rabbit' || traits.body === 'Rabbit') return 'rabbit';
+  return 'normal';
+}
+

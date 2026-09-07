@@ -13,7 +13,8 @@ import {
   Crown,
   Activity,
   Sliders,
-  Check
+  Check,
+  Shield
 } from 'lucide-react';
 import type { Monke } from '../../types';
 import { BODY_COLORS, PRESET_COLORS } from '../../utils/constants';
@@ -28,12 +29,16 @@ import {
   HEAD_FX_LIST,
   EYE_FX_LIST,
   EARRING_FX_LIST,
+  BODY_FX_LIST,
   EARRING_TRAITS,
+  BODY_TRAITS,
   EarringTraitType,
   MOTION_ACTION_PRESETS,
   MotionActionType,
   PixelGrid,
-  PixelColor
+  PixelColor,
+  SeriesType,
+  detectMonkeSpecies
 } from './types';
 import {
   loadCanvasImage,
@@ -41,8 +46,11 @@ import {
   applyHeadEffect,
   applyEyeEffect,
   applyEarringEffect,
+  applyBodyEffect,
   renderGridToContext,
-  generateComboMonkeGif
+  renderBodyGridToContext,
+  generateComboMonkeGif,
+  calculateAdaptiveEyeFxFrame
 } from './diyGifEngine';
 
 function extractNativeEyeGrid(upperImg: HTMLImageElement, isPeer: boolean): PixelGrid {
@@ -193,27 +201,31 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
   const [bgMode, setBgMode] = useState<'transparent' | 'auto' | 'custom'>('transparent');
   const [customColor, setCustomColor] = useState('#FFFFFF');
 
-  // Independent rhythm/speed states for Action, Head FX, Eye FX, Earring FX
+  // Independent rhythm/speed states for Action, Head FX, Eye FX, Earring FX, Body FX
   const [actionSpeed, setActionSpeed] = useState<number>(1.0);
   const [headSpeed, setHeadSpeed] = useState<number>(1.0);
   const [eyeSpeed, setEyeSpeed] = useState<number>(1.0);
   const [earringSpeed, setEarringSpeed] = useState<number>(1.0);
+  const [bodySpeed, setBodySpeed] = useState<number>(1.0);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [isReady, setIsReady] = useState(false);
 
-  // Right console active subtab (Settings moved to far left, then Action, Head FX, Eye FX, Earring FX)
-  const [activeTab, setActiveTab] = useState<'settings' | 'action' | 'headFx' | 'eyeFx' | 'earringFx'>('settings');
+  // Right console active subtab (Settings, Action, Body FX, Head FX, Eye FX, Earring FX)
+  const [activeTab, setActiveTab] = useState<'settings' | 'action' | 'bodyFx' | 'headFx' | 'eyeFx' | 'earringFx'>('settings');
 
-  // Hat, Eye & Earring dynamic FX state
+  // Hat, Eye, Earring & Body dynamic FX state
   const [headFx, setHeadFx] = useState<string>('vertical_shimmer');
   const [eyeFx, setEyeFx] = useState<string>('natural_blink');
   const [earringFx, setEarringFx] = useState<string>('none');
+  const [bodyFx, setBodyFx] = useState<string>('none');
   const [headCategory, setHeadCategory] = useState<string>('全部');
   const [eyeCategory, setEyeCategory] = useState<string>('全部');
   const [earringCategory, setEarringCategory] = useState<string>('全部');
+  const [bodyCategory, setBodyCategory] = useState<string>('全部');
+  const [selectedBodyTrait, setSelectedBodyTrait] = useState<string | null>(null);
 
   // Native traits strictly from monke metadata
   const [nativeTraits, setNativeTraits] = useState<{ head: string; eyes: string; earring: string; body: string }>({
@@ -222,6 +234,9 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     earring: 'None',
     body: 'Gold',
   });
+
+  const species = useMemo<SeriesType>(() => detectMonkeSpecies(nativeTraits), [nativeTraits]);
+  const effectiveBody = selectedBodyTrait || nativeTraits.body || 'Light';
 
   const effectiveEarring = nativeTraits.earring || 'None';
   const hasEarring = effectiveEarring !== 'None' && effectiveEarring !== '';
@@ -271,18 +286,19 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       return { r: 239, g: 206, b: 148 }; // Default Monke face skin
     }
     const hex = BODY_COLORS[nativeTraits.body.toLowerCase()] || '#efce94';
-    const clean = hex.replace('#', '');
+    const parsed = parseInt(hex.replace('#', ''), 16);
     return {
-      r: parseInt(clean.substring(0, 2), 16),
-      g: parseInt(clean.substring(2, 4), 16),
-      b: parseInt(clean.substring(4, 6), 16),
+      r: (parsed >> 16) & 255,
+      g: (parsed >> 8) & 255,
+      b: parsed & 255
     };
   }, [nativeTraits.body, sampledSkin]);
 
-  // Cached pixel grids for head, eyes and earring in REFS to avoid re-triggering animation teardowns!
+  // Cached pixel grids for head, eyes, earring and body in REFS to avoid re-triggering animation teardowns!
   const headGridRef = useRef<PixelGrid | null>(null);
   const eyeGridRef = useRef<PixelGrid | null>(null);
   const earringGridRef = useRef<PixelGrid | null>(null);
+  const bodyGridRef = useRef<PixelGrid | null>(null);
 
   // Split images URLs
   const [images, setImages] = useState<{ upper: string | null; lower: string | null; full?: string }>({
@@ -300,8 +316,42 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
   const headProgressRef = useRef(0);
   const eyeProgressRef = useRef(0);
   const earringProgressRef = useRef(0);
+  const bodyProgressRef = useRef(0);
   const lastTimeRef = useRef(0);
   const dynamicUpperCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dynamicLowerCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Draggable horizontal scroll for subtabs bar
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingTabsRef = useRef(false);
+  const tabsStartXRef = useRef(0);
+  const tabsScrollLeftRef = useRef(0);
+
+  const handleTabsMouseDown = (e: React.MouseEvent) => {
+    if (!tabsContainerRef.current) return;
+    isDraggingTabsRef.current = true;
+    tabsStartXRef.current = e.pageX - tabsContainerRef.current.offsetLeft;
+    tabsScrollLeftRef.current = tabsContainerRef.current.scrollLeft;
+  };
+
+  const handleTabsMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingTabsRef.current || !tabsContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - tabsContainerRef.current.offsetLeft;
+    const walk = (x - tabsStartXRef.current) * 1.5;
+    tabsContainerRef.current.scrollLeft = tabsScrollLeftRef.current - walk;
+  };
+
+  const handleTabsMouseUpOrLeave = () => {
+    isDraggingTabsRef.current = false;
+  };
+
+  const handleTabsWheel = (e: React.WheelEvent) => {
+    if (!tabsContainerRef.current) return;
+    if (e.deltaY !== 0) {
+      tabsContainerRef.current.scrollLeft += e.deltaY;
+    }
+  };
 
   // Auto background detection from monke body trait
   const getAutoBackground = useCallback((imageId: number) => {
@@ -323,6 +373,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     const nativeEarring = item?.attributes?.Earring && item.attributes.Earring !== 'None' ? item.attributes.Earring : 'None';
     const nativeBody = item?.attributes?.Body || 'Light';
 
+    setSelectedBodyTrait(null);
     setNativeTraits({ head: nativeHead, eyes: nativeEyes, earring: nativeEarring, body: nativeBody });
   }, [currentId, monkes]);
 
@@ -579,10 +630,28 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       earringGridRef.current = null;
     }
 
+    // Load Body trait grid (from local bundle /traits/${species}/body/${effectiveBody}.png)
+    if (effectiveBody) {
+      const bodyName = encodeURIComponent(effectiveBody);
+      const localBodyUrl = `/traits/${species}/body/${bodyName}.png`;
+      loadCanvasImage(localBodyUrl)
+        .then((img) => {
+          if (isMounted) {
+            bodyGridRef.current = imageToGrid(img);
+          }
+        })
+        .catch((err) => {
+          console.warn('Body grid load error:', localBodyUrl, err);
+          bodyGridRef.current = null;
+        });
+    } else {
+      bodyGridRef.current = null;
+    }
+
     return () => {
       isMounted = false;
     };
-  }, [images, mode, currentId, nativeTraits.head, nativeTraits.eyes, nativeTraits.earring, effectiveEarring, nativeTraits.body, isZh]);
+  }, [images, mode, currentId, nativeTraits.head, nativeTraits.eyes, nativeTraits.earring, effectiveEarring, nativeTraits.body, effectiveBody, species, isZh]);
 
   // 4. Master Animation Loop (Driven by requestAnimationFrame; reads refs smoothly at 60 FPS)
   useEffect(() => {
@@ -607,6 +676,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     headProgressRef.current = 0;
     eyeProgressRef.current = 0;
     earringProgressRef.current = 0;
+    bodyProgressRef.current = 0;
     lastTimeRef.current = 0;
 
     const currentHatName = mode === 'santa' ? 'Santa' : (isSpecialSeries ? 'None' : nativeTraits.head);
@@ -636,63 +706,110 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       // 3. Eye FX cycle:
       const eyeCycleMs = 1200 / eyeSpeed;
       eyeProgressRef.current = (eyeProgressRef.current + (deltaTime / eyeCycleMs)) % 1;
-      const eyeFxFrame = Math.floor(eyeProgressRef.current * 8) % 8;
+      const eyeFxFrame = calculateAdaptiveEyeFxFrame(eyeFx, eyeProgressRef.current, eyeSpeed);
 
       // 4. Earring FX cycle:
       const earringCycleMs = 1200 / earringSpeed;
       earringProgressRef.current = (earringProgressRef.current + (deltaTime / earringCycleMs)) % 1;
       const earringFxFrame = Math.floor(earringProgressRef.current * 8) % 8;
 
-      // 1. Synthesize dynamic upper canvas (base upperImg + animated head + animated eyes + animated earring)
+      // 5. Body FX cycle:
+      const bodyCycleMs = 1200 / bodySpeed;
+      bodyProgressRef.current = (bodyProgressRef.current + (deltaTime / bodyCycleMs)) % 1;
+      const bodyFxFrame = Math.floor(bodyProgressRef.current * 8) % 8;
+
+      const activeBodyGrid = bodyGridRef.current;
+      const isCustomSkin = !!selectedBodyTrait && selectedBodyTrait !== nativeTraits.body;
+      const animBodyGrid = (bodyFx !== 'none' && activeBodyGrid)
+        ? applyBodyEffect(effectiveBody, bodyFx, activeBodyGrid, bodyFxFrame, 8, species)
+        : (isCustomSkin ? activeBodyGrid : null);
+
+      // 1. Synthesize dynamic upper canvas (base upperImg + body FX + animated head + animated eyes + animated earring)
       if (upperCompCtx && upperImgRef.current && upperImgRef.current.complete) {
         upperCompCtx.clearRect(0, 0, resolution, resolution);
         upperCompCtx.imageSmoothingEnabled = false;
         upperCompCtx.drawImage(upperImgRef.current, 0, 0, resolution, resolution);
 
-        // Render Head FX overlay (on native hat or Santa hat)
         const activeHeadGrid = headGridRef.current;
-        if (headFx !== 'none' && activeHeadGrid && currentHatName !== 'None') {
-          const animHead = applyHeadEffect(currentHatName, headFx, activeHeadGrid, headFxFrame, 8);
-          renderGridToContext(upperCompCtx, animHead, resolution);
+
+        // Render Body FX overlay on upper body (rows 0..22), masked by activeHeadGrid
+        if (animBodyGrid) {
+          renderBodyGridToContext(upperCompCtx, animBodyGrid, resolution, 0, 22, activeHeadGrid);
         }
 
-        // Render Eye FX overlay (on native eyes or dedicated accessory)
-        const activeEyeGrid = eyeGridRef.current;
-        if (eyeFx !== 'none' && activeEyeGrid) {
-          const isPeerMonke = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
-          const animEyes = applyEyeEffect(
-            effectiveEyeName,
-            eyeFx,
-            activeEyeGrid,
-            eyeFxFrame,
-            8,
-            isPeerMonke,
-            eyelidColor
-          );
-          renderGridToContext(upperCompCtx, animEyes, resolution);
-        }
-
-        // Render Earring FX overlay (strictly only on monkeys with native earring)
+        // Render Earring layer: animated if FX active, or restored on top if body was modified
         const activeEarringGrid = earringGridRef.current;
-        if (hasEarring && earringFx !== 'none' && activeEarringGrid) {
-          const animEarring = applyEarringEffect(
-            effectiveEarring,
-            earringFx,
-            activeEarringGrid,
-            earringFxFrame,
-            8
-          );
-          renderGridToContext(upperCompCtx, animEarring, resolution);
+        if (hasEarring && activeEarringGrid) {
+          if (earringFx !== 'none') {
+            const animEarring = applyEarringEffect(
+              effectiveEarring,
+              earringFx,
+              activeEarringGrid,
+              earringFxFrame,
+              8
+            );
+            renderGridToContext(upperCompCtx, animEarring, resolution);
+          } else if (animBodyGrid) {
+            renderGridToContext(upperCompCtx, activeEarringGrid, resolution);
+          }
+        }
+
+        // Render Eye layer: animated if FX active, or restored on top if body was modified
+        const activeEyeGrid = eyeGridRef.current;
+        if (activeEyeGrid) {
+          if (eyeFx !== 'none') {
+            const isPeerMonke = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
+            const animEyes = applyEyeEffect(
+              effectiveEyeName,
+              eyeFx,
+              activeEyeGrid,
+              eyeFxFrame,
+              8,
+              isPeerMonke,
+              eyelidColor
+            );
+            renderGridToContext(upperCompCtx, animEyes, resolution);
+          } else if (animBodyGrid) {
+            renderGridToContext(upperCompCtx, activeEyeGrid, resolution);
+          }
+        }
+
+        // Render Head layer: animated if FX active, or restored on top if body was modified
+        if (activeHeadGrid && currentHatName !== 'None') {
+          if (headFx !== 'none') {
+            const animHead = applyHeadEffect(currentHatName, headFx, activeHeadGrid, headFxFrame, 8);
+            renderGridToContext(upperCompCtx, animHead, resolution);
+          } else if (animBodyGrid) {
+            renderGridToContext(upperCompCtx, activeHeadGrid, resolution);
+          }
         }
       }
 
-      // 2. Render frame to main preview canvas using official drawActionFrame!
+      // 2. Synthesize dynamic lower canvas (if body FX active, synthesize dynamic lower canvas for rows 23..27)
+      let effectiveLowerSource: CanvasImageSource | null = lowerImgRef.current;
+      if (animBodyGrid && lowerImgRef.current && lowerImgRef.current.complete) {
+        if (!dynamicLowerCanvasRef.current) {
+          dynamicLowerCanvasRef.current = document.createElement('canvas');
+        }
+        dynamicLowerCanvasRef.current.width = resolution;
+        dynamicLowerCanvasRef.current.height = resolution;
+        const lowerCompCtx = dynamicLowerCanvasRef.current.getContext('2d', { willReadFrequently: true });
+        if (lowerCompCtx) {
+          lowerCompCtx.clearRect(0, 0, resolution, resolution);
+          lowerCompCtx.imageSmoothingEnabled = false;
+          lowerCompCtx.drawImage(lowerImgRef.current, 0, 0, resolution, resolution);
+          renderBodyGridToContext(lowerCompCtx, animBodyGrid, resolution, 23, 27, null);
+          effectiveLowerSource = dynamicLowerCanvasRef.current;
+        }
+      }
+
+      // 3. Render frame to main preview canvas using official drawActionFrame!
       const c = canvasRef.current?.getContext('2d');
-      if (c && dynamicUpperCanvasRef.current && lowerImgRef.current) {
+      if (c && dynamicUpperCanvasRef.current && effectiveLowerSource) {
         drawActionFrame(
           c,
           dynamicUpperCanvasRef.current,
-          lowerImgRef.current,
+          effectiveLowerSource,
           monkeImgRef.current,
           action as GifActionType,
           actionProgressRef.current,
@@ -722,9 +839,13 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     eyeSpeed,
     earringFx,
     earringSpeed,
+    bodyFx,
+    bodySpeed,
     effectiveEyeName,
     hasEarring,
     effectiveEarring,
+    effectiveBody,
+    species,
     bgColor,
     mode,
     nativeTraits.head,
@@ -783,9 +904,12 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         headName: hatName,
         eyeName: eyeName,
         earringName: hasEarring ? effectiveEarring : 'None',
+        bodyName: effectiveBody,
+        nativeBody: nativeTraits.body,
         headFxId: headFx,
         eyeFxId: eyeFx,
         earringFxId: hasEarring ? earringFx : 'none',
+        bodyFxId: bodyFx,
         action,
         backgroundColor: bgColor,
         resolution,
@@ -793,8 +917,10 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         headSpeed,
         eyeSpeed,
         earringSpeed,
+        bodySpeed,
         antiAlias,
         isPeer: nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer',
+        species: species,
         eyelidColor: eyelidColor,
         onProgress: (p) => setProgress(p),
       });
@@ -803,7 +929,8 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       const link = document.createElement('a');
       link.href = url;
       const earTag = hasEarring && earringFx !== 'none' ? `_ear-${earringFx}` : '';
-      link.download = `nodemonke_${currentId}_${mode}_${action}_hat-${headFx}_eye-${eyeFx}${earTag}_${resolution}px.gif`;
+      const bodyTag = bodyFx !== 'none' ? `_body-${bodyFx}` : '';
+      link.download = `nodemonke_${currentId}_${mode}_${action}_hat-${headFx}_eye-${eyeFx}${earTag}${bodyTag}_${resolution}px.gif`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -837,11 +964,13 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
   const currentHeadFxMeta = HEAD_FX_LIST.find((f) => f.id === headFx) || HEAD_FX_LIST[0];
   const currentEyeFxMeta = EYE_FX_LIST.find((f) => f.id === eyeFx) || EYE_FX_LIST[0];
   const currentEarringFxMeta = EARRING_FX_LIST.find((f) => f.id === earringFx) || EARRING_FX_LIST[0];
+  const currentBodyFxMeta = BODY_FX_LIST.find((f) => f.id === bodyFx) || BODY_FX_LIST[0];
 
   // Unique categories for filtering
   const headCategories = useMemo(() => ['全部', ...Array.from(new Set(HEAD_FX_LIST.map((h) => h.category)))], []);
   const eyeCategories = useMemo(() => ['全部', ...Array.from(new Set(EYE_FX_LIST.map((e) => e.category)))], []);
   const earringCategories = useMemo(() => ['全部', ...Array.from(new Set(EARRING_FX_LIST.map((e) => e.category)))], []);
+  const bodyCategories = useMemo(() => ['全部', ...Array.from(new Set(BODY_FX_LIST.map((b) => b.category)))], []);
 
   const filteredHeadFx = useMemo(() => {
     if (headCategory === '全部') return HEAD_FX_LIST;
@@ -857,6 +986,11 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     if (earringCategory === '全部') return EARRING_FX_LIST;
     return EARRING_FX_LIST.filter((e) => e.category === earringCategory);
   }, [earringCategory]);
+
+  const filteredBodyFx = useMemo(() => {
+    if (bodyCategory === '全部') return BODY_FX_LIST;
+    return BODY_FX_LIST.filter((b) => b.category === bodyCategory);
+  }, [bodyCategory]);
 
   const getCategoryLabel = useCallback((cat: string) => {
     if (isZh) return cat;
@@ -875,12 +1009,16 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       '珠宝闪耀': 'Jewelry',
       '奢华流光': 'Luxe Gleam',
       '科技幻彩': 'Cyber Prism',
+      '金属奢华': 'Metallic',
+      '赛博科技': 'Cyber Tech',
+      '元素爆发': 'Elemental',
+      '神性超凡': 'Mystic',
     };
     return map[cat] || cat;
   }, [isZh]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-[1360px] mx-auto px-2 sm:px-4 space-y-6 animate-in fade-in duration-300">
 
       {/* Header */}
       <div className="text-center space-y-2 px-2">
@@ -902,10 +1040,10 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
         {/* Left Side: Preview Canvas & Quick Selector */}
-        <div className="lg:col-span-6 flex flex-col items-center gap-3.5">
+        <div className="lg:col-span-5 flex flex-col items-center gap-3.5">
           <div className="relative w-full aspect-square max-w-[480px] rounded-3xl glass-panel p-3 flex items-center justify-center border border-white/10 overflow-hidden shadow-2xl bg-slate-950/80">
             {bgMode === 'transparent' && (
               <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:14px_14px]" />
@@ -931,6 +1069,12 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
               <span className="text-amber-300 truncate">🎩 {(isZh ? currentHeadFxMeta.name : currentHeadFxMeta.nameEn).split(' ')[0]}</span>
               <span className="text-slate-500">•</span>
               <span className="text-purple-300 truncate">👀 {(isZh ? currentEyeFxMeta.name : currentEyeFxMeta.nameEn).split(' ')[0]}</span>
+              {bodyFx !== 'none' && (
+                <>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-emerald-300 truncate">🥋 {(isZh ? currentBodyFxMeta.name : currentBodyFxMeta.nameEn).split(' ')[0]}</span>
+                </>
+              )}
             </div>
 
             {/* Bottom-right Action Pill Badge */}
@@ -999,8 +1143,13 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
                 <span className="text-slate-200">{isZh ? '耳饰: ' : 'Earring: '}{effectiveEarring}</span>
               </span>
               <span className="text-slate-600">|</span>
-              <span className="text-slate-400">
-                {isZh ? '肤色: ' : 'Body: '}<span className="text-slate-200">{nativeTraits.body}</span>
+              <span className="text-slate-400 flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-slate-200">
+                  {isZh ? '物种: ' : 'Species: '}<span className="text-amber-300 font-semibold uppercase">{species}</span>
+                  {' · '}
+                  <span className={selectedBodyTrait ? 'text-emerald-300 font-bold' : 'text-slate-200'}>{effectiveBody}</span>
+                </span>
               </span>
             </div>
             
@@ -1026,16 +1175,25 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         </div>
 
         {/* Right Side: Pro Controls Studio */}
-        <div className="lg:col-span-6 space-y-4 glass-panel p-5 rounded-3xl border border-white/[0.08] shadow-2xl">
+        <div className="lg:col-span-7 space-y-4 glass-panel p-5 sm:p-6 rounded-3xl border border-white/[0.08] shadow-2xl">
 
-          {/* Navigation Subtabs (5 Tabs: Settings, Action, Hat FX, Eye FX, Earring FX) */}
-          <div className="flex items-center gap-1 p-1 bg-slate-950/60 border border-white/10 rounded-2xl">
+          {/* Navigation Subtabs (6 Tabs: Settings, Action, Body FX, Hat FX, Eye FX, Earring FX) - Supports Mouse Drag & Wheel Scroll */}
+          <div
+            ref={tabsContainerRef}
+            onMouseDown={handleTabsMouseDown}
+            onMouseMove={handleTabsMouseMove}
+            onMouseUp={handleTabsMouseUpOrLeave}
+            onMouseLeave={handleTabsMouseUpOrLeave}
+            onWheel={handleTabsWheel}
+            className="flex items-center gap-1.5 p-1.5 bg-slate-950/70 border border-white/10 rounded-2xl overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing select-none"
+          >
             {[
-              { id: 'settings', label: isZh ? '⚙️ 画面设置' : '⚙️ Settings', icon: Sliders },
-              { id: 'action', label: isZh ? '🕺 动作预设' : '🕺 Actions', icon: Activity },
-              { id: 'headFx', label: isZh ? '🎩 帽子光效' : '🎩 Hat FX', icon: Crown },
-              { id: 'eyeFx', label: isZh ? '👀 眼睛微动' : '👀 Eye FX', icon: Eye },
-              { id: 'earringFx', label: isZh ? '👂 耳饰微动' : '👂 Earring FX', icon: Sparkles },
+              { id: 'settings', label: isZh ? '画面设置' : 'Settings', icon: Sliders },
+              { id: 'action', label: isZh ? '动作预设' : 'Actions', icon: Activity },
+              { id: 'bodyFx', label: isZh ? '身体微动' : 'Body FX', icon: Shield },
+              { id: 'headFx', label: isZh ? '帽子光效' : 'Hat FX', icon: Crown },
+              { id: 'eyeFx', label: isZh ? '眼睛微动' : 'Eye FX', icon: Eye },
+              { id: 'earringFx', label: isZh ? '耳饰微动' : 'Earring FX', icon: Sparkles },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1045,7 +1203,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
                   type="button"
                   onClick={() => setActiveTab(tab.id as any)}
                   className={clsx(
-                    'flex items-center gap-1 px-2 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex-1 justify-center',
+                    'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex-1 justify-center shrink-0 min-w-[80px]',
                     isActive
                       ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -1362,6 +1520,120 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
                 color="amber"
                 isZh={isZh}
               />
+            </div>
+          )}
+
+          {/* Tab Content: Body FX (20 Effects + None across 5 Species) */}
+          {activeTab === 'bodyFx' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block">
+                  {isZh
+                    ? `${BODY_FX_LIST.length}款 身体微动与全身体动态光效 (${species.toUpperCase()} · 生效于 ${effectiveBody})`
+                    : `${BODY_FX_LIST.length} Body Dynamic FX (${species.toUpperCase()} · Applied to ${effectiveBody})`}
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 font-bold">
+                  {isZh ? currentBodyFxMeta.name : currentBodyFxMeta.nameEn}
+                </span>
+              </div>
+
+              {/* Category Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {bodyCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setBodyCategory(cat)}
+                    className={clsx(
+                      'px-2.5 py-1 rounded-xl text-[10px] font-mono whitespace-nowrap transition-all',
+                      bodyCategory === cat
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                        : 'bg-slate-950/40 text-slate-400 border border-white/5 hover:text-white'
+                    )}
+                  >
+                    {getCategoryLabel(cat)}
+                  </button>
+                ))}
+              </div>
+
+              {/* FX Options Grid */}
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                {filteredBodyFx.map((fx) => {
+                  const isActive = bodyFx === fx.id;
+                  return (
+                    <button
+                      key={fx.id}
+                      type="button"
+                      onClick={() => setBodyFx(fx.id)}
+                      className={clsx(
+                        'py-2 px-2.5 rounded-2xl border text-left transition-all relative overflow-hidden',
+                        isActive
+                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-md'
+                          : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-1 text-xs">
+                        <span className="truncate">{isZh ? fx.name : fx.nameEn}</span>
+                        {isActive && <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-normal mt-0.5 line-clamp-2">
+                        {isZh ? fx.desc : fx.descEn}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Body FX Speed Control */}
+              <FxSpeedControl
+                title={isZh ? '身体微动节奏' : 'Body FX Tempo'}
+                icon={Shield}
+                speed={bodySpeed}
+                setSpeed={setBodySpeed}
+                color="emerald"
+                isZh={isZh}
+              />
+
+              {/* Body Skin Trait Switcher */}
+              <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-slate-300 font-bold flex items-center gap-1">
+                    <span>{isZh ? '身体肤色自选测试' : 'Body Skin Selector'}</span>
+                    <span className="text-[10px] text-slate-500">({BODY_TRAITS.length} 款)</span>
+                  </span>
+                  {selectedBodyTrait && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBodyTrait(null)}
+                      className="text-[10px] text-amber-400 hover:underline flex items-center gap-1"
+                    >
+                      <span>↺ {isZh ? '恢复原版' : 'Reset'}: {nativeTraits.body}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+                  {BODY_TRAITS.map((trait) => {
+                    const isCur = effectiveBody === trait;
+                    const isNative = nativeTraits.body === trait;
+                    return (
+                      <button
+                        key={trait}
+                        type="button"
+                        onClick={() => setSelectedBodyTrait(trait)}
+                        className={clsx(
+                          'px-2 py-1 rounded-xl text-[10px] font-mono whitespace-nowrap transition-all border shrink-0 flex items-center gap-1',
+                          isCur
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold shadow-sm ring-1 ring-emerald-500/30'
+                            : 'bg-slate-950/40 text-slate-400 border-white/5 hover:text-white hover:bg-white/5'
+                        )}
+                      >
+                        <span>{trait}</span>
+                        {isNative && <span className="text-[8px] text-amber-400 font-bold">★</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 

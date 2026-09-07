@@ -1,10 +1,37 @@
-import { PixelGrid, PixelColor, MotionActionType, MotionActionMeta, MOTION_ACTION_PRESETS } from './types';
+import { PixelGrid, PixelColor, MotionActionType, MotionActionMeta, MOTION_ACTION_PRESETS, SeriesType } from './types';
 import { easeInOutQuad, drawActionFrame, GifActionType, calculateAdaptiveGifBudget } from '../../utils/gifEngine';
 
 export { calculateAdaptiveGifBudget };
 
 export function clamp(v: number, min = 0, max = 255): number {
   return Math.max(min, Math.min(max, Math.round(v)));
+}
+
+export function clampCoord(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  let r: number, g: number, b: number;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      let val = t;
+      if (val < 0) val += 1;
+      if (val > 1) val -= 1;
+      if (val < 1 / 6) return p + (q - p) * 6 * val;
+      if (val < 1 / 2) return q;
+      if (val < 2 / 3) return p + (q - p) * (2 / 3 - val) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
 }
 
 export function getBounds(grid: PixelGrid | null) {
@@ -274,8 +301,7 @@ export function applyEyeEffect(
       // is covered with smooth eyelid skin tone even if the trait PNG had null gaps between lashes
       if (isPeerEye && y === 13 && x >= 6 && x <= 19 && bounds.minY <= 13) {
         if (((fxId === 'natural_blink' && (f === 4 || f === 5 || f === 6)) ||
-             (fxId === 'sleepy_snap' && (f === 3 || f === 4 || f === 5)) ||
-             (fxId === 'chill_squint' && (f === 4 || f === 5)))
+             (fxId === 'sleepy_snap' && (f === 3 || f === 4 || f === 5)))
         ) {
           p = p || { r: lidR, g: lidG, b: lidB, a: 255 };
         }
@@ -310,30 +336,31 @@ export function applyEyeEffect(
           break;
         }
         case 'chill_squint': {
+          const eyeSquintY = bounds.maxY > 14 ? 14 : bounds.minY;
           if (name === 'Pepe') {
             if (f === 4 || f === 5) {
-              if (y <= bounds.minY + 1) { r = 45; g = 175; b = 35; }
+              if (y <= eyeSquintY) { r = 45; g = 175; b = 35; }
               // Warm relaxed corner highlight
               if (y === bounds.maxY && (x === bounds.minX || x === bounds.maxX)) {
                 r = clamp(r + 40); g = clamp(g + 40); b = clamp(b + 40);
               }
             } else if (f === 3 || f === 6) {
-              if (y === bounds.minY) { r = 45; g = 175; b = 35; }
+              if (y <= eyeSquintY) { r = 45; g = 175; b = 35; }
             }
           } else {
             if (f === 4 || f === 5) {
-              if (y === bounds.minY && bounds.maxY > bounds.minY) {
+              if (y === eyeSquintY && bounds.maxY > eyeSquintY) {
                 // Top row narrows into eyelid skin tone
                 r = lidR; g = lidG; b = lidB;
               } else if (bounds.maxY === bounds.minY) {
                 // Single-pixel height eyes squint by dimming
                 r = clamp(r * 0.5); g = clamp(g * 0.5); b = clamp(b * 0.5);
-              } else {
+              } else if (y === bounds.maxY) {
                 // Subtle warm relaxed gleam on remaining eye pixels
                 r = clamp(r + 35); g = clamp(g + 30); b = clamp(b + 20);
               }
             } else if (f === 3 || f === 6) {
-              if (y === bounds.minY && bounds.maxY > bounds.minY) {
+              if (y === eyeSquintY && bounds.maxY > eyeSquintY) {
                 r = clamp(r * 0.7 + lidR * 0.3);
                 g = clamp(g * 0.7 + lidG * 0.3);
                 b = clamp(b * 0.7 + lidB * 0.3);
@@ -571,6 +598,48 @@ export function applyEyeEffect(
   return frameGrid;
 }
 
+/**
+ * Calculate adaptive eye effect frame index.
+ * For discrete biomechanical eye gestures (natural blink, sleepy snap, chill squint):
+ * - At speed >= 1.0: perfectly linear matching standard original dynamics.
+ * - At speed < 1.0: preserves a crisp, natural ~450ms gesture duration
+ *   while cleanly extending the open-eye idle duration, eliminating slideshow lag
+ *   and sluggishness in low-speed animations.
+ */
+export function calculateAdaptiveEyeFxFrame(fxId: string, progress: number, speed: number): number {
+  const normProgress = ((progress % 1) + 1) % 1;
+  const isBlinkAction = fxId === 'natural_blink' || fxId === 'sleepy_snap' || fxId === 'chill_squint';
+  if (!isBlinkAction) {
+    return Math.floor(normProgress * 8) % 8;
+  }
+
+  if (speed >= 1.0) {
+    return Math.floor(normProgress * 8) % 8;
+  }
+
+  const T = 1200 / speed;
+  const actionMs = fxId === 'chill_squint' ? 500 : 420;
+  const actionFramesRatio = fxId === 'chill_squint' ? 0.5 : 0.375;
+  const B = Math.min(actionFramesRatio, actionMs / T);
+
+  const actionBaseStart = fxId === 'chill_squint' ? 0.375 : 0.5;
+  const openBlinkRatio = (1 - B) / (1 - actionFramesRatio);
+  const actionStart = actionBaseStart * openBlinkRatio;
+  const actionEnd = actionStart + B;
+
+  let effP: number;
+  if (normProgress < actionStart) {
+    effP = (normProgress / actionStart) * actionBaseStart;
+  } else if (normProgress < actionEnd) {
+    effP = actionBaseStart + ((normProgress - actionStart) / B) * actionFramesRatio;
+  } else {
+    const endStart = 0.875;
+    effP = endStart + ((normProgress - actionEnd) / (1 - actionEnd)) * (1 - endStart);
+  }
+
+  return Math.floor(effP * 8) % 8;
+}
+
 // --- 2.5 Earring Dynamic Effects Engine (10 Distinct Effects + None) ---
 export function applyEarringEffect(
   name: string,
@@ -677,6 +746,264 @@ export function applyEarringEffect(
     }
     frameGrid.push(row);
   }
+  return frameGrid;
+}
+
+// --- 2.5. Body Dynamic Effects Engine (20 Distinct Effects + None across 5 Species) ---
+export function applyBodyEffect(
+  name: string,
+  fxId: string,
+  baseGrid: PixelGrid | null,
+  f: number,
+  totalFrames: number = 8,
+  species: SeriesType = 'normal'
+): PixelGrid | null {
+  if (!baseGrid) return null;
+  if (!fxId || fxId === 'none') return baseGrid;
+
+  const progress = (f % totalFrames) / totalFrames;
+  const sineWave = Math.sin(progress * Math.PI * 2);
+  const frameGrid: PixelGrid = [];
+  const bounds = getBounds(baseGrid);
+  const width = Math.max(1, bounds.maxX - bounds.minX + 1);
+  const height = Math.max(1, bounds.maxY - bounds.minY + 1);
+
+  for (let y = 0; y < 28; y++) {
+    const row: (PixelColor | null)[] = [];
+    for (let x = 0; x < 28; x++) {
+      const p = baseGrid[y] ? baseGrid[y][x] : null;
+      if (!p) { row.push(null); continue; }
+      let { r, g, b, a } = p;
+
+      // Normal monke classic eye protection (black pupil at y=15, x=14,15; white at 16,17)
+      const isClassicEyePixel = (species === 'normal' && y === 15 && x >= 14 && x <= 17 && (r < 10 || r > 240));
+
+      switch (fxId) {
+        case 'vertical_shimmer': {
+          if (!isClassicEyePixel) {
+            const sweepX = bounds.minX - 2 + progress * (width + 4);
+            const dist = Math.abs(x - sweepX);
+            if (dist < 2.2) {
+              const beamFactor = Math.cos((dist / 2.2) * Math.PI * 0.5);
+              const boost = Math.round(Math.pow(beamFactor, 1.8) * 75);
+              r = clamp(r + boost);
+              g = clamp(g + boost);
+              b = clamp(b + boost);
+            } else {
+              const breathe = sineWave * 8;
+              r = clamp(r + breathe);
+              g = clamp(g + breathe);
+              b = clamp(b + breathe);
+            }
+          }
+          break;
+        }
+
+        case 'diagonal_glint': {
+          const sweep = bounds.minX + bounds.minY + progress * (width + height + 2) - 2;
+          const dist = Math.abs((x + y * 0.75) - sweep);
+          if (dist <= 1.2 && !isClassicEyePixel) {
+            const boost = (dist < 0.6) ? 75 : 40;
+            r = clamp(r + boost); g = clamp(g + boost); b = clamp(b + boost);
+          } else if (!isClassicEyePixel) {
+            const breathe = sineWave * 10;
+            r = clamp(r + breathe); g = clamp(g + breathe); b = clamp(b + breathe);
+          }
+          break;
+        }
+
+        case 'pure_gold': {
+          if (!isClassicEyePixel) {
+            // Diagonal fluid liquid gold wave (45-degree angle, organic liquid flow)
+            const fluidPhase = (x * 0.45 + y * 0.35) - progress * (width + height + 6);
+            const wave1 = Math.sin(((x * 0.3 + y * 0.2) / width + progress * 2) * Math.PI * 2);
+            const wave2 = Math.cos(((x * 0.2 - y * 0.3) / height - progress) * Math.PI * 2);
+            const liquidPulse = (wave1 * 0.6 + wave2 * 0.4 + 1) * 0.5; // 0..1 smooth organic liquid flow
+
+            // 45° diagonal liquid specular sheen (soft cosine bell-curve, smooth glint)
+            const glintDist = Math.abs((fluidPhase % (width + 8)));
+            const specular = glintDist < 2.5 ? Math.pow(Math.cos((glintDist / 2.5) * Math.PI * 0.5), 2) : 0;
+
+            // Target luminous, opulent 24K gold tones:
+            // Base gold is bright and glowing (not dark or muddy)
+            const goldBaseR = 255;
+            const goldBaseG = 215 + Math.round(liquidPulse * 30); // 215..245
+            const goldBaseB = 75 + Math.round(liquidPulse * 65);  // 75..140 bright radiant champagne
+
+            // Luminous golden blend: preserves monkey's original brightness while infusing 24K radiance
+            const blendRatio = 0.50;
+            r = clamp(r * (1 - blendRatio) + goldBaseR * blendRatio + specular * 75);
+            g = clamp(g * (1 - blendRatio) + goldBaseG * blendRatio + specular * 65);
+            b = clamp(b * (1 - blendRatio) + goldBaseB * blendRatio + specular * 50);
+          }
+          break;
+        }
+
+        case 'cyber_neon': {
+          const phase = (y / height + progress * 2) % 1;
+          if (!isClassicEyePixel) {
+            if (phase < 0.5) {
+              const intensity = Math.sin(phase * Math.PI * 2);
+              r = clamp(r * 0.5 + 10 * 0.5);
+              g = clamp(g * 0.5 + 230 * intensity);
+              b = clamp(b * 0.5 + 255 * intensity);
+            } else {
+              const intensity = Math.sin((phase - 0.5) * Math.PI * 2);
+              r = clamp(r * 0.5 + 255 * intensity);
+              g = clamp(g * 0.5 + 20 * 0.5);
+              b = clamp(b * 0.5 + 200 * intensity);
+            }
+          }
+          break;
+        }
+
+        case 'holo_prism': {
+          if (!isClassicEyePixel) {
+            const hue = ((x + y) / (width + height) + progress) % 1;
+            const rgb = hslToRgb(hue, 0.9, 0.6);
+            r = clamp(r * 0.45 + rgb.r * 0.55);
+            g = clamp(g * 0.45 + rgb.g * 0.55);
+            b = clamp(b * 0.45 + rgb.b * 0.55);
+          }
+          break;
+        }
+
+        case 'molten_lava': {
+          if (!isClassicEyePixel) {
+            const magmaWave = Math.sin((y * 0.4 + x * 0.2 - progress * Math.PI * 4));
+            const pulse = (magmaWave + 1) * 0.5;
+            r = clamp(200 + pulse * 55);
+            g = clamp(40 + pulse * 120);
+            b = clamp(10 + pulse * 20);
+          }
+          break;
+        }
+
+        case 'deep_aurora': {
+          if (!isClassicEyePixel) {
+            const wave1 = Math.sin((x / width * 3 + progress * 2) * Math.PI);
+            const wave2 = Math.cos((y / height * 3 - progress * 2) * Math.PI);
+            const blend = (wave1 + wave2) * 0.25 + 0.5;
+            const targetR = Math.round(20 * blend + 160 * (1 - blend));
+            const targetG = Math.round(240 * blend + 40 * (1 - blend));
+            const targetB = Math.round(160 * blend + 240 * (1 - blend));
+            r = clamp(r * 0.5 + targetR * 0.5);
+            g = clamp(g * 0.5 + targetG * 0.5);
+            b = clamp(b * 0.5 + targetB * 0.5);
+          }
+          break;
+        }
+
+        case 'overheat_tactical': {
+          if (!isClassicEyePixel) {
+            const strobe = (f % 4 < 2) ? 1.0 : 0.2;
+            const heatWave = Math.sin((progress * 4 + y / 4) * Math.PI * 2) * 25;
+            r = clamp(r * 0.4 + 230 * strobe + heatWave);
+            g = clamp(g * 0.4 + 30 * strobe);
+            b = clamp(b * 0.4 + 30 * strobe);
+          }
+          break;
+        }
+
+        case 'glitch_tear': {
+          if (!isClassicEyePixel) {
+            const isGlitchFrame = (f === 2 || f === 6);
+            if (isGlitchFrame) {
+              const shift = (f === 2) ? 1 : -1;
+              const sourceX = clampCoord(x + shift, 0, 27);
+              const sampleP = baseGrid[y] ? baseGrid[y][sourceX] : null;
+              if (sampleP) {
+                r = sampleP.r;
+                g = p.g;
+                b = clamp(p.b + 80);
+              }
+            } else {
+              const breathe = sineWave * 8;
+              r = clamp(r + breathe); g = clamp(g + breathe); b = clamp(b + breathe);
+            }
+          }
+          break;
+        }
+
+        case 'ghost_aura': {
+          const alphaFade = 0.55 + 0.45 * Math.sin(progress * Math.PI * 2);
+          a = clamp(Math.round(p.a * alphaFade));
+          if (!isClassicEyePixel) {
+            r = clamp(r * 0.5 + 80 * 0.5);
+            g = clamp(g * 0.5 + 180 * 0.5);
+            b = clamp(b * 0.5 + 240 * 0.5);
+          }
+          break;
+        }
+
+        case 'vitality_pulse': {
+          const pulse = Math.pow(Math.sin(progress * Math.PI * 2), 2);
+          const delta = Math.round(pulse * 40);
+          if (!isClassicEyePixel) {
+            r = clamp(r + delta);
+            g = clamp(g + delta);
+            b = clamp(b + delta);
+          }
+          break;
+        }
+
+        case 'toxic_slime': {
+          if (!isClassicEyePixel) {
+            const slimeWave = Math.sin((progress * 2 + y / 5 + x / 8) * Math.PI * 2);
+            const intensity = (slimeWave + 1) * 0.5;
+            r = clamp(r * 0.4 + 40 * intensity);
+            g = clamp(g * 0.4 + 245 * intensity);
+            b = clamp(b * 0.4 + 30 * intensity);
+          }
+          break;
+        }
+
+        case 'starlight_glimmer': {
+          const starSeed = (x * 17 + y * 31 + f * 7) % 23;
+          if (starSeed === 0 && !isClassicEyePixel) {
+            r = 255; g = 255; b = 255;
+          } else {
+            const gentleGleam = sineWave * 10;
+            r = clamp(r + gentleGleam);
+            g = clamp(g + gentleGleam);
+            b = clamp(b + gentleGleam);
+          }
+          break;
+        }
+
+        case 'sunset_vapor': {
+          if (!isClassicEyePixel) {
+            const sweep = (x / width + progress) % 1;
+            const targetR = Math.round(255 * (1 - sweep) + 140 * sweep);
+            const targetG = Math.round(120 * (1 - sweep) + 50 * sweep);
+            const targetB = Math.round(160 * (1 - sweep) + 220 * sweep);
+            r = clamp(r * 0.4 + targetR * 0.6);
+            g = clamp(g * 0.4 + targetG * 0.6);
+            b = clamp(b * 0.4 + targetB * 0.6);
+          }
+          break;
+        }
+
+        case 'abyssal_void': {
+          if (!isClassicEyePixel) {
+            const voidWave = Math.sin((progress * 2 - y / height * 3) * Math.PI);
+            const voidFactor = Math.max(0.2, (voidWave + 1) * 0.4);
+            r = clamp(Math.round(r * voidFactor + 25 * (1 - voidFactor)));
+            g = clamp(Math.round(g * voidFactor + 10 * (1 - voidFactor)));
+            b = clamp(Math.round(b * voidFactor + 50 * (1 - voidFactor)));
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+
+      row.push({ r, g, b, a });
+    }
+    frameGrid.push(row);
+  }
+
   return frameGrid;
 }
 
@@ -830,6 +1157,42 @@ export function renderGridToContext(
           ctx.fillRect(startX, startY, w, h);
         }
       }
+    }
+  }
+}
+
+export function renderBodyGridToContext(
+  ctx: CanvasRenderingContext2D,
+  grid: PixelGrid | null,
+  size: number,
+  minY: number = 0,
+  maxY: number = 27,
+  maskHeadGrid: PixelGrid | null = null
+) {
+  if (!grid) return;
+  ctx.imageSmoothingEnabled = false;
+  for (let y = minY; y <= maxY && y < 28; y++) {
+    const startY = Math.floor((y * size) / 28);
+    const endY = Math.ceil(((y + 1) * size) / 28);
+    const h = endY - startY;
+
+    for (let x = 0; x < 28; x++) {
+      const p = grid[y] ? grid[y][x] : null;
+      if (!p || p.a === 0) continue;
+
+      // Hat mask protection: if monkey wears a hat covering this pixel, do not overwrite the hat
+      if (maskHeadGrid && maskHeadGrid[y] && maskHeadGrid[y][x] && maskHeadGrid[y][x]!.a > 0) {
+        continue;
+      }
+
+      const startX = Math.floor((x * size) / 28);
+      const nextP = grid[y]?.[x + 1];
+      const isRightEdge = !nextP || nextP.a === 0;
+      const endX = Math.ceil(((x + 1) * size) / 28) + (isRightEdge ? 1 : 0);
+      const w = endX - startX;
+
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${p.a / 255})`;
+      ctx.fillRect(startX, startY, w, h);
     }
   }
 }
@@ -1070,12 +1433,16 @@ export interface ComboMonkeGifOptions {
   headGrid: PixelGrid | null;
   eyeGrid: PixelGrid | null;
   earringGrid?: PixelGrid | null;
+  bodyGrid?: PixelGrid | null;
   headName: string;
   eyeName: string;
   earringName?: string;
+  bodyName?: string;
+  nativeBody?: string;
   headFxId: string;
   eyeFxId: string;
   earringFxId?: string;
+  bodyFxId?: string;
   action: MotionActionType;
   backgroundColor: string | null;
   resolution?: number;
@@ -1084,10 +1451,12 @@ export interface ComboMonkeGifOptions {
   headSpeed?: number;
   eyeSpeed?: number;
   earringSpeed?: number;
+  bodySpeed?: number;
   antiAlias?: boolean;
-  showLayers?: { body: boolean; eyes: boolean; head: boolean; earring?: boolean };
+  showLayers?: { body: boolean; eyes: boolean; head: boolean; earring?: boolean; bodyFx?: boolean };
   onProgress?: (progress: number) => void;
   isPeer?: boolean;
+  species?: SeriesType;
   eyelidColor?: { r: number; g: number; b: number } | null;
 }
 
@@ -1099,12 +1468,16 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     headGrid,
     eyeGrid,
     earringGrid,
+    bodyGrid,
     headName,
     eyeName,
     earringName = 'None',
+    bodyName = 'Light',
+    nativeBody,
     headFxId,
     eyeFxId,
     earringFxId = 'none',
+    bodyFxId = 'none',
     action,
     backgroundColor,
     resolution = 400,
@@ -1113,10 +1486,12 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     headSpeed,
     eyeSpeed,
     earringSpeed,
+    bodySpeed,
     antiAlias = true,
-    showLayers = { body: true, eyes: true, head: true, earring: true },
+    showLayers = { body: true, eyes: true, head: true, earring: true, bodyFx: true },
     onProgress,
     isPeer = false,
+    species = 'normal',
     eyelidColor
   } = options;
 
@@ -1124,6 +1499,7 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
   const hSpeed = headSpeed ?? speed ?? 1.0;
   const eSpeed = eyeSpeed ?? speed ?? 1.0;
   const earSpeed = earringSpeed ?? speed ?? 1.0;
+  const bSpeed = bodySpeed ?? speed ?? 1.0;
 
   let GIFConstructor = (window as any).GIF;
   if (!GIFConstructor) {
@@ -1180,16 +1556,27 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     } catch (_) {}
   }
 
+  let effectiveBodyGrid = bodyGrid;
+  if (!effectiveBodyGrid && bodyName) {
+    try {
+      const img = await loadCanvasImage(`/traits/${species}/body/${encodeURIComponent(bodyName)}.png`);
+      effectiveBodyGrid = imageToGrid(img);
+    } catch (_) {}
+  }
+
   // Determine active states of micro-FX
   const isHeadActive = headFxId !== 'none' && !!effectiveHeadGrid;
   const isEyeActive = eyeFxId !== 'none' && !!effectiveEyeGrid;
   const isEarringActive = earringFxId !== 'none' && !!effectiveEarringGrid && earringName && earringName !== 'None';
+  const isCustomBody = !!nativeBody && !!bodyName && bodyName !== nativeBody;
+  const isBodyActive = (bodyFxId !== 'none' || isCustomBody) && !!effectiveBodyGrid;
 
   let totalDurationMs: number;
   let actionLoops = 1;
   let eyeCycles = 1;
   let headCycles = 1;
   let earringCycles = 1;
+  let bodyCycles = 1;
 
   if (action === 'static') {
     // In Pure Micro-FX (Still Body) mode:
@@ -1198,6 +1585,7 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     if (isEyeActive) activeSpeeds.push(eSpeed);
     if (isHeadActive) activeSpeeds.push(hSpeed);
     if (isEarringActive) activeSpeeds.push(earSpeed);
+    if (isBodyActive) activeSpeeds.push(bSpeed);
 
     const minFxSpeed = activeSpeeds.length > 0 ? Math.min(...activeSpeeds) : 1.0;
     // Base cycle is 1200ms. At lower speeds (e.g. 0.5x), duration expands (e.g. 2400ms) to play the full animation smoothly
@@ -1209,6 +1597,7 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     eyeCycles = isEyeActive ? Math.max(1, Math.round(totalDurationMs / (1200 / eSpeed))) : 1;
     headCycles = isHeadActive ? Math.max(1, Math.round(totalDurationMs / (1200 / hSpeed))) : 1;
     earringCycles = isEarringActive ? Math.max(1, Math.round(totalDurationMs / (1200 / earSpeed))) : 1;
+    bodyCycles = isBodyActive ? Math.max(1, Math.round(totalDurationMs / (1200 / bSpeed))) : 1;
   } else {
     // In Dynamic Body Action mode:
     const baseActionDuration = action === 'headbang' ? 800 : 1200;
@@ -1218,7 +1607,8 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     const slowestFxSpeed = Math.min(
       isEyeActive ? eSpeed : 999,
       isHeadActive ? hSpeed : 999,
-      isEarringActive ? earSpeed : 999
+      isEarringActive ? earSpeed : 999,
+      isBodyActive ? bSpeed : 999
     );
 
     if (slowestFxSpeed < actSpeed && slowestFxSpeed < 999) {
@@ -1231,6 +1621,7 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     eyeCycles = isEyeActive ? Math.max(1, Math.round(totalDurationMs / (1200 / eSpeed))) : 1;
     headCycles = isHeadActive ? Math.max(1, Math.round(totalDurationMs / (1200 / hSpeed))) : 1;
     earringCycles = isEarringActive ? Math.max(1, Math.round(totalDurationMs / (1200 / earSpeed))) : 1;
+    bodyCycles = isBodyActive ? Math.max(1, Math.round(totalDurationMs / (1200 / bSpeed))) : 1;
   }
 
   // Calculate resolution-adaptive frame budget
@@ -1259,7 +1650,13 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
   upperCompCanvas.width = resolution;
   upperCompCanvas.height = resolution;
   const upperCompCtx = upperCompCanvas.getContext('2d', { willReadFrequently: true })!;
-  console.log(`>>> generateComboMonkeGif: res=${resolution}px, frames=${frameCount}, delay=${frameDelay}ms, total=${frameCount * frameDelay}ms, action=${action}(x${actionLoops}), head=${headName}(${headFxId}, x${headCycles}), eye=${eyeName}(${eyeFxId}, x${eyeCycles}), ear=${earringName}(${earringFxId}, x${earringCycles})`);
+
+  const lowerCompCanvas = document.createElement('canvas');
+  lowerCompCanvas.width = resolution;
+  lowerCompCanvas.height = resolution;
+  const lowerCompCtx = lowerCompCanvas.getContext('2d', { willReadFrequently: true })!;
+
+  console.log(`>>> generateComboMonkeGif: res=${resolution}px, frames=${frameCount}, delay=${frameDelay}ms, total=${frameCount * frameDelay}ms, action=${action}(x${actionLoops}), head=${headName}(${headFxId}, x${headCycles}), eye=${eyeName}(${eyeFxId}, x${eyeCycles}), ear=${earringName}(${earringFxId}, x${earringCycles}), body=${bodyName}(${bodyFxId}, x${bodyCycles})`);
 
   for (let f = 0; f < frameCount; f++) {
     const globalProgress = f / frameCount;
@@ -1267,8 +1664,18 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
 
     // Every active effect completes its integer cycles smoothly without truncation:
     const headFxFrame = ((Math.floor(globalProgress * headCycles * 8) % 8) + 8) % 8;
-    const eyeFxFrame = ((Math.floor(globalProgress * eyeCycles * 8) % 8) + 8) % 8;
+    const eyeFxFrame = calculateAdaptiveEyeFxFrame(eyeFxId, (globalProgress * eyeCycles) % 1, eSpeed);
     const earringFxFrame = ((Math.floor(globalProgress * earringCycles * 8) % 8) + 8) % 8;
+    const bodyFxFrame = ((Math.floor(globalProgress * bodyCycles * 8) % 8) + 8) % 8;
+
+    let animBodyGrid: PixelGrid | null = null;
+    if (showLayers.body !== false && effectiveBodyGrid) {
+      if (showLayers.bodyFx !== false && bodyFxId !== 'none') {
+        animBodyGrid = applyBodyEffect(bodyName, bodyFxId, effectiveBodyGrid, bodyFxFrame, 8, species);
+      } else if (isCustomBody) {
+        animBodyGrid = effectiveBodyGrid;
+      }
+    }
 
     upperCompCtx.clearRect(0, 0, resolution, resolution);
     upperCompCtx.imageSmoothingEnabled = false;
@@ -1277,34 +1684,64 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
       upperCompCtx.drawImage(upperImg, 0, 0, resolution, resolution);
     }
 
-    if (showLayers.head && headFxId !== 'none' && effectiveHeadGrid) {
-      const animHead = applyHeadEffect(headName, headFxId, effectiveHeadGrid, headFxFrame, 8);
-      renderGridToContext(upperCompCtx, animHead, resolution);
+    if (animBodyGrid) {
+      renderBodyGridToContext(upperCompCtx, animBodyGrid, resolution, 0, 22, effectiveHeadGrid);
     }
 
-    if (showLayers.eyes && eyeFxId !== 'none' && effectiveEyeGrid) {
-      const animEyes = applyEyeEffect(
-        eyeName,
-        eyeFxId,
-        effectiveEyeGrid,
-        eyeFxFrame,
-        8,
-        isPeer || headName === 'Peer',
-        eyelidColor
-      );
-      renderGridToContext(upperCompCtx, animEyes, resolution);
+    // Earring layer: animated if FX active, or restored on top if body was modified
+    if (showLayers.earring !== false && effectiveEarringGrid && earringName && earringName !== 'None') {
+      if (earringFxId !== 'none') {
+        const animEarring = applyEarringEffect(earringName, earringFxId, effectiveEarringGrid, earringFxFrame, 8);
+        renderGridToContext(upperCompCtx, animEarring, resolution);
+      } else if (animBodyGrid) {
+        renderGridToContext(upperCompCtx, effectiveEarringGrid, resolution);
+      }
     }
 
-    if (showLayers.earring !== false && effectiveEarringGrid && earringName && earringName !== 'None' && earringFxId !== 'none') {
-      const animEarring = applyEarringEffect(earringName, earringFxId, effectiveEarringGrid, earringFxFrame, 8);
-      renderGridToContext(upperCompCtx, animEarring, resolution);
+    // Eyes layer: animated if FX active, or restored on top if body was modified
+    if (showLayers.eyes && effectiveEyeGrid) {
+      if (eyeFxId !== 'none') {
+        const animEyes = applyEyeEffect(
+          eyeName,
+          eyeFxId,
+          effectiveEyeGrid,
+          eyeFxFrame,
+          8,
+          isPeer || headName === 'Peer',
+          eyelidColor
+        );
+        renderGridToContext(upperCompCtx, animEyes, resolution);
+      } else if (animBodyGrid) {
+        renderGridToContext(upperCompCtx, effectiveEyeGrid, resolution);
+      }
+    }
+
+    // Head layer: animated if FX active, or restored on top if body was modified
+    if (showLayers.head && effectiveHeadGrid && headName && headName !== 'None') {
+      if (headFxId !== 'none') {
+        const animHead = applyHeadEffect(headName, headFxId, effectiveHeadGrid, headFxFrame, 8);
+        renderGridToContext(upperCompCtx, animHead, resolution);
+      } else if (animBodyGrid) {
+        renderGridToContext(upperCompCtx, effectiveHeadGrid, resolution);
+      }
+    }
+
+    let effectiveLowerSource: CanvasImageSource = lowerImg;
+    if (animBodyGrid) {
+      lowerCompCtx.clearRect(0, 0, resolution, resolution);
+      lowerCompCtx.imageSmoothingEnabled = false;
+      if (lowerImg && lowerImg.complete) {
+        lowerCompCtx.drawImage(lowerImg, 0, 0, resolution, resolution);
+      }
+      renderBodyGridToContext(lowerCompCtx, animBodyGrid, resolution, 23, 27, null);
+      effectiveLowerSource = lowerCompCanvas;
     }
 
     renderMotionDiyFrame(
       renderCtx,
       resolution,
       upperCompCanvas,
-      lowerImg,
+      effectiveLowerSource,
       action,
       bodyActionProgress,
       backgroundColor,
