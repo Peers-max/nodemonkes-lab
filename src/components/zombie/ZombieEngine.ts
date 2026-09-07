@@ -105,9 +105,12 @@ export class ZombieEngine {
   public monkeCanvas: HTMLCanvasElement | null = null;
   public monkeId: number = 209;
 
-  // Defense Barrier, Nuke, Combo & Mercy state
+  // Defense Barrier, Armor, Freeze, Nuke, Combo & Mercy state
   public shield: number = 100;
   public maxShield: number = 100;
+  public armor: number = 0;
+  public maxArmor: number = 5;
+  public freezeTimer: number = 0;
   public nukeCharge: number = 0; // 0 to 100%
   public combo: number = 0;
   public lastKillTime: number = 0;
@@ -158,6 +161,8 @@ export class ZombieEngine {
     this.crowdCount = 10;
     this.shield = 100;
     this.maxShield = 100;
+    this.armor = 0;
+    this.freezeTimer = 0;
     this.nukeCharge = 0;
     this.combo = 0;
     this.lastKillTime = 0;
@@ -186,6 +191,34 @@ export class ZombieEngine {
     this.nextZombieDistance = 240;
     this.rebuildUnits();
     this.loadMonkeImage(monkeId);
+  }
+
+  public pause() {
+    this.isPaused = true;
+  }
+
+  public resume() {
+    this.isPaused = false;
+    this.lastTime = performance.now();
+  }
+
+  public togglePause(): boolean {
+    this.isPaused = !this.isPaused;
+    if (!this.isPaused) {
+      this.lastTime = performance.now();
+    }
+    return this.isPaused;
+  }
+
+  public stopGame() {
+    this.stop();
+    this.isGameOver = false;
+    this.isPaused = false;
+  }
+
+  public restartGame() {
+    this.reset(this.monkeId);
+    this.start();
   }
 
   public setMonkeId(id: number) {
@@ -372,9 +405,13 @@ export class ZombieEngine {
       gatesPassed: this.gatesPassed,
       shield: Math.round(this.shield),
       maxShield: this.maxShield,
+      armor: this.armor,
+      maxArmor: this.maxArmor,
       nukeCharge: Math.floor(this.nukeCharge),
       combo: this.combo,
       isFever: this.feverTimer > 0,
+      isPaused: this.isPaused,
+      freezeTimeLeft: Math.max(0, Math.ceil(this.freezeTimer / 1000)),
     };
   }
 
@@ -393,6 +430,47 @@ export class ZombieEngine {
     this.animId = requestAnimationFrame(this.loop);
   };
 
+  public applyGateEffect(g: Gate, isClaimedFromShot: boolean = false) {
+    this.gatesPassed++;
+    const xPos = isClaimedFromShot ? g.x + g.width / 2 : this.playerX;
+    const yPos = isClaimedFromShot ? g.y : this.playerY - 40;
+
+    if (g.op === 'weapon' && g.weaponType) {
+      this.setWeapon(g.weaponType);
+      if (isClaimedFromShot) {
+        this.addFloatingText(xPos, yPos, `🎯 打爆领取!`, '#f59e0b', 18);
+      }
+    } else if (g.op === 'shield') {
+      this.shield = Math.min(this.maxShield, this.shield + g.value);
+      this.audio.playShieldRepair();
+      this.addFloatingText(xPos, yPos, isClaimedFromShot ? `🎯 击破获得: 护盾+${g.value}!` : `🛡️ 护盾 +${g.value}!`, '#38bdf8', 20);
+    } else if (g.op === 'armor') {
+      this.armor = Math.min(this.maxArmor, this.armor + g.value);
+      this.audio.playArmorHit();
+      this.addFloatingText(xPos, yPos, isClaimedFromShot ? `🎯 击破获得: 装甲+${g.value}!` : `🛡️ 纳米装甲 +${g.value}!`, '#38bdf8', 20);
+    } else if (g.op === 'freeze') {
+      this.freezeTimer = 5000;
+      this.audio.playFreeze();
+      this.addFloatingText(xPos, yPos, isClaimedFromShot ? `🎯 击破激活: 极寒冰暴!` : `❄️ 极寒冰暴 5s!`, '#06b6d4', 22);
+    } else if (g.op === 'multiply') {
+      this.updateCrowd(g.value, true);
+      if (isClaimedFromShot) {
+        this.addFloatingText(xPos, yPos, `🎯 击破翻倍: x${g.value}!`, '#a855f7', 20);
+      }
+    } else if (g.op === 'add') {
+      this.updateCrowd(g.value, false);
+      if (isClaimedFromShot) {
+        this.addFloatingText(xPos, yPos, `🎯 击破吸收: +${g.value}!`, '#4ade80', 20);
+      }
+    } else if (g.op === 'subtract') {
+      this.updateCrowd(-g.value, false);
+    } else if (g.op === 'divide') {
+      const nextVal = Math.max(1, Math.floor(this.crowdCount / g.value));
+      this.updateCrowd(nextVal - this.crowdCount, false);
+    }
+    this.spawnGateParticles(g);
+  }
+
   private update(dt: number) {
     this.distance += this.speed * (dt / 16.66);
     this.wave = 1 + Math.floor(this.distance / 1200);
@@ -401,6 +479,7 @@ export class ZombieEngine {
     if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
     if (this.adrenalineTimer > 0) this.adrenalineTimer -= dt;
     if (this.feverTimer > 0) this.feverTimer -= dt;
+    if (this.freezeTimer > 0) this.freezeTimer -= dt;
 
     // Combo decay
     if (this.combo > 0 && performance.now() - this.lastKillTime > 1600) {
@@ -485,25 +564,7 @@ export class ZombieEngine {
         const squadLeft = this.playerX - 35;
         const squadRight = this.playerX + 35;
         if (squadRight >= g.x && squadLeft <= g.x + g.width) {
-          // Trigger Gate!
-          this.gatesPassed++;
-          if (g.op === 'weapon' && g.weaponType) {
-            this.setWeapon(g.weaponType);
-          } else if (g.op === 'shield') {
-            this.shield = Math.min(this.maxShield, this.shield + g.value);
-            this.audio.playShieldRepair();
-            this.addFloatingText(this.playerX, this.playerY - 40, `🛡️ SHIELD +${g.value}!`, '#38bdf8', 20);
-          } else if (g.op === 'multiply') {
-            this.updateCrowd(g.value, true);
-          } else if (g.op === 'add') {
-            this.updateCrowd(g.value, false);
-          } else if (g.op === 'subtract') {
-            this.updateCrowd(-g.value, false);
-          } else if (g.op === 'divide') {
-            const nextVal = Math.max(1, Math.floor(this.crowdCount / g.value));
-            this.updateCrowd(nextVal - this.crowdCount, false);
-          }
-          this.spawnGateParticles(g);
+          this.applyGateEffect(g, false);
           this.gates.splice(i, 1);
           continue;
         }
@@ -520,29 +581,41 @@ export class ZombieEngine {
     const squadRight = this.playerX + squadRadius;
     const squadTop = this.playerY - 22;
     const squadBottom = this.playerY + 30;
+    const isFrozen = this.freezeTimer > 0;
+    const zombieSpeedMult = isFrozen ? 0.35 : 1.0;
 
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
-      z.y += (this.speed + z.speed) * (dt / 16.66);
-      z.walkFrame += (this.speed + z.speed) * (dt / 16.66) * 0.12;
+      z.y += (this.speed + z.speed * zombieSpeedMult) * (dt / 16.66);
+      z.walkFrame += (this.speed + z.speed * zombieSpeedMult) * (dt / 16.66) * 0.12;
       if (z.hitFlash > 0) z.hitFlash -= dt * 0.01;
 
       // 1. Direct collision with player Monke squad (physical contact)
       if (z.y + z.radius >= squadTop && z.y - z.radius <= squadBottom) {
         if (z.x + z.radius >= squadLeft && z.x - z.radius <= squadRight) {
           if (this.invulnerableTimer <= 0) {
-            this.audio.playHit();
-            this.screenShake = 6;
-            let penalty = 1; // Walker default -1
-            if (z.type === 'runner') penalty = 1;
-            else if (z.type === 'tank') penalty = 3;
-            else if (z.type === 'exploder') penalty = 4;
-            else if (z.type === 'boss') penalty = 8;
+            if (this.armor > 0) {
+              // Nano-Armor absorbs full zombie damage!
+              this.armor--;
+              this.audio.playArmorHit();
+              this.screenShake = 5;
+              this.invulnerableTimer = 600;
+              this.spawnSpark(z.x, z.y, '#38bdf8');
+              this.addFloatingText(this.playerX, this.playerY - 45, `🛡️ 护甲抵挡! (余${this.armor})`, '#38bdf8', 18);
+            } else {
+              this.audio.playHit();
+              this.screenShake = 6;
+              let penalty = 1; // Walker default -1
+              if (z.type === 'runner') penalty = 1;
+              else if (z.type === 'tank') penalty = 3;
+              else if (z.type === 'exploder') penalty = 4;
+              else if (z.type === 'boss') penalty = 8;
 
-            this.updateCrowd(-penalty);
-            this.invulnerableTimer = 800; // 0.8s mercy window
-            this.spawnBloodParticles(z.x, z.y, '#ef4444');
-            this.addFloatingText(z.x, z.y - 12, `-${penalty} 👥`, '#ef4444', 18);
+              this.updateCrowd(-penalty);
+              this.invulnerableTimer = 800; // 0.8s mercy window
+              this.spawnBloodParticles(z.x, z.y, '#ef4444');
+              this.addFloatingText(z.x, z.y - 12, `-${penalty} 👥`, '#ef4444', 18);
+            }
           }
           this.zombies.splice(i, 1);
           continue;
@@ -660,32 +733,45 @@ export class ZombieEngine {
       const b = this.bullets[bi];
       let bulletDead = false;
 
-      // 1. Collide with shootable Gates
-      for (const g of this.gates) {
+      // 1. Collide with shootable Gates / Items
+      for (let gi = this.gates.length - 1; gi >= 0; gi--) {
+        const g = this.gates[gi];
         if (b.x >= g.x && b.x <= g.x + g.width && b.y >= g.y && b.y <= g.y + g.height) {
           g.hitFlash = 1;
           g.hitsReceived++;
+          g.hp -= b.damage;
           this.audio.playGateUpgrade();
           this.spawnSpark(b.x, b.y, g.op === 'subtract' || g.op === 'divide' ? '#f87171' : '#38bdf8');
 
-          // Shoot to UPGRADE positive gate, or MITIGATE negative gate (strictly hit-count driven!)
-          if (g.upgradesDone < g.maxUpgrades && g.hitsReceived >= (g.upgradesDone + 1) * g.hitsRequired) {
-            g.upgradesDone++;
-            if (g.op === 'add') {
-              g.value += 1;
-              this.addFloatingText(g.x + g.width / 2, g.y - 10, `UP! +${g.value}`, '#38bdf8', 16);
-            } else if (g.op === 'multiply') {
-              if (g.value < 3) {
-                g.value += 1;
-                this.addFloatingText(g.x + g.width / 2, g.y - 10, `UP! x${g.value}`, '#a855f7', 18);
+          // Check if durability depleted to 0
+          if (g.hp <= 0) {
+            const isNegative = g.op === 'subtract' || g.op === 'divide';
+            if (isNegative) {
+              // Negative gate purified into positive gate!
+              // "数值为负的道具可以在打完耐久度之后变成正值，正值要给个限制额度，正值的耐久度打完就算吃到道具"
+              let convertedVal = 3;
+              if (g.op === 'subtract') {
+                convertedVal = Math.min(5, Math.max(2, Math.floor(g.originalValue * 0.4)));
+              } else if (g.op === 'divide') {
+                convertedVal = 3;
               }
-            } else if (g.op === 'subtract') {
-              // Cannot reduce penalty below 50% of original value! (e.g. -8 can only drop to -4, never 0)
-              const minPenalty = Math.max(2, Math.ceil(g.originalValue * 0.5));
-              if (g.value > minPenalty) {
-                g.value = Math.max(minPenalty, g.value - 2);
-                this.addFloatingText(g.x + g.width / 2, g.y - 10, `WEAKENED! -${g.value}`, '#fbbf24', 16);
-              }
+              g.op = 'add';
+              g.value = convertedVal;
+              g.originalValue = convertedVal;
+              g.isConverted = true;
+              g.maxHp = this.getGateMaxHp('add', convertedVal);
+              g.hp = g.maxHp;
+              this.audio.playPurify();
+              this.spawnExplosion(g.x + g.width / 2, g.y + g.height / 2, 40);
+              this.addFloatingText(g.x + g.width / 2, g.y - 12, `✨ 净化转正: +${convertedVal}!`, '#38bdf8', 18);
+            } else {
+              // Positive gate claimed directly by shooting!
+              // "红框的这个道具应该增加一个耐久度，耐久度打完了就等于直接给我们吃到了"
+              // "正值的耐久度打完就算吃到道具"
+              this.audio.playPowerup();
+              this.spawnExplosion(g.x + g.width / 2, g.y + g.height / 2, 50);
+              this.applyGateEffect(g, true);
+              this.gates.splice(gi, 1);
             }
           }
 
@@ -786,187 +872,128 @@ export class ZombieEngine {
     }
   }
 
-  // --- Spawners ---
-  // --- Spawners ---
+  // --- Gate Durability & Spawners ---
+  public getGateMaxHp(op: GateOp, val: number): number {
+    switch (op) {
+      case 'add':
+        // Value scales durability: +4 => 60hp, +8 => 92hp, +15 => 148hp
+        return Math.round(28 + val * 8);
+      case 'multiply':
+        // x2 => 140hp, x3 => 220hp
+        return Math.round(val === 2 ? 140 : 220);
+      case 'weapon':
+        return 95;
+      case 'armor':
+        // +2 armor => 90hp, +3 armor => 110hp
+        return Math.round(50 + val * 20);
+      case 'freeze':
+        return 75;
+      case 'shield':
+        return Math.round(35 + val * 1.2);
+      case 'subtract':
+        // -3 => 53hp, -6 => 71hp, -10 => 95hp
+        return Math.round(35 + val * 6);
+      case 'divide':
+        return 95;
+      default:
+        return 65;
+    }
+  }
+
+  private createGate(op: GateOp, val: number, xPos: number, weaponType?: WeaponType): Gate {
+    const W = this.canvas.width;
+    const gateW = (W - 40) / 2;
+    const maxHp = this.getGateMaxHp(op, val);
+    return {
+      id: Math.random(),
+      x: xPos,
+      y: -90,
+      width: gateW,
+      height: 60,
+      op,
+      value: val,
+      weaponType,
+      speed: this.speed,
+      hp: maxHp,
+      maxHp,
+      hitFlash: 0,
+      hitsReceived: 0,
+      hitsRequired: 18,
+      maxUpgrades: 0,
+      upgradesDone: 0,
+      originalValue: val,
+    };
+  }
+
   private spawnGatePair() {
     const W = this.canvas.width;
     const gateW = (W - 40) / 2;
+    const leftX = 15;
+    const rightX = 25 + gateW;
     const isEarlyWave = this.wave === 1 && this.gatesPassed < 2;
 
     if (isEarlyWave) {
-      // Guaranteed beginner buffet: +10 and x2 / Gatling!
-      this.gates.push({
-        id: Math.random(),
-        x: 15,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: 'add',
-        value: 10,
-        speed: this.speed,
-        hp: 15,
-        maxHp: 15,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 18,
-        maxUpgrades: 3,
-        upgradesDone: 0,
-        originalValue: 10,
-      });
-
-      this.gates.push({
-        id: Math.random(),
-        x: 25 + gateW,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: Math.random() > 0.5 ? 'multiply' : 'weapon',
-        value: 2,
-        weaponType: 'gatling',
-        speed: this.speed,
-        hp: 15,
-        maxHp: 15,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 30,
-        maxUpgrades: 1,
-        upgradesDone: 0,
-        originalValue: 2,
-      });
+      // Guaranteed beginner buffet: +10 on left and x2 or Gatling on right
+      this.gates.push(this.createGate('add', 10, leftX));
+      if (Math.random() > 0.5) {
+        this.gates.push(this.createGate('multiply', 2, rightX));
+      } else {
+        this.gates.push(this.createGate('weapon', 1, rightX, 'gatling'));
+      }
       return;
     }
 
-    // Occasional Shield Repair gate (22% chance if shield < 80)
-    if (this.shield < 80 && Math.random() < 0.22) {
-      this.gates.push({
-        id: Math.random(),
-        x: 15,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: 'shield',
-        value: 35,
-        speed: this.speed,
-        hp: 15,
-        maxHp: 15,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 999,
-        maxUpgrades: 0,
-        upgradesDone: 0,
-        originalValue: 35,
-      });
+    const randType = Math.random();
+
+    // 1. Special Item: Nano-Armor (18% chance)
+    if (randType < 0.18) {
+      const isLeft = Math.random() > 0.5;
+      const armorVal = this.wave >= 4 ? 3 : 2;
       const bonus = Math.floor(Math.random() * 5) + 5;
-      this.gates.push({
-        id: Math.random(),
-        x: 25 + gateW,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: 'add',
-        value: bonus,
-        speed: this.speed,
-        hp: 15,
-        maxHp: 15,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 18,
-        maxUpgrades: 3,
-        upgradesDone: 0,
-        originalValue: bonus,
-      });
+      this.gates.push(this.createGate('armor', armorVal, isLeft ? leftX : rightX));
+      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
       return;
     }
 
-    const isWeaponGate = Math.random() < 0.28;
-    if (isWeaponGate) {
+    // 2. Special Item: Cryo Freeze (15% chance)
+    if (randType < 0.33) {
+      const isLeft = Math.random() > 0.5;
+      const bonus = Math.floor(Math.random() * 5) + 4;
+      this.gates.push(this.createGate('freeze', 5, isLeft ? leftX : rightX));
+      this.gates.push(this.createGate(Math.random() > 0.5 ? 'add' : 'multiply', Math.random() > 0.5 ? bonus : 2, isLeft ? rightX : leftX));
+      return;
+    }
+
+    // 3. Special Item: Weapon Crate (22% chance)
+    if (randType < 0.55) {
       const weapons: WeaponType[] = ['shotgun', 'gatling', 'laser', 'rocket'];
       const pick = weapons[Math.floor(Math.random() * weapons.length)];
-      this.gates.push({
-        id: Math.random(),
-        x: 15,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: 'weapon',
-        value: 1,
-        weaponType: pick,
-        speed: this.speed,
-        hp: 20,
-        maxHp: 20,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 999,
-        maxUpgrades: 0,
-        upgradesDone: 0,
-        originalValue: 1,
-      });
-
-      // Other side positive buff
-      const bonus = Math.floor(Math.random() * 5) + 5; // +5 to +9
-      this.gates.push({
-        id: Math.random(),
-        x: 25 + gateW,
-        y: -90,
-        width: gateW,
-        height: 60,
-        op: 'add',
-        value: bonus,
-        speed: this.speed,
-        hp: 15,
-        maxHp: 15,
-        hitFlash: 0,
-        hitsReceived: 0,
-        hitsRequired: 18,
-        maxUpgrades: 3,
-        upgradesDone: 0,
-        originalValue: bonus,
-      });
-    } else {
-      // One positive, one negative / challenge gate
-      const isLeftGood = Math.random() > 0.5;
-      const goodOp: GateOp = Math.random() > 0.65 ? 'multiply' : 'add';
-      const goodVal = goodOp === 'multiply' ? 2 : Math.floor(Math.random() * 6) + 4;
-
-      const badOp: GateOp = Math.random() > 0.8 ? 'divide' : 'subtract';
-      const badVal = badOp === 'divide' ? 2 : Math.floor(Math.random() * 5) + 3;
-
-      const createGateObj = (op: GateOp, val: number, xPos: number): Gate => {
-        let hitsReq = 18;
-        let maxUp = 3;
-        if (op === 'multiply') {
-          hitsReq = 35;
-          maxUp = 1;
-        } else if (op === 'divide') {
-          hitsReq = 999;
-          maxUp = 0;
-        } else if (op === 'subtract') {
-          hitsReq = 16;
-          maxUp = 2;
-        }
-        return {
-          id: Math.random(),
-          x: xPos,
-          y: -90,
-          width: gateW,
-          height: 60,
-          op,
-          value: val,
-          speed: this.speed,
-          hp: 15,
-          maxHp: 15,
-          hitFlash: 0,
-          hitsReceived: 0,
-          hitsRequired: hitsReq,
-          maxUpgrades: maxUp,
-          upgradesDone: 0,
-          originalValue: val,
-        };
-      };
-
-      this.gates.push(createGateObj(isLeftGood ? goodOp : badOp, isLeftGood ? goodVal : badVal, 15));
-      this.gates.push(createGateObj(!isLeftGood ? goodOp : badOp, !isLeftGood ? goodVal : badVal, 25 + gateW));
+      const isLeft = Math.random() > 0.5;
+      const bonus = Math.floor(Math.random() * 5) + 5;
+      this.gates.push(this.createGate('weapon', 1, isLeft ? leftX : rightX, pick));
+      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
+      return;
     }
+
+    // 4. Defense Shield Repair (if shield < 80 and 15% chance)
+    if (this.shield < 80 && randType < 0.70) {
+      const isLeft = Math.random() > 0.5;
+      const bonus = Math.floor(Math.random() * 5) + 4;
+      this.gates.push(this.createGate('shield', 35, isLeft ? leftX : rightX));
+      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
+      return;
+    }
+
+    // 5. Classic Choice: 1 Positive Buff vs 1 Negative Hazard (shoot to purify!)
+    const isLeftGood = Math.random() > 0.5;
+    const goodOp: GateOp = Math.random() > 0.65 ? 'multiply' : 'add';
+    const goodVal = goodOp === 'multiply' ? 2 : Math.floor(Math.random() * 6) + 4;
+
+    const badOp: GateOp = Math.random() > 0.8 ? 'divide' : 'subtract';
+    const badVal = badOp === 'divide' ? 2 : Math.floor(Math.random() * 5) + 3;
+
+    this.gates.push(this.createGate(isLeftGood ? goodOp : badOp, isLeftGood ? goodVal : badVal, leftX));
+    this.gates.push(this.createGate(!isLeftGood ? goodOp : badOp, !isLeftGood ? goodVal : badVal, rightX));
   }
 
   private spawnZombieWave() {
@@ -1305,27 +1332,42 @@ export class ZombieEngine {
     const isBad = g.op === 'subtract' || g.op === 'divide';
     const isWeapon = g.op === 'weapon';
     const isShield = g.op === 'shield';
+    const isArmor = g.op === 'armor';
+    const isFreeze = g.op === 'freeze';
+    const isConverted = !!g.isConverted;
 
     let mainColor = '#38bdf8'; // sky blue
-    let glowColor = 'rgba(56, 189, 248, 0.4)';
+    let glowColor = 'rgba(56, 189, 248, 0.45)';
     let text = `+${g.value}`;
 
-    if (isShield) {
-      mainColor = '#06b6d4'; // cyan
-      glowColor = 'rgba(6, 182, 212, 0.5)';
-      text = `🛡️ +${g.value}`;
+    if (isArmor) {
+      mainColor = '#0284c7'; // vibrant oceanic blue / armor
+      glowColor = 'rgba(2, 132, 199, 0.55)';
+      text = `🛡️ 护甲 +${g.value}`;
+    } else if (isFreeze) {
+      mainColor = '#06b6d4'; // bright ice cyan
+      glowColor = 'rgba(6, 182, 212, 0.55)';
+      text = `❄️ 冰暴 5s`;
+    } else if (isShield) {
+      mainColor = '#14b8a6'; // teal
+      glowColor = 'rgba(20, 184, 166, 0.5)';
+      text = `🛡️ 护盾 +${g.value}`;
     } else if (isWeapon) {
       mainColor = '#f59e0b'; // amber gold
       glowColor = 'rgba(245, 158, 11, 0.5)';
       const cfg = g.weaponType ? WEAPON_CONFIGS[g.weaponType] : null;
       text = cfg ? `${cfg.icon} ${cfg.nameZh}` : 'CRATE';
+    } else if (isConverted) {
+      mainColor = '#10b981'; // emerald green for purified
+      glowColor = 'rgba(16, 185, 129, 0.55)';
+      text = `✨ +${g.value}`;
     } else if (isBad) {
       mainColor = '#ef4444'; // red
       glowColor = 'rgba(239, 68, 68, 0.4)';
       text = g.op === 'divide' ? `÷${g.value}` : `-${g.value}`;
     } else if (g.op === 'multiply') {
       mainColor = '#a855f7'; // purple
-      glowColor = 'rgba(168, 85, 247, 0.4)';
+      glowColor = 'rgba(168, 85, 247, 0.45)';
       text = `×${g.value}`;
     }
 
@@ -1333,45 +1375,52 @@ export class ZombieEngine {
     if (g.hitFlash > 0) {
       ctx.fillStyle = '#ffffff';
     } else {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     }
 
     // Gate card body with rounded corners
     ctx.strokeStyle = mainColor;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = isConverted ? 3 : 2.2;
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = isConverted ? 14 : 9;
     this.roundRect(ctx, g.x, g.y, g.width, g.height, 8);
     ctx.fill();
     ctx.stroke();
 
     // Top gate energy banner
     ctx.fillStyle = mainColor;
-    ctx.fillRect(g.x + 4, g.y + 4, g.width - 8, 4);
+    ctx.fillRect(g.x + 4, g.y + 4, g.width - 8, 3.5);
 
-    // Gate text
+    // Gate main text
     ctx.fillStyle = mainColor;
-    ctx.font = '900 20px monospace, sans-serif';
+    ctx.font = '900 18px monospace, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = '#000';
     ctx.shadowBlur = 6;
-    ctx.fillText(text, g.x + g.width / 2, g.y + g.height / 2);
+    ctx.fillText(text, g.x + g.width / 2, g.y + g.height / 2 - 4);
 
-    // Gate upgrade hits progress indicator if upgradable
-    if (!isWeapon && !isShield && g.maxUpgrades > 0) {
-      const barW = g.width * 0.7;
-      const barH = 3;
-      const bx = g.x + (g.width - barW) / 2;
-      const by = g.y + g.height - 8;
-      const currentStepHits = g.hitsReceived - g.upgradesDone * g.hitsRequired;
-      const progress = g.upgradesDone >= g.maxUpgrades ? 1 : Math.min(1, Math.max(0, currentStepHits / g.hitsRequired));
+    // Durability (HP) Bar at bottom of gate
+    const barW = g.width * 0.84;
+    const barH = 5;
+    const bx = g.x + (g.width - barW) / 2;
+    const by = g.y + g.height - 11;
+    const hpRatio = Math.max(0, Math.min(1, g.hp / g.maxHp));
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.fillRect(bx, by, barW, barH);
-      ctx.fillStyle = g.upgradesDone >= g.maxUpgrades ? '#10b981' : mainColor;
-      ctx.fillRect(bx, by, barW * progress, barH);
-    }
+    // Durability bar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(bx, by, barW, barH);
+    // Durability fill
+    ctx.fillStyle = mainColor;
+    ctx.fillRect(bx, by, barW * hpRatio, barH);
+
+    // HP label
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.font = '900 9px monospace, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const hpHint = isBad ? `耐久 ${Math.max(0, g.hp)} (净化)` : `耐久 ${Math.max(0, g.hp)} (获取)`;
+    ctx.fillText(hpHint, g.x + g.width / 2, by - 1);
 
     ctx.restore();
   }
@@ -1391,6 +1440,17 @@ export class ZombieEngine {
     // Walking slight wobble
     const sway = Math.sin(z.walkFrame * 4) * (z.type === 'runner' ? 2 : 1);
     ctx.drawImage(sprite, -sw / 2 + sway, -sh / 2, sw, sh);
+
+    // Cryo Freeze visual frost aura
+    if (this.freezeTimer > 0) {
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.4)';
+      ctx.beginPath();
+      ctx.arc(0, 0, z.radius * 1.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('❄️', 0, -sh / 2 - 14);
+    }
 
     // Zombie HP Bar
     if (z.hp < z.maxHp || z.type === 'boss' || z.type === 'tank') {
@@ -1416,6 +1476,26 @@ export class ZombieEngine {
 
     const isInvul = this.invulnerableTimer > 0;
     const isAdrenaline = this.adrenalineTimer > 0;
+
+    // Nano-Armor Forcefield Shield Dome around squad
+    if (this.armor > 0) {
+      ctx.save();
+      const squadRadius = Math.min(80, 26 + Math.sqrt(this.units.length) * 7.5);
+      const pulse = Math.sin(performance.now() * 0.006) * 3;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12;
+      ctx.setLineDash([8, 4]);
+      ctx.beginPath();
+      ctx.arc(this.playerX, this.playerY, squadRadius + pulse, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Semi-transparent nano-mesh fill
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+      ctx.fill();
+      ctx.restore();
+    }
 
     for (const unit of this.units) {
       if (unit.y < minY) minY = unit.y;
@@ -1461,7 +1541,7 @@ export class ZombieEngine {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
-    const badgeW = 72;
+    const badgeW = this.armor > 0 ? 104 : 74;
     const badgeH = 22;
     const badgeY = minY - 28;
     this.roundRect(ctx, this.playerX - badgeW / 2, badgeY, badgeW, badgeH, 11);
@@ -1469,10 +1549,11 @@ export class ZombieEngine {
     ctx.stroke();
 
     ctx.fillStyle = '#38bdf8';
-    ctx.font = '900 13px monospace, sans-serif';
+    ctx.font = '900 12px monospace, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`👥 ${this.crowdCount}`, this.playerX, badgeY + badgeH / 2);
+    const badgeText = this.armor > 0 ? `👥 ${this.crowdCount} | 🛡️ ${this.armor}` : `👥 ${this.crowdCount}`;
+    ctx.fillText(badgeText, this.playerX, badgeY + badgeH / 2);
     ctx.restore();
   }
 

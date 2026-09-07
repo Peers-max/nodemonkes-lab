@@ -19,7 +19,7 @@ export interface WeaponConfig {
   durationMs?: number; // active duration if picked up as buff
 }
 
-export type GateOp = 'add' | 'multiply' | 'subtract' | 'divide' | 'weapon' | 'shield';
+export type GateOp = 'add' | 'multiply' | 'subtract' | 'divide' | 'weapon' | 'shield' | 'armor' | 'freeze';
 
 export interface Gate {
   id: number;
@@ -39,6 +39,7 @@ export interface Gate {
   maxUpgrades: number;
   upgradesDone: number;
   originalValue: number;
+  isConverted?: boolean;
 }
 
 export type ZombieType = 'walker' | 'runner' | 'tank' | 'exploder' | 'boss';
@@ -117,7 +118,11 @@ export interface GameStats {
   gatesPassed: number;
   shield: number;
   maxShield: number;
+  armor: number;
+  maxArmor: number;
   nukeCharge: number;
   combo: number;
   isFever: boolean;
+  isPaused: boolean;
+  freezeTimeLeft: number;
 }

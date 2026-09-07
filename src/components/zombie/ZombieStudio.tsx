@@ -3,7 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, 
+  Pause,
   RotateCcw, 
+  Square,
   Trophy, 
   Volume2, 
   VolumeX, 
@@ -45,6 +47,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
   // Game UI state
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [monkeId, setMonkeId] = useState<number>(initialMonkeId);
   const [monkeInput, setMonkeInput] = useState<string>(String(initialMonkeId));
@@ -58,9 +61,13 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     gatesPassed: 0,
     shield: 100,
     maxShield: 100,
+    armor: 0,
+    maxArmor: 5,
     nukeCharge: 0,
     combo: 0,
     isFever: false,
+    isPaused: false,
+    freezeTimeLeft: 0,
   });
   const [crowdCount, setCrowdCount] = useState<number>(10);
   const [weapon, setWeapon] = useState<WeaponType>('pistol');
@@ -76,6 +83,36 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     audioRef.current.enabled = next;
   };
 
+  // Game control actions
+  const handleTogglePause = useCallback(() => {
+    if (!engineRef.current || !isPlaying || isGameOver) return;
+    const nextPaused = engineRef.current.togglePause();
+    setIsPaused(nextPaused);
+    if (nextPaused) {
+      onToast(isZh ? '⏸️ 游戏已暂停' : '⏸️ Game Paused', '', 'info');
+    } else {
+      onToast(isZh ? '▶️ 游戏继续' : '▶️ Game Resumed', '', 'info');
+    }
+  }, [isPlaying, isGameOver, isZh, onToast]);
+
+  const handleRestart = useCallback(() => {
+    if (!engineRef.current) return;
+    engineRef.current.restartGame();
+    setIsPlaying(true);
+    setIsGameOver(false);
+    setIsPaused(false);
+    onToast(isZh ? '🔄 战队已重新集结！' : '🔄 Squad Redeployed!', '', 'info');
+  }, [isZh, onToast]);
+
+  const handleStop = useCallback(() => {
+    if (!engineRef.current) return;
+    engineRef.current.stopGame();
+    setIsPlaying(false);
+    setIsGameOver(false);
+    setIsPaused(false);
+    onToast(isZh ? '⏹️ 战斗已停止，返回整备' : '⏹️ Game Stopped', '', 'info');
+  }, [isZh, onToast]);
+
   // Initialize Game Engine
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -87,11 +124,13 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
       setCrowdCount(newCrowd);
       setWeapon(newWeapon);
       setWeaponTimeLeft(timeLeft);
+      setIsPaused(newStats.isPaused);
     };
 
     engine.onGameOver = (finalStats) => {
       setIsPlaying(false);
       setIsGameOver(true);
+      setIsPaused(false);
       if (finalStats.score > highScore) {
         setHighScore(finalStats.score);
         localStorage.setItem('monke_zombie_high_score', String(finalStats.score));
@@ -108,7 +147,26 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!engineRef.current || !isPlaying) return;
+      if (!engineRef.current) return;
+
+      // Pause / Resume: P or Escape
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (isPlaying && !isGameOver) {
+          e.preventDefault();
+          handleTogglePause();
+          return;
+        }
+      }
+
+      // Restart: R key
+      if ((e.key === 'r' || e.key === 'R') && (isPlaying || isGameOver)) {
+        e.preventDefault();
+        handleRestart();
+        return;
+      }
+
+      if (!isPlaying || isPaused) return;
+
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
         engineRef.current.movePlayerBy(-28);
       } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
@@ -124,11 +182,11 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, isZh]);
+  }, [isPlaying, isGameOver, isPaused, isZh, handleTogglePause, handleRestart]);
 
   // Pointer / Mouse tracking on Canvas
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!engineRef.current || !canvasRef.current || !isPlaying) return;
+    if (!engineRef.current || !canvasRef.current || !isPlaying || isPaused) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const scaleX = canvasRef.current.width / rect.width;
     const clientX = e.clientX - rect.left;
@@ -141,6 +199,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     engineRef.current.start();
     setIsPlaying(true);
     setIsGameOver(false);
+    setIsPaused(false);
   };
 
   const handleMonkeChange = (id: number) => {
@@ -179,12 +238,23 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
       <div className="relative w-full max-w-[500px] flex flex-col items-center bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl p-3 md:p-4 backdrop-blur-xl">
         {/* Top HUD */}
         <div className="w-full flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 mb-2 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs font-mono">
-          {/* Crowd count & Defense Shield */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold" title={isZh ? '小队猴子人数' : 'Squad Monke Count'}>
+          {/* Crowd count & Armor & Base Defense Shield */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold" title={isZh ? '小队猴子人数' : 'Squad Monke Count'}>
               <Users className="w-3.5 h-3.5 text-sky-400" />
               <span>{crowdCount}</span>
             </div>
+
+            {/* Armor Badge if > 0 */}
+            {stats.armor > 0 && (
+              <div 
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/40 font-bold animate-pulse shadow-sm shadow-blue-500/20"
+                title={isZh ? `纳米装甲板: 可抵挡 ${stats.armor} 次僵尸致命撞击` : `Nano-Armor: absorbs ${stats.armor} hits`}
+              >
+                <span>🛡️</span>
+                <span>{stats.armor}/{stats.maxArmor || 5}</span>
+              </div>
+            )}
 
             {/* Base Defense Shield */}
             <div 
@@ -198,16 +268,27 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
               )}
               title={isZh ? '基地激光防线耐久度（抵挡漏网僵尸）' : 'Base Defense Shield'}
             >
-              <span>🛡️</span>
+              <span>🏰</span>
               <span>{stats.shield}%</span>
             </div>
+
+            {/* Freeze active countdown */}
+            {stats.freezeTimeLeft > 0 && (
+              <div 
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold animate-pulse"
+                title={isZh ? '极寒减速生效中' : 'Cryo Freeze Active'}
+              >
+                <span>❄️</span>
+                <span>{stats.freezeTimeLeft}s</span>
+              </div>
+            )}
           </div>
 
           {/* Score & Kills & Wave */}
-          <div className="flex items-center gap-2.5 text-slate-300 font-semibold">
+          <div className="flex items-center gap-2 text-slate-300 font-semibold">
             <span className="text-amber-400">⚡ {stats.score}</span>
             <span className="text-emerald-400">🧟 {stats.zombiesKilled}</span>
-            <span className="text-purple-400">W {stats.wave}</span>
+            <span className="text-purple-400">W{stats.wave}</span>
             {stats.combo >= 3 && (
               <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30 text-[11px] animate-bounce">
                 x{stats.combo}
@@ -215,33 +296,67 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
             )}
           </div>
 
-          {/* Tactical Nuke & Trophy */}
+          {/* Controls: Pause / Resume, Restart, Stop, Nuke, Sound, Trophy */}
           <div className="flex items-center gap-1.5">
             {/* Tactical Nuke Button */}
             {stats.nukeCharge >= 100 ? (
               <button
                 onClick={() => {
-                  if (engineRef.current && isPlaying) {
+                  if (engineRef.current && isPlaying && !isPaused) {
                     const fired = engineRef.current.triggerNuke();
                     if (fired) {
                       onToast(isZh ? '☢️ 战术空袭已引爆！' : '☢️ Orbital Strike Launched!', '', 'success');
                     }
                   }
                 }}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black border border-amber-300 shadow-md shadow-amber-500/30 animate-pulse active:scale-95 transition-all"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black border border-amber-300 shadow-md shadow-amber-500/30 animate-pulse active:scale-95 transition-all"
                 title={isZh ? '点击或按空格键引爆战术核弹！' : 'Click or press Spacebar to Launch!'}
               >
                 <span>💣</span>
-                <span>{isZh ? '核弹 [SPACE]' : 'NUKE [SPACE]'}</span>
+                <span>{isZh ? '核弹' : 'NUKE'}</span>
               </button>
             ) : (
               <div 
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 text-slate-400 border border-slate-700/60 font-mono text-[11px]"
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-800/80 text-slate-400 border border-slate-700/60 font-mono text-[11px]"
                 title={isZh ? `击杀僵尸积攒核能: ${stats.nukeCharge}%` : `Nuke Energy: ${stats.nukeCharge}%`}
               >
                 <span>💣</span>
                 <span>{stats.nukeCharge}%</span>
               </div>
+            )}
+
+            {/* Game In-Progress Controls: Pause/Resume, Restart, Stop */}
+            {isPlaying && !isGameOver && (
+              <>
+                <button
+                  onClick={handleTogglePause}
+                  className={clsx(
+                    "p-1.5 rounded-lg border transition-colors",
+                    isPaused 
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 animate-pulse" 
+                      : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                  )}
+                  title={isPaused ? (isZh ? '继续游戏 [P / Esc]' : 'Resume [P / Esc]') : (isZh ? '暂停游戏 [P / Esc]' : 'Pause [P / Esc]')}
+                >
+                  {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5" />}
+                </button>
+
+                <button
+                  onClick={handleRestart}
+                  className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors"
+                  title={isZh ? '重新开始游戏 [R]' : 'Restart Game [R]'}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={handleStop}
+                  className="p-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 text-rose-300 transition-colors"
+                  title={isZh ? '停止游戏并返回' : 'Stop Game'}
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+              </>
             )}
 
             <button
@@ -251,6 +366,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
             >
               {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
             </button>
+
             <div className="flex items-center gap-1 text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
               <Trophy className="w-3 h-3" />
               <span>{highScore}</span>
@@ -288,6 +404,47 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
             onPointerDown={handlePointerMove}
             className="w-full h-full object-contain cursor-crosshair touch-none select-none"
           />
+
+          {/* Pause Modal Overlay */}
+          {isPlaying && isPaused && !isGameOver && (
+            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 flex items-center justify-center text-3xl mb-3 shadow-lg shadow-amber-500/20">
+                ⏸️
+              </div>
+              <h2 className="text-2xl font-black text-white mb-1">
+                {isZh ? '战斗暂停 • PAUSED' : 'GAME PAUSED'}
+              </h2>
+              <p className="text-xs text-slate-400 mb-6 font-mono">
+                {isZh ? `当前波次: Wave ${stats.wave} | 战队人数: ${crowdCount} | 得分: ${stats.score}` : `Wave ${stats.wave} | Squad: ${crowdCount} | Score: ${stats.score}`}
+              </p>
+
+              <div className="flex flex-col gap-3 w-full max-w-xs font-bold text-sm">
+                <button
+                  onClick={handleTogglePause}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                >
+                  <Play className="w-4 h-4 fill-slate-950" />
+                  <span>{isZh ? '继续战斗 [P / Esc]' : 'RESUME GAME'}</span>
+                </button>
+
+                <button
+                  onClick={handleRestart}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>{isZh ? '重来本关 [R]' : 'RESTART GAME'}</span>
+                </button>
+
+                <button
+                  onClick={handleStop}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 active:scale-95 transition-all"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                  <span>{isZh ? '停止退出' : 'STOP & EXIT'}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Start Screen Overlay */}
           {!isPlaying && !isGameOver && (
