@@ -1,5 +1,5 @@
 // src/components/zombie/ZombieSprites.ts
-import type { ZombieType, WeaponType } from './types';
+import type { ZombieType, SubWeaponType, DroppedItem, EnemyBullet, Bullet } from './types';
 
 // Cache for all pre-rendered pixel sprites
 const spriteCache = new Map<string, HTMLCanvasElement>();
@@ -281,17 +281,17 @@ function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, is
 export function renderFighterJet(
   ctx: CanvasRenderingContext2D,
   monkeSprite: CanvasImageSource,
-  weapon: WeaponType,
-  thrusterFrame: number,
-  isAdrenaline: boolean,
-  isFever: boolean,
-  size: number = 38
+  mainLevel: number = 1,
+  subWeapon: SubWeaponType = 'none',
+  subWeaponLevel: number = 1,
+  thrusterFrame: number = 0,
+  isHyper: boolean = false,
+  size: number = 44
 ) {
   const W = size;
   const H = size;
   ctx.save();
 
-  const isHyper = isAdrenaline || isFever;
   const fuselageColor = isHyper ? '#1e1b4b' : '#1e293b'; // slate dark metal
   const wingColor = isHyper ? '#4338ca' : '#334155'; // midnight / dark wing
   const highlightColor = isHyper ? '#818cf8' : '#64748b';
@@ -300,7 +300,7 @@ export function renderFighterJet(
 
   // 1. Dual Jet Thruster Exhaust Flames (rendered underneath rear of jet)
   const flamePulse = Math.sin(thrusterFrame * 12) * 3;
-  const flameLen = (isHyper ? 14 : 9) + flamePulse;
+  const flameLen = (isHyper ? 16 : 10) + flamePulse;
 
   // Left Jet Flame
   ctx.fillStyle = thrusterColor;
@@ -360,21 +360,56 @@ export function renderFighterJet(
   pRect(ctx, W * 0.04, H * 0.70, 2.5, 3, '#ef4444'); // red port light
   pRect(ctx, W * 0.93, H * 0.70, 2.5, 3, '#22c55e'); // green starboard light
 
-  // 3. Wing-Mounted Gun Cannons (visual reflects weapon)
-  let gunColor = '#38bdf8';
-  if (weapon === 'gatling') gunColor = '#f59e0b';
-  else if (weapon === 'shotgun') gunColor = '#ec4899';
-  else if (weapon === 'laser') gunColor = '#06b6d4';
-  else if (weapon === 'rocket') gunColor = '#ef4444';
+  // 3. Wing-Mounted Gun Cannons (visual reflects main weapon power level 1-5)
+  const gunColor = mainLevel >= 4 ? '#f59e0b' : mainLevel >= 2 ? '#38bdf8' : '#94a3b8';
+  // Inner twin blasters
+  pRect(ctx, W * 0.22, H * 0.38, 3, 13, '#1e293b');
+  pRect(ctx, W * 0.22, H * 0.30, 3, 7, gunColor);
+  pRect(ctx, W * 0.75, H * 0.38, 3, 13, '#1e293b');
+  pRect(ctx, W * 0.75, H * 0.30, 3, 7, gunColor);
 
-  // Left Gun
-  pRect(ctx, W * 0.18, H * 0.38, 3, 14, '#1e293b');
-  pRect(ctx, W * 0.18, H * 0.32, 3, 6, gunColor);
-  // Right Gun
-  pRect(ctx, W * 0.79, H * 0.38, 3, 14, '#1e293b');
-  pRect(ctx, W * 0.79, H * 0.32, 3, 6, gunColor);
+  // Outer extra cannons if mainLevel >= 3
+  if (mainLevel >= 3) {
+    pRect(ctx, W * 0.12, H * 0.48, 2.5, 10, '#1e293b');
+    pRect(ctx, W * 0.12, H * 0.42, 2.5, 6, gunColor);
+    pRect(ctx, W * 0.85, H * 0.48, 2.5, 10, '#1e293b');
+    pRect(ctx, W * 0.85, H * 0.42, 2.5, 6, gunColor);
+  }
 
-  // 4. Main Fuselage Body
+  // Heavy muzzle brakes if mainLevel >= 5 (MAX)
+  if (mainLevel >= 5) {
+    pRect(ctx, W * 0.44, H * 0.12, 5, 8, '#f59e0b');
+    pRect(ctx, W * 0.44, H * 0.08, 5, 4, '#ffffff');
+  }
+
+  // 4. Sub-Weapon Wing Pod Attachments (外挂战术装备)
+  if (subWeapon === 'missile') {
+    // Twin Missile Launcher Pods mounted beside wings
+    const podW = 5.5;
+    const podH = 12;
+    // Left Pod
+    pRect(ctx, W * 0.06, H * 0.52, podW, podH, '#0f172a');
+    pRect(ctx, W * 0.06 + 1, H * 0.52 - 3, podW - 2, 3, '#ef4444'); // red missile warhead tip
+    pRect(ctx, W * 0.06, H * 0.52 + 4, podW, 2, '#22c55e'); // green missile pod LED
+    // Right Pod
+    pRect(ctx, W * 0.88, H * 0.52, podW, podH, '#0f172a');
+    pRect(ctx, W * 0.88 + 1, H * 0.52 - 3, podW - 2, 3, '#ef4444'); // red missile warhead tip
+    pRect(ctx, W * 0.88, H * 0.52 + 4, podW, 2, '#22c55e');
+  } else if (subWeapon === 'laser') {
+    // Twin Laser Prism Focusing Emitters
+    const podW = 5;
+    const podH = 14;
+    // Left Prism
+    pRect(ctx, W * 0.06, H * 0.50, podW, podH, '#1e1b4b');
+    pRect(ctx, W * 0.06 + 1, H * 0.50 + 2, podW - 2, podH - 4, '#a855f7'); // glowing purple core
+    pRect(ctx, W * 0.06, H * 0.50 - 4, podW, 4, '#38bdf8'); // cyan focus lens
+    // Right Prism
+    pRect(ctx, W * 0.88, H * 0.50, podW, podH, '#1e1b4b');
+    pRect(ctx, W * 0.88 + 1, H * 0.50 + 2, podW - 2, podH - 4, '#a855f7');
+    pRect(ctx, W * 0.88, H * 0.50 - 4, podW, 4, '#38bdf8');
+  }
+
+  // 5. Main Fuselage Body
   ctx.fillStyle = fuselageColor;
   ctx.beginPath();
   ctx.moveTo(W * 0.5, H * 0.04); // Sharp aerodynamic nose
@@ -389,7 +424,7 @@ export function renderFighterJet(
   // Fuselage armor panel stripes
   pRect(ctx, W * 0.46, H * 0.08, W * 0.08, H * 0.22, highlightColor);
 
-  // 5. Transparent Bubble Cockpit Canopy with the NodeMonke Pilot inside!
+  // 6. Transparent Bubble Cockpit Canopy with the NodeMonke Pilot inside!
   const cockpitW = W * 0.44;
   const cockpitH = H * 0.40;
   const cockpitX = (W - cockpitW) / 2;
@@ -426,6 +461,123 @@ export function renderFighterJet(
   ctx.lineTo(cockpitX + 2, cockpitY + cockpitH * 0.6);
   ctx.closePath();
   ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * 7. DROPPED POWERUP CAPSULE / BADGE ([ P ], [ M ], [ L ], [ B ], [ S ])
+ */
+export function renderPowerupItem(ctx: CanvasRenderingContext2D, item: DroppedItem) {
+  const { x, y, label, color, bgGlow, radius } = item;
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Subtle floating pulse
+  const pulse = Math.sin(item.life * 0.008) * 1.5;
+  const r = radius + pulse;
+
+  // Outer neon glow
+  ctx.shadowColor = bgGlow;
+  ctx.shadowBlur = 10;
+
+  // Capsule body
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Inner ring
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Icon / Letter badge
+  ctx.fillStyle = color;
+  ctx.font = `900 ${Math.round(r * 1.15)}px monospace, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 4;
+  ctx.fillText(label, 0, 1);
+
+  ctx.restore();
+}
+
+/**
+ * 8. RETRO ENEMY BULLET (Arcade Glowing Energy Orb)
+ */
+export function renderEnemyBullet(ctx: CanvasRenderingContext2D, b: EnemyBullet) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 8;
+
+  if (b.type === 'heavy') {
+    const r = b.radius;
+    const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.4, '#fde047');
+    grad.addColorStop(0.8, '#f97316');
+    grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Round energy orb
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hot white core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, b.radius * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * 9. HOMING MICRO-MISSILE WITH SMOKE TRAIL
+ */
+export function renderHomingMissile(ctx: CanvasRenderingContext2D, b: Bullet) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  const angle = Math.atan2(b.vy, b.vx);
+  ctx.rotate(angle);
+
+  const L = 14;
+  const W = 4;
+  // Missile body
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillRect(-L / 2, -W / 2, L, W);
+
+  // Red warhead tip
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.moveTo(L / 2, -W / 2);
+  ctx.lineTo(L / 2 + 4, 0);
+  ctx.lineTo(L / 2, W / 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Stabilizer fins
+  ctx.fillStyle = '#64748b';
+  ctx.fillRect(-L / 2, -W, 3, W * 2);
+
+  // Jet exhaust flare
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(-L / 2 - 5, -1.5, 5, 3);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-L / 2 - 3, -0.8, 3, 1.6);
 
   ctx.restore();
 }

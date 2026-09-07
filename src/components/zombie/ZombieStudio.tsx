@@ -1,27 +1,24 @@
 // src/components/zombie/ZombieStudio.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, 
-  Pause,
+  Pause, 
   RotateCcw, 
-  Square,
+  Square, 
   Trophy, 
   Volume2, 
   VolumeX, 
-  ShieldAlert, 
-  Users, 
-  Plane,
+  Plane, 
   Zap, 
-  Flame, 
-  Crosshair,
-  Search,
-  Sparkles
+  Crosshair, 
+  Sparkles,
+  ShieldCheck,
+  Heart
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Monke } from '../../types';
-import type { GameStats, WeaponType } from './types';
-import { ZombieEngine, WEAPON_CONFIGS } from './ZombieEngine';
+import type { GameStats } from './types';
+import { ZombieEngine } from './ZombieEngine';
 import { ZombieAudio } from './ZombieAudio';
 import { useLanguage } from '../../utils/i18n';
 import { getMonkeImageUrl } from '../../utils/api';
@@ -58,23 +55,21 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     score: 0,
     zombiesKilled: 0,
     wave: 1,
-    maxCrowd: 10,
-    gatesPassed: 0,
+    hp: 100,
+    maxHp: 100,
     shield: 100,
     maxShield: 100,
-    armor: 0,
-    maxArmor: 5,
-    nukeCharge: 0,
+    bombs: 3,
+    powerLevel: 1,
+    subWeapon: 'none',
+    subWeaponLevel: 1,
     combo: 0,
     isFever: false,
     isPaused: false,
-    freezeTimeLeft: 0,
   });
-  const [crowdCount, setCrowdCount] = useState<number>(10);
-  const [weapon, setWeapon] = useState<WeaponType>('pistol');
-  const [weaponTimeLeft, setWeaponTimeLeft] = useState<number>(0);
+
   const [highScore, setHighScore] = useState<number>(() => {
-    return parseInt(localStorage.getItem('monke_zombie_high_score') || '0', 10);
+    return parseInt(localStorage.getItem('monke_fighter_high_score') || '0', 10);
   });
 
   // Sound toggle
@@ -102,7 +97,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     setIsPlaying(true);
     setIsGameOver(false);
     setIsPaused(false);
-    onToast(isZh ? '🔄 战机编队已重新集结！' : '🔄 Squadron Redeployed!', '', 'info');
+    onToast(isZh ? '🔄 战机已重新出击！' : '🔄 Fighter Redeployed!', '', 'info');
   }, [isZh, onToast]);
 
   const handleStop = useCallback(() => {
@@ -111,8 +106,16 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     setIsPlaying(false);
     setIsGameOver(false);
     setIsPaused(false);
-    onToast(isZh ? '⏹️ 巡航已停止，返航整备' : '⏹️ Mission Aborted', '', 'info');
+    onToast(isZh ? '⏹️ 战斗已中止，返航整备' : '⏹️ Mission Aborted', '', 'info');
   }, [isZh, onToast]);
+
+  const handleLaunchBomb = useCallback(() => {
+    if (!engineRef.current || !isPlaying || isPaused) return;
+    const fired = engineRef.current.triggerBomb();
+    if (fired) {
+      onToast(isZh ? '💣 全屏战术核弹已引爆！' : '💣 Tactical Nuke Launched!', '', 'success');
+    }
+  }, [isPlaying, isPaused, isZh, onToast]);
 
   // Initialize Game Engine
   useEffect(() => {
@@ -120,11 +123,8 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     const engine = new ZombieEngine(canvasRef.current, audioRef.current);
     engineRef.current = engine;
 
-    engine.onStatsUpdate = (newStats, newCrowd, newWeapon, timeLeft) => {
+    engine.onStatsUpdate = (newStats) => {
       setStats(newStats);
-      setCrowdCount(newCrowd);
-      setWeapon(newWeapon);
-      setWeaponTimeLeft(timeLeft);
       setIsPaused(newStats.isPaused);
     };
 
@@ -134,9 +134,9 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
       setIsPaused(false);
       if (finalStats.score > highScore) {
         setHighScore(finalStats.score);
-        localStorage.setItem('monke_zombie_high_score', String(finalStats.score));
+        localStorage.setItem('monke_fighter_high_score', String(finalStats.score));
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-        onToast(isZh ? '🎉 创下新高纪录！' : '🎉 New High Score!', `${finalStats.score} pts`, 'success');
+        onToast(isZh ? '🎉 创下王牌新高纪录！' : '🎉 New High Score!', `${finalStats.score} pts`, 'success');
       }
     };
 
@@ -145,7 +145,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     };
   }, []);
 
-  // Keyboard controls
+  // Keyboard controls: 2D Full Directional Flight
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!engineRef.current) return;
@@ -168,30 +168,35 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
 
       if (!isPlaying || isPaused) return;
 
+      // 2D Movement
+      const step = 28;
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        engineRef.current.movePlayerBy(-28);
+        engineRef.current.movePlayerBy(-step, 0);
       } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        engineRef.current.movePlayerBy(28);
+        engineRef.current.movePlayerBy(step, 0);
+      } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        engineRef.current.movePlayerBy(0, -step);
+      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        engineRef.current.movePlayerBy(0, step);
       } else if (e.code === 'Space') {
         e.preventDefault();
-        const fired = engineRef.current.triggerNuke();
-        if (fired) {
-          onToast(isZh ? '☢️ 战术空袭已引爆！' : '☢️ Orbital Strike Launched!', '', 'success');
-        }
+        handleLaunchBomb();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, isGameOver, isPaused, isZh, handleTogglePause, handleRestart]);
+  }, [isPlaying, isGameOver, isPaused, handleTogglePause, handleRestart, handleLaunchBomb]);
 
-  // Pointer / Mouse tracking on Canvas
+  // Pointer / Mouse tracking on Canvas (Smooth 2D flight control)
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!engineRef.current || !canvasRef.current || !isPlaying || isPaused) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const scaleX = canvasRef.current.width / rect.width;
-    const clientX = e.clientX - rect.left;
-    engineRef.current.setPlayerTargetX(clientX * scaleX);
+    const scaleY = canvasRef.current.height / rect.height;
+    const clientX = (e.clientX - rect.left) * scaleX;
+    const clientY = (e.clientY - rect.top) * scaleY;
+    engineRef.current.setPlayerTarget(clientX, clientY);
   };
 
   const startGame = () => {
@@ -211,76 +216,90 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     }
   };
 
-  const currentWeaponCfg = WEAPON_CONFIGS[weapon];
-
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-6 flex flex-col items-center">
+    <div className="w-full max-w-6xl mx-auto px-4 py-2 md:py-4 flex flex-col items-center">
       {/* Top Banner */}
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-3">
+      <div className="text-center mb-3">
+        <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-1.5">
           <Zap className="w-3.5 h-3.5" />
-          <span>{isZh ? '原创街机 • 战机编队突围' : 'Original Arcade • Flight Squadron Combat'}</span>
+          <span>{isZh ? '原创街机 • 经典雷电式飞机大战' : 'Classic Arcade • Sky Thunder Striker'}</span>
         </div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight flex items-center justify-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center justify-center gap-3">
           <span>✈️</span>
-          <span>{isZh ? '节点猴：空战突围' : 'NodeMonkes: Sky Squadron'}</span>
-          <span className="text-xs px-2.5 py-0.5 rounded-md bg-sky-500/20 border border-sky-500/40 text-sky-300 font-mono">
-            AIR COMBAT
+          <span>{isZh ? '节点猴：雷电空战' : 'NodeMonkes: Sky Striker'}</span>
+          <span className="text-xs px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono">
+            SHMUP
           </span>
         </h1>
-        <p className="text-slate-400 text-sm mt-2 max-w-xl mx-auto">
+        <p className="text-slate-400 text-xs mt-1 max-w-xl mx-auto">
           {isZh 
-            ? '驾驶节点猴战机编队，在苍穹中左右滑移拦截，射击补给门扩编战机战队，打爆负面门削弱惩罚，消灭敌机舰队群！'
-            : 'Pilot your NodeMonke fighter squadron! Slide left and right to intercept, blast supply gates to expand your air wing, and eliminate enemy armadas!'}
+            ? '由节点猴亲自驾驶的王牌战机！全向滑移机动、拾取[P]增强主炮、挂载[M]追踪导弹与[L]激光副武器，投掷[B]全屏核爆摧毁敌军舰队！'
+            : 'Pilot the flagship NodeMonke fighter! Full 2D maneuvers, [P] main gun upgrades, [M] homing missiles, [L] piercing lasers, and [B] screen-clearing bombs!'}
         </p>
       </div>
 
       {/* Main Game Arena Container */}
-      <div className="relative w-full max-w-[500px] flex flex-col items-center bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl p-3 md:p-4 backdrop-blur-xl">
+      <div className="relative w-full max-w-[460px] flex flex-col items-center bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl p-2.5 md:p-3 backdrop-blur-xl">
         {/* Top HUD */}
-        <div className="w-full flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 mb-2 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs font-mono">
-          {/* Crowd count & Armor & Base Defense Shield */}
+        <div className="w-full flex flex-wrap items-center justify-between gap-1.5 px-2.5 py-1.5 mb-2 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs font-mono">
+          {/* Status Group: HP, Shield, Main Weapon, Sub Weapon */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold" title={isZh ? '战机编队数量' : 'Squadron Flight Count'}>
-              <Plane className="w-3.5 h-3.5 text-sky-400" />
-              <span>{crowdCount}</span>
-            </div>
-
-            {/* Armor Badge if > 0 */}
-            {stats.armor > 0 && (
-              <div 
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/40 font-bold animate-pulse shadow-sm shadow-blue-500/20"
-                title={isZh ? `纳米偏折护甲: 可抵挡 ${stats.armor} 次敌机致命撞击` : `Deflector Armor: absorbs ${stats.armor} hits`}
-              >
-                <span>🛡️</span>
-                <span>{stats.armor}/{stats.maxArmor || 5}</span>
-              </div>
-            )}
-
-            {/* Base Defense Shield */}
+            {/* HP */}
             <div 
               className={clsx(
                 "flex items-center gap-1 px-2 py-1 rounded-lg border font-bold transition-colors",
-                stats.shield > 50 
-                  ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" 
-                  : stats.shield > 20 
-                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30" 
-                  : "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                stats.hp > 50 
+                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" 
+                  : stats.hp > 25 
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse" 
+                  : "bg-rose-500/25 text-rose-300 border-rose-500/50 animate-bounce"
               )}
-              title={isZh ? '空天防空网耐久度（拦截突防敌机）' : 'Air Defense Barrier'}
+              title={isZh ? `机体装甲: ${stats.hp}%` : `Hull Integrity: ${stats.hp}%`}
             >
-              <span>🏰</span>
+              <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-500/40" />
+              <span>{stats.hp}%</span>
+            </div>
+
+            {/* Shield */}
+            <div 
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-bold"
+              title={isZh ? `偏折护盾: ${stats.shield}%` : `Deflector Shield: ${stats.shield}%`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
               <span>{stats.shield}%</span>
             </div>
 
-            {/* Freeze active countdown */}
-            {stats.freezeTimeLeft > 0 && (
+            {/* Main Cannon Level */}
+            <div 
+              className={clsx(
+                "flex items-center gap-1 px-2 py-1 rounded-lg font-bold border",
+                stats.powerLevel >= 5
+                  ? "bg-amber-500/25 text-amber-300 border-amber-400/50 shadow-sm shadow-amber-500/30 animate-pulse"
+                  : "bg-amber-500/15 text-amber-200 border-amber-500/30"
+              )}
+              title={isZh ? `主炮强化等级: Lv.${stats.powerLevel}` : `Main Gun: Lv.${stats.powerLevel}`}
+            >
+              <Zap className="w-3 h-3 text-amber-400" />
+              <span>{stats.powerLevel >= 5 ? 'MAX' : `Lv.${stats.powerLevel}`}</span>
+            </div>
+
+            {/* Wing-Pod Sub-Weapon */}
+            {stats.subWeapon !== 'none' ? (
               <div 
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold animate-pulse"
-                title={isZh ? '极寒减速生效中' : 'Cryo Freeze Active'}
+                className={clsx(
+                  "flex items-center gap-1 px-2 py-1 rounded-lg font-bold border animate-pulse",
+                  stats.subWeapon === 'missile'
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                )}
+                title={isZh ? `外挂副武: ${stats.subWeapon === 'missile' ? '追踪导弹' : '贯穿激光'} Lv.${stats.subWeaponLevel}` : `Sub-Weapon: ${stats.subWeapon} Lv.${stats.subWeaponLevel}`}
               >
-                <span>❄️</span>
-                <span>{stats.freezeTimeLeft}s</span>
+                <span>{stats.subWeapon === 'missile' ? '🚀' : '🔮'}</span>
+                <span>{stats.subWeapon === 'missile' ? (isZh ? '追踪弹' : 'MISSILE') : (isZh ? '激光' : 'LASER')} Lv.{stats.subWeaponLevel}</span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-800/60 text-slate-500 border border-slate-700/40 font-mono text-[11px]">
+                <span>外挂:[空]</span>
               </div>
             )}
           </div>
@@ -297,34 +316,23 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
             )}
           </div>
 
-          {/* Controls: Pause / Resume, Restart, Stop, Nuke, Sound, Trophy */}
+          {/* Controls: Bomb Button, Pause/Resume, Restart, Stop, Sound, HighScore */}
           <div className="flex items-center gap-1.5">
-            {/* Tactical Nuke Button */}
-            {stats.nukeCharge >= 100 ? (
-              <button
-                onClick={() => {
-                  if (engineRef.current && isPlaying && !isPaused) {
-                    const fired = engineRef.current.triggerNuke();
-                    if (fired) {
-                      onToast(isZh ? '☢️ 战术空袭已引爆！' : '☢️ Orbital Strike Launched!', '', 'success');
-                    }
-                  }
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black border border-amber-300 shadow-md shadow-amber-500/30 animate-pulse active:scale-95 transition-all"
-                title={isZh ? '点击或按空格键引爆战术核弹！' : 'Click or press Spacebar to Launch!'}
-              >
-                <span>💣</span>
-                <span>{isZh ? '核弹' : 'NUKE'}</span>
-              </button>
-            ) : (
-              <div 
-                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-800/80 text-slate-400 border border-slate-700/60 font-mono text-[11px]"
-                title={isZh ? `击杀僵尸积攒核能: ${stats.nukeCharge}%` : `Nuke Energy: ${stats.nukeCharge}%`}
-              >
-                <span>💣</span>
-                <span>{stats.nukeCharge}%</span>
-              </div>
-            )}
+            {/* Tactical Bomb Button */}
+            <button
+              onClick={handleLaunchBomb}
+              disabled={stats.bombs <= 0 || !isPlaying || isPaused}
+              className={clsx(
+                "flex items-center gap-1 px-2.5 py-1 rounded-lg font-black border transition-all text-xs font-mono",
+                stats.bombs > 0 && isPlaying && !isPaused
+                  ? "bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30 animate-pulse active:scale-95 cursor-pointer"
+                  : "bg-slate-800/60 text-slate-500 border-slate-700/40 cursor-not-allowed opacity-60"
+              )}
+              title={isZh ? `全屏战术核爆 (按空格 SPACE 释放) 剩余: ${stats.bombs}` : `Screen Bomb [SPACE] (Left: ${stats.bombs})`}
+            >
+              <span>💣</span>
+              <span>x{stats.bombs}</span>
+            </button>
 
             {/* Game In-Progress Controls: Pause/Resume, Restart, Stop */}
             {isPlaying && !isGameOver && (
@@ -337,7 +345,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                       ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 animate-pulse" 
                       : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
                   )}
-                  title={isPaused ? (isZh ? '继续游戏 [P / Esc]' : 'Resume [P / Esc]') : (isZh ? '暂停游戏 [P / Esc]' : 'Pause [P / Esc]')}
+                  title={isPaused ? (isZh ? '继续巡航 [P / Esc]' : 'Resume [P / Esc]') : (isZh ? '暂停巡航 [P / Esc]' : 'Pause [P / Esc]')}
                 >
                   {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5" />}
                 </button>
@@ -353,7 +361,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 <button
                   onClick={handleStop}
                   className="p-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 text-rose-300 transition-colors"
-                  title={isZh ? '停止游戏并返回' : 'Stop Game'}
+                  title={isZh ? '停止游戏并返航' : 'Stop Game'}
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
                 </button>
@@ -377,26 +385,13 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
 
         {/* Fever Mode Alert Banner */}
         {stats.isFever && (
-          <div className="w-full flex items-center justify-center px-3 py-1 mb-2 rounded-lg bg-gradient-to-r from-pink-600/30 via-purple-600/30 to-pink-600/30 border border-pink-500/50 text-pink-300 text-xs font-mono font-black tracking-wide animate-pulse">
-            <span>🔥 {isZh ? '狂热状态！火力与穿透大幅提升！' : 'FEVER MODE! +50% DAMAGE & PIERCE!'} 🔥</span>
-          </div>
-        )}
-
-        {/* Active Weapon Indicator */}
-        {weapon !== 'pistol' && (
-          <div className="w-full flex items-center justify-between px-3 py-1.5 mb-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono animate-pulse">
-            <span className="flex items-center gap-1.5 font-bold">
-              <span>{currentWeaponCfg.icon}</span>
-              <span>{isZh ? currentWeaponCfg.nameZh : currentWeaponCfg.nameEn}</span>
-            </span>
-            <span className="font-bold bg-amber-500/30 px-2 py-0.5 rounded text-amber-200">
-              {weaponTimeLeft}s
-            </span>
+          <div className="w-full flex items-center justify-center px-3 py-1 mb-2 rounded-lg bg-gradient-to-r from-amber-600/30 via-rose-600/30 to-amber-600/30 border border-amber-500/50 text-amber-300 text-xs font-mono font-black tracking-wide animate-pulse">
+            <span>🔥 {isZh ? '超能狂热暴走！全炮火力翻倍！' : 'HYPER OVERDRIVE! DOUBLE FIREPOWER!'} 🔥</span>
           </div>
         )}
 
         {/* Game Canvas Container */}
-        <div className="relative w-full aspect-[480/800] rounded-xl overflow-hidden shadow-inner border border-slate-700/60 bg-slate-950 flex items-center justify-center">
+        <div className="relative w-full max-h-[66vh] aspect-[480/800] rounded-xl overflow-hidden shadow-inner border border-slate-700/60 bg-slate-950 flex items-center justify-center">
           <canvas
             ref={canvasRef}
             width={480}
@@ -416,7 +411,9 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 {isZh ? '空战暂停 • PAUSED' : 'FLIGHT PAUSED'}
               </h2>
               <p className="text-xs text-slate-400 mb-6 font-mono">
-                {isZh ? `当前波次: Wave ${stats.wave} | 战机数: ${crowdCount} | 得分: ${stats.score}` : `Wave ${stats.wave} | Squadron: ${crowdCount} | Score: ${stats.score}`}
+                {isZh 
+                  ? `波次: W${stats.wave} | 装甲: ${stats.hp}% | 护盾: ${stats.shield}% | 得分: ${stats.score}` 
+                  : `Wave ${stats.wave} | HP: ${stats.hp}% | Shield: ${stats.shield}% | Score: ${stats.score}`}
               </p>
 
               <div className="flex flex-col gap-3 w-full max-w-xs font-bold text-sm">
@@ -433,7 +430,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>{isZh ? '重整编队 [R]' : 'REDEPLOY SQUADRON'}</span>
+                  <span>{isZh ? '重新出击 [R]' : 'REDEPLOY FIGHTER'}</span>
                 </button>
 
                 <button
@@ -454,34 +451,43 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 ✈️
               </div>
               <h2 className="text-2xl font-black text-white mb-2">
-                {isZh ? '节点猴：空战突围' : 'NodeMonkes: Sky Squadron'}
+                {isZh ? '节点猴：雷电空战' : 'NodeMonkes: Sky Striker'}
               </h2>
-              <p className="text-xs text-slate-400 mb-6 max-w-xs leading-relaxed">
+              <p className="text-xs text-slate-400 mb-5 max-w-xs leading-relaxed">
                 {isZh 
-                  ? '滑动或按键控制战机左右翱翔，节点猴飞行员全员自动开火！射击航路补给门扩充战机编队，夺取重型机炮粉碎敌军空天舰队！'
-                  : 'Slide to pilot fighter formation. Continuous aerial auto-fire! Blast math gates to expand your air wing and eliminate enemy armadas!'}
+                  ? '经典街机飞机大战！节点猴亲自驾驶旗舰战机，全向滑移规避敌军弹幕，拾取空投胶囊强化主炮、挂载副武器，释放全屏核弹轰杀敌机舰队！'
+                  : 'Classic arcade SHMUP! Full 2D flight control, dodge enemy bullet storms, collect powerup capsules for homing missiles and laser beams, and trigger tactical nukes!'}
               </p>
+
+              {/* Powerups Legend */}
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold">[P] 主炮</span>
+                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] font-bold">[M] 导弹</span>
+                <span className="px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-500/40 text-sky-300 font-mono text-[10px] font-bold">[L] 激光</span>
+                <span className="px-1.5 py-0.5 rounded bg-orange-500/20 border border-orange-500/40 text-orange-300 font-mono text-[10px] font-bold">[B] 核弹</span>
+                <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono text-[10px] font-bold">[S] 护盾</span>
+              </div>
 
               <button
                 onClick={startGame}
                 className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-base shadow-lg shadow-sky-500/30 hover:scale-105 active:scale-95 transition-all"
               >
                 <Play className="w-5 h-5 fill-slate-950" />
-                <span>{isZh ? '升空起飞巡航' : 'LAUNCH SQUADRON'}</span>
+                <span>{isZh ? '出击升空！' : 'SCRAMBLE FIGHTER'}</span>
               </button>
 
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400 font-mono">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-400 font-mono">
                 <span className="flex items-center gap-1">
                   <Crosshair className="w-3.5 h-3.5 text-sky-400" />
-                  {isZh ? '支持鼠标/触控拖拽' : 'Mouse / Touch Drag'}
+                  {isZh ? '鼠标/触控拖拽' : 'Mouse / Touch'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">A / D</span>
-                  {isZh ? '机动移位' : 'Maneuver'}
+                  <span className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">W/A/S/D</span>
+                  {isZh ? '全向飞行' : 'Flight'}
                 </span>
                 <span className="flex items-center gap-1 text-amber-400">
                   <span className="px-1.5 py-0.5 bg-slate-800 rounded border border-amber-500/40 font-bold">SPACE</span>
-                  {isZh ? '轨道轰炸' : 'Strike'}
+                  {isZh ? '清屏核弹' : 'Nuke'}
                 </span>
               </div>
             </div>
@@ -494,10 +500,10 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 💥
               </div>
               <h2 className="text-2xl font-black text-white mb-1">
-                {isZh ? '编队失守 • MISSION FAILED' : 'MISSION FAILED'}
+                {isZh ? '战机被击坠 • MISSION FAILED' : 'MISSION FAILED'}
               </h2>
               <p className="text-xs text-slate-400 mb-6">
-                {isZh ? '节点猴战机编队在敌军舰队围攻下陨落！' : 'Your fighter squadron was shot down by the armada!'}
+                {isZh ? '节点猴战机在敌军狂轰滥炸下被击落！' : 'Your flagship fighter was brought down by the enemy armada!'}
               </p>
 
               {/* Stats Summary Grid */}
@@ -507,16 +513,16 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   <div className="text-lg font-black text-amber-400">{stats.score}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">{isZh ? '击落敌机' : 'Armada Downed'}</div>
+                  <div className="text-slate-400 text-[10px]">{isZh ? '击落敌机' : 'Enemies Downed'}</div>
                   <div className="text-lg font-black text-emerald-400">{stats.zombiesKilled}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">{isZh ? '生存波次' : 'Wave Reached'}</div>
+                  <div className="text-slate-400 text-[10px]">{isZh ? '推进波次' : 'Wave Reached'}</div>
                   <div className="text-base font-bold text-purple-400">WAVE {stats.wave}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">{isZh ? '巅峰战机数' : 'Peak Squadron'}</div>
-                  <div className="text-base font-bold text-sky-400">✈️ {stats.maxCrowd}</div>
+                  <div className="text-slate-400 text-[10px]">{isZh ? '主炮等级' : 'Max Power'}</div>
+                  <div className="text-base font-bold text-sky-400">⚡ Lv.{stats.powerLevel}</div>
                 </div>
               </div>
 
@@ -525,14 +531,14 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-base shadow-lg shadow-sky-500/30 hover:scale-105 active:scale-95 transition-all"
               >
                 <RotateCcw className="w-5 h-5" />
-                <span>{isZh ? '重新升空起飞' : 'SCRAMBLE SQUADRON'}</span>
+                <span>{isZh ? '重新出击' : 'SCRAMBLE FIGHTER'}</span>
               </button>
             </div>
           )}
         </div>
 
         {/* Character Commander Selector Bottom Panel */}
-        <div className="w-full mt-4 p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="w-full mt-2.5 p-2 bg-slate-950/70 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 border border-amber-500/40 flex-shrink-0 shadow-inner flex items-center justify-center">
               <img
