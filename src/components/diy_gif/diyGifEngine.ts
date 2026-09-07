@@ -268,9 +268,29 @@ export function applyEyeEffect(
     const row: (PixelColor | null)[] = [];
     for (let x = 0; x < 28; x++) {
       const p = baseGrid[y] ? baseGrid[y][x] : null;
+
+      // On Peer, the forehead contour at Y <= 13 ends at X = 19.
+      // During blink/squint frames, explicitly clear X >= 20 at Y <= 13 to erase any open eyelash residue!
+      if (isPeerEye && y <= 13 && x >= 20) {
+        const isBlinkClosing =
+          (fxId === 'natural_blink' && (f >= 4 && f <= 6)) ||
+          (fxId === 'sleepy_snap' && (f >= 3 && f <= 5)) ||
+          (fxId === 'chill_squint' && (f >= 4 && f <= 5));
+        if (isBlinkClosing) {
+          row.push({ r: 0, g: 0, b: 0, a: 0 });
+          continue;
+        }
+        row.push(p ? { ...p } : null);
+        continue;
+      }
+
       if (!p) { row.push(null); continue; }
+
       let { r, g, b, a } = p;
       const relX = (x - bounds.minX) / width;
+
+      const eyeTopY = bounds.minY < 14 ? 14 : bounds.minY;
+      const eyeBottomY = bounds.maxY > 15 ? 15 : bounds.maxY;
 
       switch (fxId) {
         case 'natural_blink': {
@@ -278,57 +298,71 @@ export function applyEyeEffect(
             if (f === 5) {
               r = 45; g = 175; b = 35;
             } else if (f === 4 || f === 6) {
-              if (y <= bounds.minY + 1) { r = 45; g = 175; b = 35; }
+              if (y <= 14) { r = 45; g = 175; b = 35; }
             }
           } else {
-            if (f === 5) {
-              if (y === bounds.maxY) {
-                r = 25; g = 25; b = 25;
-              } else {
+            if (y < eyeTopY) {
+              // Decorative row above eyeball (e.g. Lashes, eyebrow, frames):
+              // During blink frames (f === 4, 5, 6), cover or suppress Lashes so they don't leave residue!
+              if (f >= 4 && f <= 6) {
+                if (name === 'Lashes' || name === 'None' || name === 'Classic' || name === 'Peer') {
+                  if (f === 5 && x <= 19) {
+                    // Closed blink: forehead skin covers lash roots
+                    r = lidR; g = lidG; b = lidB;
+                  } else {
+                    row.push(null);
+                    continue;
+                  }
+                }
+                // For other accessories (e.g. glasses frames), keep original color unchanged
+              }
+            } else if (y === eyeTopY) {
+              // Eyeball upper row: closes down to eyelid skin color
+              // Only within face bounds (x <= 23)
+              if ((f === 4 || f === 5 || f === 6) && x <= 23) {
                 r = lidR; g = lidG; b = lidB;
               }
-            } else if (f === 4 || f === 6) {
-              if (y === bounds.minY && bounds.maxY > bounds.minY) {
-                r = lidR; g = lidG; b = lidB;
+            } else if (y === eyeBottomY) {
+              // Eyeball lower row / closed contact seam line
+              // Only within face bounds (x <= 23)
+              if (f === 5 && x <= 23) {
+                r = 25; g = 25; b = 25;
               }
             }
           }
           break;
         }
         case 'chill_squint': {
-          // Relaxed symmetrical squint / smile:
-          // Frames 0-2: open, calm gaze
-          // Frame 3: start relaxing (upper row softens)
-          // Frames 4-5: eyes gently narrow into a peaceful squint
-          // Frame 6: softly opening back up
-          // Frame 7: returned to normal
           if (name === 'Pepe') {
             if (f === 4 || f === 5) {
-              if (y <= bounds.minY + 1) { r = 45; g = 175; b = 35; }
-              // Warm relaxed corner highlight
-              if (y === bounds.maxY && (x === bounds.minX || x === bounds.maxX)) {
+              if (y <= 14) { r = 45; g = 175; b = 35; }
+              if (y === 15 && (x === bounds.minX || x === bounds.maxX)) {
                 r = clamp(r + 40); g = clamp(g + 40); b = clamp(b + 40);
               }
             } else if (f === 3 || f === 6) {
-              if (y === bounds.minY) { r = 45; g = 175; b = 35; }
+              if (y <= 14) { r = 45; g = 175; b = 35; }
             }
           } else {
-            if (f === 4 || f === 5) {
-              if (y === bounds.minY && bounds.maxY > bounds.minY) {
+            if (y < eyeTopY) {
+              if (f === 4 || f === 5) {
+                if (name === 'Lashes') {
+                  row.push(null);
+                  continue;
+                }
+              }
+            } else if (y === eyeTopY) {
+              if ((f === 4 || f === 5) && x <= 23) {
                 // Top row narrows into eyelid skin tone
                 r = lidR; g = lidG; b = lidB;
-              } else if (bounds.maxY === bounds.minY) {
-                // Single-pixel height eyes squint by dimming
-                r = clamp(r * 0.5); g = clamp(g * 0.5); b = clamp(b * 0.5);
-              } else {
-                // Subtle warm relaxed gleam on remaining eye pixels
-                r = clamp(r + 35); g = clamp(g + 30); b = clamp(b + 20);
-              }
-            } else if (f === 3 || f === 6) {
-              if (y === bounds.minY && bounds.maxY > bounds.minY) {
+              } else if ((f === 3 || f === 6) && x <= 23) {
                 r = clamp(r * 0.7 + lidR * 0.3);
                 g = clamp(g * 0.7 + lidG * 0.3);
                 b = clamp(b * 0.7 + lidB * 0.3);
+              }
+            } else if (y === eyeBottomY) {
+              if (f === 4 || f === 5) {
+                // Subtle warm relaxed gleam on remaining eye pixels
+                r = clamp(r + 35); g = clamp(g + 30); b = clamp(b + 20);
               }
             }
           }
@@ -450,18 +484,29 @@ export function applyEyeEffect(
           break;
         }
         case 'sleepy_snap': {
-          if (f === 3 || f === 4) {
-            if (y === bounds.minY && bounds.maxY > bounds.minY) {
-              r = lidR; g = lidG; b = lidB;
+          if (y < eyeTopY) {
+            if (f >= 3 && f <= 5) {
+              if (name === 'Lashes') {
+                if (f === 5 && x <= 19) {
+                  r = lidR; g = lidG; b = lidB;
+                } else {
+                  row.push(null);
+                  continue;
+                }
+              }
             }
-          } else if (f === 5) {
-            if (y === bounds.maxY) {
+          } else if (y === eyeTopY) {
+            if ((f >= 3 && f <= 5) && x <= 23) {
+              r = lidR; g = lidG; b = lidB;
+            } else if (f === 6) {
+              r = clamp(r + 60); g = clamp(g + 60); b = clamp(b + 60);
+            }
+          } else if (y === eyeBottomY) {
+            if (f === 5 && x <= 23) {
               r = 25; g = 25; b = 25;
-            } else {
-              r = lidR; g = lidG; b = lidB;
+            } else if (f === 6) {
+              r = clamp(r + 60); g = clamp(g + 60); b = clamp(b + 60);
             }
-          } else if (f === 6) {
-            r = clamp(r + 60); g = clamp(g + 60); b = clamp(b + 60);
           }
           break;
         }
@@ -797,14 +842,26 @@ export function renderGridToContext(
     for (let x = 0; x < 28; x++) {
       const p = grid[y] ? grid[y][x] : null;
       if (p) {
-        const startX = Math.floor((x * size) / 28);
-        const isRightEdge = !grid[y]?.[x + 1];
-        // At the right boundary (e.g. eye right edge at x = 23), extend 1px to completely cover any sub-pixel bleed from underlying image
-        const endX = Math.ceil(((x + 1) * size) / 28) + (isRightEdge ? 1 : 0);
-        const w = endX - startX;
+        if (p.a === 0) {
+          // Explicit clear: erase any underlying pixel in this cell (e.g. stray lashes outside face boundary)
+          const prevP = grid[y]?.[x - 1];
+          const hasLeftNeighbor = prevP && prevP.a > 0;
+          const clearStartX = hasLeftNeighbor
+            ? Math.ceil((x * size) / 28) + 1
+            : Math.floor((x * size) / 28);
+          const clearEndX = Math.ceil(((x + 1) * size) / 28) + 1;
+          ctx.clearRect(clearStartX, startY, clearEndX - clearStartX, h);
+        } else {
+          const startX = Math.floor((x * size) / 28);
+          const nextP = grid[y]?.[x + 1];
+          const isRightEdge = !nextP || nextP.a === 0;
+          // At the right boundary (e.g. eye right edge at x = 23), extend 1px to completely cover any sub-pixel bleed from underlying image
+          const endX = Math.ceil(((x + 1) * size) / 28) + (isRightEdge ? 1 : 0);
+          const w = endX - startX;
 
-        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${p.a / 255})`;
-        ctx.fillRect(startX, startY, w, h);
+          ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${p.a / 255})`;
+          ctx.fillRect(startX, startY, w, h);
+        }
       }
     }
   }
