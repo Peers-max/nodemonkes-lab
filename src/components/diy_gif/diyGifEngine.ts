@@ -270,10 +270,13 @@ export function applyEyeEffect(
       let p = baseGrid[y] ? baseGrid[y][x] : null;
 
       // On PEER with decorative brow/lashes at Y=13:
-      // When closed (f=5 in natural_blink or sleepy_snap), ensure the full forehead bar (x: 6..19)
+      // When closed or in closing transition, ensure the forehead bar (x: 6..19, y: 13)
       // is covered with smooth eyelid skin tone even if the trait PNG had null gaps between lashes
       if (isPeerEye && y === 13 && x >= 6 && x <= 19 && bounds.minY <= 13) {
-        if ((fxId === 'natural_blink' || fxId === 'sleepy_snap') && f === 5) {
+        if (((fxId === 'natural_blink' && (f === 4 || f === 5 || f === 6)) ||
+             (fxId === 'sleepy_snap' && (f === 3 || f === 4 || f === 5)) ||
+             (fxId === 'chill_squint' && (f === 4 || f === 5)))
+        ) {
           p = p || { r: lidR, g: lidG, b: lidB, a: 255 };
         }
       }
@@ -283,38 +286,23 @@ export function applyEyeEffect(
       let { r, g, b, a } = p;
       const relX = (x - bounds.minX) / width;
 
-      const eyeTopY = 14;
-      const eyeBottomY = 15;
-
       switch (fxId) {
         case 'natural_blink': {
           if (name === 'Pepe') {
             if (f === 5) {
               r = 45; g = 175; b = 35;
             } else if (f === 4 || f === 6) {
-              if (y <= 14) { r = 45; g = 175; b = 35; }
+              if (y <= bounds.minY + 1) { r = 45; g = 175; b = 35; }
             }
           } else {
             if (f === 5) {
-              if (y === eyeBottomY) {
-                // Seam line
+              if (y === bounds.maxY) {
                 r = 25; g = 25; b = 25;
-              } else if (y === eyeTopY) {
-                // Eyelid row
+              } else {
                 r = lidR; g = lidG; b = lidB;
-              } else if (y < eyeTopY) {
-                // Decorative row above eyeball (e.g. Lashes, Monobrow):
-                if (isPeerEye && x >= 20) {
-                  // Beside the eyebrow outside forehead: clear so no black lash residue from base image shows
-                  a = 0;
-                } else if (!isPeerEye || x <= 19) {
-                  // Forehead skin covers lash roots smoothly
-                  r = lidR; g = lidG; b = lidB;
-                }
               }
             } else if (f === 4 || f === 6) {
-              if (y === eyeTopY) {
-                // Half-closed: upper eye row narrows to eyelid skin tone
+              if (y === bounds.minY && bounds.maxY > bounds.minY) {
                 r = lidR; g = lidG; b = lidB;
               }
             }
@@ -324,24 +312,28 @@ export function applyEyeEffect(
         case 'chill_squint': {
           if (name === 'Pepe') {
             if (f === 4 || f === 5) {
-              if (y <= 14) { r = 45; g = 175; b = 35; }
-              if (y === 15 && (x === bounds.minX || x === bounds.maxX)) {
+              if (y <= bounds.minY + 1) { r = 45; g = 175; b = 35; }
+              // Warm relaxed corner highlight
+              if (y === bounds.maxY && (x === bounds.minX || x === bounds.maxX)) {
                 r = clamp(r + 40); g = clamp(g + 40); b = clamp(b + 40);
               }
             } else if (f === 3 || f === 6) {
-              if (y <= 14) { r = 45; g = 175; b = 35; }
+              if (y === bounds.minY) { r = 45; g = 175; b = 35; }
             }
           } else {
             if (f === 4 || f === 5) {
-              if (y === eyeTopY) {
+              if (y === bounds.minY && bounds.maxY > bounds.minY) {
                 // Top row narrows into eyelid skin tone
                 r = lidR; g = lidG; b = lidB;
-              } else if (y === eyeBottomY) {
+              } else if (bounds.maxY === bounds.minY) {
+                // Single-pixel height eyes squint by dimming
+                r = clamp(r * 0.5); g = clamp(g * 0.5); b = clamp(b * 0.5);
+              } else {
                 // Subtle warm relaxed gleam on remaining eye pixels
                 r = clamp(r + 35); g = clamp(g + 30); b = clamp(b + 20);
               }
             } else if (f === 3 || f === 6) {
-              if (y === eyeTopY) {
+              if (y === bounds.minY && bounds.maxY > bounds.minY) {
                 r = clamp(r * 0.7 + lidR * 0.3);
                 g = clamp(g * 0.7 + lidG * 0.3);
                 b = clamp(b * 0.7 + lidB * 0.3);
@@ -467,25 +459,17 @@ export function applyEyeEffect(
         }
         case 'sleepy_snap': {
           if (f === 3 || f === 4) {
-            if (y === eyeTopY) {
+            if (y === bounds.minY && bounds.maxY > bounds.minY) {
               r = lidR; g = lidG; b = lidB;
             }
           } else if (f === 5) {
-            if (y === eyeBottomY) {
+            if (y === bounds.maxY) {
               r = 25; g = 25; b = 25;
-            } else if (y === eyeTopY) {
+            } else {
               r = lidR; g = lidG; b = lidB;
-            } else if (y < eyeTopY) {
-              if (isPeerEye && x >= 20) {
-                a = 0;
-              } else if (!isPeerEye || x <= 19) {
-                r = lidR; g = lidG; b = lidB;
-              }
             }
           } else if (f === 6) {
-            if (y === eyeTopY || y === eyeBottomY) {
-              r = clamp(r + 60); g = clamp(g + 60); b = clamp(b + 60);
-            }
+            r = clamp(r + 60); g = clamp(g + 60); b = clamp(b + 60);
           }
           break;
         }
@@ -569,6 +553,17 @@ export function applyEyeEffect(
           break;
         }
       }
+
+      // Clean boundary outside PEER forehead:
+      // PEER forehead ends at x=19 for y<=13. When brow/lashes turn into skin tone
+      // during blinking/closing, ensure pixels outside forehead (x >= 20) are cleared (a = 0)
+      // so neither floating skin blocks nor underlying base image black lash residue shows!
+      if (isPeerEye && x >= 20 && y <= 13) {
+        if (r === lidR && g === lidG && b === lidB) {
+          a = 0;
+        }
+      }
+
       row.push({ r, g, b, a });
     }
     frameGrid.push(row);
