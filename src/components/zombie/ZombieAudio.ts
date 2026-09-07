@@ -4,6 +4,9 @@ import type { WeaponType } from './types';
 export class ZombieAudio {
   private ctx: AudioContext | null = null;
   public enabled = true;
+  private lastShootTime: number = 0;
+  private lastHitTime: number = 0;
+  private lastUpgradeTime: number = 0;
 
   private init() {
     if (!this.ctx) {
@@ -19,6 +22,9 @@ export class ZombieAudio {
 
   public playShoot(weapon: WeaponType = 'pistol') {
     if (!this.enabled) return;
+    const now = performance.now();
+    if (now - this.lastShootTime < 45) return;
+    this.lastShootTime = now;
     this.init();
     if (!this.ctx) return;
 
@@ -82,6 +88,9 @@ export class ZombieAudio {
 
   public playHit() {
     if (!this.enabled) return;
+    const now = performance.now();
+    if (now - this.lastHitTime < 40) return;
+    this.lastHitTime = now;
     this.init();
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
@@ -118,6 +127,9 @@ export class ZombieAudio {
 
   public playGateUpgrade() {
     if (!this.enabled) return;
+    const now = performance.now();
+    if (now - this.lastUpgradeTime < 45) return;
+    this.lastUpgradeTime = now;
     this.init();
     if (!this.ctx) return;
     const t = this.ctx.currentTime;

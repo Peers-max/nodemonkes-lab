@@ -51,6 +51,7 @@ export interface Zombie {
   skinId: number; // for rendering zombie pixel aesthetics
   hitFlash: number;
   scoreValue: number;
+  walkFrame: number;
 }
 
 export interface Bullet {

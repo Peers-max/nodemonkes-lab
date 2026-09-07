@@ -12,6 +12,8 @@ import type {
   GameStats,
 } from './types';
 import { ZombieAudio } from './ZombieAudio';
+import { getMonkeImageUrl } from '../../utils/api';
+import { getZombieSprite, getFallbackMonkeSprite, createMonkeCanvas } from './ZombieSprites';
 
 export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   pistol: {
@@ -100,6 +102,7 @@ export class ZombieEngine {
   public currentWeapon: WeaponType = 'pistol';
   public weaponExpiresAt: number = 0;
   public monkeImage: HTMLImageElement | null = null;
+  public monkeCanvas: HTMLCanvasElement | null = null;
   public monkeId: number = 209;
 
   // Entities
@@ -172,12 +175,14 @@ export class ZombieEngine {
   }
 
   private loadMonkeImage(id: number) {
+    this.monkeCanvas = null;
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = `https://pub-2f0821e8464b4c139f681d763393f4ee.r2.dev/${id}.png`;
     img.onload = () => {
       this.monkeImage = img;
+      this.monkeCanvas = createMonkeCanvas(img);
     };
+    img.src = getMonkeImageUrl(id);
   }
 
   public setPlayerTargetX(x: number) {
@@ -211,8 +216,9 @@ export class ZombieEngine {
     }
     const newUnits: MonkeUnit[] = [];
 
-    // Compact hexagonal / phyllotaxis layout
-    for (let i = 0; i < n; i++) {
+    // Compact hexagonal / phyllotaxis layout (visual representation capped at 65 units for 60 FPS)
+    const visualCount = Math.min(65, n);
+    for (let i = 0; i < visualCount; i++) {
       let ox = 0;
       let oy = 0;
       if (i > 0) {
@@ -316,9 +322,15 @@ export class ZombieEngine {
       this.addFloatingText(this.playerX, this.playerY - 40, 'Blasters Ready', '#94a3b8', 16);
     }
 
-    // Units position and shooting
+    // Units position and dynamic firepower scaling
     const weaponCfg = WEAPON_CONFIGS[this.currentWeapon];
-    for (const unit of this.units) {
+    const totalCrowd = Math.max(1, this.crowdCount);
+    // When crowd is large, aggregate shooting across front 12 shooters with scaled damage
+    const activeShooters = Math.min(this.units.length, 12);
+    const damageMult = totalCrowd / activeShooters;
+
+    for (let i = 0; i < this.units.length; i++) {
+      const unit = this.units[i];
       const tx = this.playerX + unit.offsetX;
       const ty = this.playerY + unit.offsetY;
       unit.x += (tx - unit.x) * 0.28;
@@ -327,7 +339,9 @@ export class ZombieEngine {
 
       unit.shootCooldown -= dt;
       if (unit.shootCooldown <= 0) {
-        this.fireBullet(unit, weaponCfg);
+        if (i < activeShooters || this.units.length <= 12) {
+          this.fireBullet(unit, weaponCfg, damageMult);
+        }
         unit.shootCooldown = weaponCfg.fireInterval;
       }
     }
@@ -396,6 +410,7 @@ export class ZombieEngine {
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
       z.y += (this.speed + z.speed) * (dt / 16.66);
+      z.walkFrame += (this.speed + z.speed) * (dt / 16.66) * 0.12;
       if (z.hitFlash > 0) z.hitFlash -= dt * 0.01;
 
       // Zombie reaches player squad line
@@ -458,8 +473,12 @@ export class ZombieEngine {
     }
   }
 
-  private fireBullet(unit: MonkeUnit, config: WeaponConfig) {
+  private fireBullet(unit: MonkeUnit, config: WeaponConfig, damageMult: number = 1) {
+    if (this.bullets.length > 130) return; // Prevent bullet runaway count
+
     this.audio.playShoot(config.type);
+    const damage = Math.max(1, Math.round(config.damage * damageMult));
+    const radius = damageMult > 2.5 ? Math.min(config.bulletRadius * 1.3, config.bulletRadius + 2) : config.bulletRadius;
 
     if (config.spreadCount && config.spreadAngle) {
       const count = config.spreadCount;
@@ -473,8 +492,8 @@ export class ZombieEngine {
           y: unit.y - 12,
           vx: Math.cos(angle) * config.bulletSpeed,
           vy: Math.sin(angle) * config.bulletSpeed,
-          radius: config.bulletRadius,
-          damage: config.damage,
+          radius,
+          damage,
           color: config.bulletColor,
           pierce: config.pierce || 1,
           weaponType: config.type,
@@ -489,8 +508,8 @@ export class ZombieEngine {
         y: unit.y - 12,
         vx: 0,
         vy: -config.bulletSpeed,
-        radius: config.bulletRadius,
-        damage: config.damage,
+        radius,
+        damage,
         color: config.bulletColor,
         pierce: config.pierce || 1,
         weaponType: config.type,
@@ -546,14 +565,14 @@ export class ZombieEngine {
         continue;
       }
 
-      // 2. Collide with Zombies
+      // 2. Collide with Zombies (Fast squared distance check)
       for (let zi = this.zombies.length - 1; zi >= 0; zi--) {
         const z = this.zombies[zi];
         const dx = b.x - z.x;
         const dy = b.y - z.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const hitRadius = b.radius + z.radius;
 
-        if (dist <= b.radius + z.radius) {
+        if (dx * dx + dy * dy <= hitRadius * hitRadius) {
           z.hitFlash = 1;
           z.hp -= b.damage;
           this.audio.playHit();
@@ -564,10 +583,11 @@ export class ZombieEngine {
             this.audio.playExplosion();
             this.screenShake = 8;
             this.spawnExplosion(b.x, b.y, b.splashRadius);
+            const splashSq = b.splashRadius * b.splashRadius;
             for (const otherZ of this.zombies) {
               const odx = otherZ.x - b.x;
               const ody = otherZ.y - b.y;
-              if (Math.sqrt(odx * odx + ody * ody) <= b.splashRadius) {
+              if (odx * odx + ody * ody <= splashSq) {
                 otherZ.hp -= b.damage;
                 otherZ.hitFlash = 1;
               }
@@ -586,11 +606,12 @@ export class ZombieEngine {
               this.audio.playExplosion();
               this.screenShake = 10;
               this.spawnExplosion(z.x, z.y, 90);
+              const exploderSq = 90 * 90;
               for (const otherZ of this.zombies) {
                 if (otherZ !== z) {
                   const odx = otherZ.x - z.x;
                   const ody = otherZ.y - z.y;
-                  if (Math.sqrt(odx * odx + ody * ody) <= 90) {
+                  if (odx * odx + ody * ody <= exploderSq) {
                     otherZ.hp -= 80;
                   }
                 }
@@ -713,6 +734,7 @@ export class ZombieEngine {
         skinId: 999,
         hitFlash: 0,
         scoreValue: 500,
+        walkFrame: 0,
       });
       return;
     }
@@ -762,13 +784,15 @@ export class ZombieEngine {
         skinId: Math.floor(Math.random() * 10),
         hitFlash: 0,
         scoreValue: scoreVal,
+        walkFrame: Math.random() * 10,
       });
     }
   }
 
   // --- Particles & FX ---
   private spawnSpark(x: number, y: number, color: string) {
-    for (let i = 0; i < 4; i++) {
+    if (this.particles.length > 80) return;
+    for (let i = 0; i < 3; i++) {
       this.particles.push({
         x,
         y,
@@ -784,7 +808,9 @@ export class ZombieEngine {
   }
 
   private spawnBloodParticles(x: number, y: number, color: string) {
-    for (let i = 0; i < 12; i++) {
+    if (this.particles.length > 90) return;
+    const count = this.particles.length > 50 ? 4 : 8;
+    for (let i = 0; i < count; i++) {
       this.particles.push({
         x,
         y,
@@ -794,13 +820,15 @@ export class ZombieEngine {
         radius: 3 + Math.random() * 3,
         alpha: 1,
         life: 0,
-        maxLife: 350 + Math.random() * 200,
+        maxLife: 300 + Math.random() * 150,
       });
     }
   }
 
   private spawnExplosion(x: number, y: number, radius: number) {
-    for (let i = 0; i < 24; i++) {
+    if (this.particles.length > 90) return;
+    const count = this.particles.length > 40 ? 8 : 14;
+    for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = Math.random() * (radius * 0.1);
       this.particles.push({
@@ -809,32 +837,36 @@ export class ZombieEngine {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         color: Math.random() > 0.5 ? '#f97316' : '#ef4444',
-        radius: 4 + Math.random() * 4,
+        radius: 3 + Math.random() * 3,
         alpha: 1,
         life: 0,
-        maxLife: 400 + Math.random() * 200,
+        maxLife: 300 + Math.random() * 150,
       });
     }
   }
 
   private spawnGateParticles(g: Gate) {
+    if (this.particles.length > 80) return;
     const color = g.op === 'weapon' ? '#f59e0b' : g.op === 'subtract' || g.op === 'divide' ? '#ef4444' : '#38bdf8';
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 10; i++) {
       this.particles.push({
         x: g.x + Math.random() * g.width,
         y: g.y + Math.random() * g.height,
-        vx: (Math.random() - 0.5) * 6,
-        vy: (Math.random() - 0.5) * 6,
+        vx: (Math.random() - 0.5) * 5,
+        vy: (Math.random() - 0.5) * 5,
         color,
-        radius: 3 + Math.random() * 2.5,
+        radius: 2.5 + Math.random() * 2,
         alpha: 1,
         life: 0,
-        maxLife: 300 + Math.random() * 200,
+        maxLife: 250 + Math.random() * 150,
       });
     }
   }
 
   public addFloatingText(x: number, y: number, text: string, color: string, size: number = 16) {
+    if (this.floatingTexts.length > 12) {
+      this.floatingTexts.shift();
+    }
     this.floatingTexts.push({
       id: Math.random(),
       x,
@@ -901,16 +933,15 @@ export class ZombieEngine {
       this.renderZombie(z);
     }
 
-    // 4. Render Bullets
+    // 4. Render Bullets (High-speed batch neon capsule rendering)
     for (const b of this.bullets) {
-      ctx.save();
+      const r = b.radius;
+      // Outer bright colored capsule
       ctx.fillStyle = b.color;
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      ctx.fillRect(b.x - r, b.y - r * 1.6, r * 2, r * 3.2);
+      // Inner glowing white core
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(b.x - r * 0.4, b.y - r * 1.1, r * 0.8, r * 2.2);
     }
 
     // 5. Render Player Crowd Squad
@@ -1022,35 +1053,26 @@ export class ZombieEngine {
     ctx.save();
     ctx.translate(z.x, z.y);
 
-    if (z.hitFlash > 0) {
-      ctx.fillStyle = '#ffffff';
-    } else {
-      ctx.fillStyle = z.color;
-    }
+    // Get pixel art sprite from ZombieSprites cache
+    const walkCycle = Math.floor(z.walkFrame * 2) % 2;
+    const isHit = z.hitFlash > 0;
+    const sprite = getZombieSprite(z.type, walkCycle, isHit);
 
-    // Zombie aura / body
-    ctx.shadowColor = z.color;
-    ctx.shadowBlur = z.type === 'boss' ? 16 : 6;
-
-    // Draw stylized pixel zombie
-    const r = z.radius;
-    this.roundRect(ctx, -r, -r, r * 2, r * 2, 4);
-    ctx.fill();
-
-    // Zombie glowing red eyes
-    ctx.fillStyle = '#ef4444';
-    const eyeSize = Math.max(2, r * 0.25);
-    ctx.fillRect(-r * 0.5, -r * 0.3, eyeSize, eyeSize);
-    ctx.fillRect(r * 0.5 - eyeSize, -r * 0.3, eyeSize, eyeSize);
+    const sw = sprite.width;
+    const sh = sprite.height;
+    // Walking slight wobble
+    const sway = Math.sin(z.walkFrame * 4) * (z.type === 'runner' ? 2 : 1);
+    ctx.drawImage(sprite, -sw / 2 + sway, -sh / 2, sw, sh);
 
     // Zombie HP Bar
     if (z.hp < z.maxHp || z.type === 'boss' || z.type === 'tank') {
-      const barW = r * 2.2;
+      const barW = Math.max(28, z.radius * 2.2);
       const barH = 4;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(-barW / 2, -r - 10, barW, barH);
+      const barY = -sh / 2 - 8;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(-barW / 2, barY, barW, barH);
       ctx.fillStyle = z.color;
-      ctx.fillRect(-barW / 2, -r - 10, barW * Math.max(0, z.hp / z.maxHp), barH);
+      ctx.fillRect(-barW / 2, barY, barW * Math.max(0, z.hp / z.maxHp), barH);
     }
 
     ctx.restore();
@@ -1061,14 +1083,48 @@ export class ZombieEngine {
 
     // Squad count badge floating above squad
     ctx.save();
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.strokeStyle = '#38bdf8';
+    // Render individual Monkes using offscreen pixel-sharp canvas
+    const sprite = this.monkeCanvas || getFallbackMonkeSprite(this.monkeId);
+    const cfg = WEAPON_CONFIGS[this.currentWeapon];
+    let minY = this.playerY - 20;
+
+    for (const unit of this.units) {
+      if (unit.y < minY) minY = unit.y;
+
+      ctx.save();
+      const bob = Math.sin(unit.walkFrame) * 2;
+      const stepTilt = Math.sin(unit.walkFrame * 2) * 0.04;
+      ctx.translate(unit.x, unit.y + bob);
+      ctx.rotate(stepTilt);
+
+      // Subtle shadow under unit
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(-12, 14, 24, 4);
+
+      // Draw pixel-sharp Monke
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sprite, -unit.size / 2, -unit.size / 2, unit.size, unit.size);
+
+      // Small equipped gun in hand
+      ctx.fillStyle = cfg.bulletColor;
+      ctx.fillRect(unit.size * 0.22, -unit.size * 0.45, 4, 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(unit.size * 0.22, -unit.size * 0.45, 4, 2);
+
+      ctx.restore();
+    }
+
+    // Squad count badge floating above squad (always rendered on top)
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = 'rgba(56, 189, 248, 0.4)';
-    ctx.shadowBlur = 6;
-    const badgeW = 64;
+    const badgeW = 72;
     const badgeH = 22;
-    this.roundRect(ctx, this.playerX - badgeW / 2, this.playerY - 46, badgeW, badgeH, 11);
+    const badgeY = minY - 28;
+    this.roundRect(ctx, this.playerX - badgeW / 2, badgeY, badgeW, badgeH, 11);
     ctx.fill();
     ctx.stroke();
 
@@ -1076,36 +1132,8 @@ export class ZombieEngine {
     ctx.font = '900 13px monospace, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`👥 ${this.crowdCount}`, this.playerX, this.playerY - 35);
+    ctx.fillText(`👥 ${this.crowdCount}`, this.playerX, badgeY + badgeH / 2);
     ctx.restore();
-
-    // Render individual Monkes
-    const img = this.monkeImage;
-    for (const unit of this.units) {
-      ctx.save();
-      const bob = Math.sin(unit.walkFrame) * 2;
-      ctx.translate(unit.x, unit.y + bob);
-
-      // Weapon aura glow
-      const cfg = WEAPON_CONFIGS[this.currentWeapon];
-      ctx.shadowColor = cfg.bulletColor;
-      ctx.shadowBlur = 8;
-
-      if (img && img.complete) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, -unit.size / 2, -unit.size / 2, unit.size, unit.size);
-      } else {
-        // Fallback pixel monke box
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(-unit.size / 2, -unit.size / 2, unit.size, unit.size);
-      }
-
-      // Small equipped gun on hand
-      ctx.fillStyle = cfg.bulletColor;
-      ctx.fillRect(unit.size * 0.25, -unit.size * 0.5, 4, 10);
-
-      ctx.restore();
-    }
   }
 
   private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

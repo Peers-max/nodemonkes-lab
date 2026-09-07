@@ -21,6 +21,7 @@ import type { GameStats, WeaponType } from './types';
 import { ZombieEngine, WEAPON_CONFIGS } from './ZombieEngine';
 import { ZombieAudio } from './ZombieAudio';
 import { useLanguage } from '../../utils/i18n';
+import { getMonkeImageUrl } from '../../utils/api';
 import confetti from 'canvas-confetti';
 
 interface ZombieStudioProps {
@@ -302,7 +303,14 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
 
         {/* Character Commander Selector Bottom Panel */}
         <div className="w-full mt-4 p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 border border-amber-500/40 flex-shrink-0 shadow-inner flex items-center justify-center">
+              <img
+                src={getMonkeImageUrl(monkeId)}
+                alt={`Monke #${monkeId}`}
+                className="w-full h-full object-contain pixelated"
+              />
+            </div>
             <span className="text-slate-400 font-semibold">{isZh ? '指挥官猴 ID:' : 'Commander Monke:'}</span>
             <input
               type="number"
