@@ -31,9 +31,14 @@ export interface Gate {
   value: number; // e.g. +5, x2, -3, or weapon index
   weaponType?: WeaponType;
   speed: number;
-  hp: number; // shootable gates!
+  hp: number;
   maxHp: number;
   hitFlash: number;
+  hitsReceived: number;
+  hitsRequired: number;
+  maxUpgrades: number;
+  upgradesDone: number;
+  originalValue: number;
 }
 
 export type ZombieType = 'walker' | 'runner' | 'tank' | 'exploder' | 'boss';
