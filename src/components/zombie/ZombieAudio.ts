@@ -235,6 +235,33 @@ export class ZombieAudio {
   }
 
   public playBossAlert() {
+    this.playBossWarning();
+  }
+
+  public playBossWarning() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Two-tone warning siren
+    for (let i = 0; i < 3; i++) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      const start = t + i * 0.32;
+      osc.frequency.setValueAtTime(440, start);
+      osc.frequency.exponentialRampToValueAtTime(880, start + 0.16);
+      osc.frequency.exponentialRampToValueAtTime(440, start + 0.3);
+      gain.gain.setValueAtTime(0.09, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.31);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.31);
+    }
+  }
+
+  public playPhaseChange() {
     if (!this.enabled) return;
     this.init();
     if (!this.ctx) return;
@@ -242,16 +269,59 @@ export class ZombieAudio {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(180, t);
-    osc.frequency.setValueAtTime(260, t + 0.1);
-    osc.frequency.setValueAtTime(180, t + 0.2);
-    osc.frequency.setValueAtTime(260, t + 0.3);
-    gain.gain.setValueAtTime(0.1, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(620, t + 0.15);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.4);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start(t);
-    osc.stop(t + 0.45);
+    osc.stop(t + 0.4);
+  }
+
+  public playStageClear() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Victory fanfare notes: C5, E5, G5, B5, C6
+    const notes = [523.25, 659.25, 783.99, 987.77, 1046.5];
+    notes.forEach((freq, idx) => {
+      const start = t + idx * 0.11;
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.07, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+      osc.start(start);
+      osc.stop(start + 0.22);
+    });
+  }
+
+  public playBossDie() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Sequential rumbling explosions
+    for (let i = 0; i < 4; i++) {
+      const start = t + i * 0.14;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120 - i * 15, start);
+      osc.frequency.exponentialRampToValueAtTime(30, start + 0.3);
+      gain.gain.setValueAtTime(0.13, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    }
   }
 
   public playShieldHit() {

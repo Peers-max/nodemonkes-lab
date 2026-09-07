@@ -10,7 +10,10 @@ import type {
   FloatingText,
   GameStats,
   SubWeaponType,
+  StageConfig,
+  StageState,
 } from './types';
+import { STAGE_CONFIGS } from './types';
 import { ZombieAudio } from './ZombieAudio';
 import { getMonkeImageUrl } from '../../utils/api';
 import {
@@ -49,6 +52,17 @@ export class ZombieEngine {
   public particles: Particle[] = [];
   public floatingTexts: FloatingText[] = [];
   private stars: Array<{ x: number; y: number; size: number; speed: number; alpha: number; color: string }> = [];
+
+  // 10 Grand Stages Progression
+  public currentStage: number = 1;
+  public stageState: StageState = 'intro';
+  public stageDistance: number = 0;
+  public stageTimer: number = 2500; // Countdown for intro / clear / all_clear
+  public midBossSpawned: boolean = false;
+  public stageBossSpawned: boolean = false;
+  public activeBoss: Zombie | null = null;
+  public activeMidBoss: Zombie | null = null;
+  public bossWarningTimer: number = 0;
 
   // Spawner & Metrics
   public distance: number = 0;
@@ -106,63 +120,76 @@ export class ZombieEngine {
   }
 
   private initStars() {
+    this.initStarsForStage(1);
+  }
+
+  public initStarsForStage(stageNum: number = 1) {
+    const stageCfg = STAGE_CONFIGS[(stageNum - 1) % STAGE_CONFIGS.length];
     this.stars = [];
-    for (let i = 0; i < 85; i++) {
+    for (let i = 0; i < 90; i++) {
       this.stars.push({
         x: Math.random() * this.canvas.width,
         y: Math.random() * this.canvas.height,
-        size: Math.random() < 0.2 ? 2.5 : 1.2,
-        speed: 0.5 + Math.random() * 1.6,
+        size: Math.random() < 0.25 ? 2.6 : 1.2,
+        speed: 0.5 + Math.random() * 1.8,
         alpha: 0.3 + Math.random() * 0.7,
-        color: Math.random() < 0.3 ? '#38bdf8' : Math.random() < 0.6 ? '#e0f2fe' : '#ffffff',
+        color: Math.random() < 0.4 ? stageCfg.starColor : '#ffffff',
       });
     }
+  }
+
+  public resetStage(stageNum: number, keepPlayerUpgrades: boolean = true) {
+    this.currentStage = Math.max(1, Math.min(10, stageNum));
+    this.stageState = 'intro';
+    this.stageDistance = 0;
+    this.stageTimer = 2500; // 2.5s stage intro banner
+    this.midBossSpawned = false;
+    this.stageBossSpawned = false;
+    this.activeBoss = null;
+    this.activeMidBoss = null;
+    this.bossWarningTimer = 0;
+    this.nextZombieDistance = 60;
+
+    this.bullets = [];
+    this.enemyBullets = [];
+    this.droppedItems = [];
+    this.zombies = [];
+    this.feverTimer = 0;
+    this.isFiringLaser = false;
+
+    this.player.x = this.canvas.width / 2;
+    this.player.y = this.canvas.height - 120;
+    this.player.targetX = this.canvas.width / 2;
+    this.player.targetY = this.canvas.height - 120;
+    this.player.invulnerableTimer = 1800;
+    this.player.hp = Math.max(this.player.hp, 80); // field repairs between stages
+    this.player.shield = this.player.maxShield;
+
+    if (!keepPlayerUpgrades) {
+      this.player.hp = 100;
+      this.player.maxHp = 100;
+      this.player.shield = 100;
+      this.player.maxShield = 100;
+      this.player.bombs = 3;
+      this.player.mainWeaponLevel = 1;
+      this.player.subWeapon = 'none';
+      this.player.subWeaponLevel = 1;
+      this.score = 0;
+      this.zombiesKilled = 0;
+      this.combo = 0;
+      this.distance = 0;
+      this.wave = 1;
+    }
+
+    this.initStarsForStage(this.currentStage);
   }
 
   public reset(monkeId: number = 209) {
     this.monkeId = monkeId;
     this.isGameOver = false;
     this.isPaused = false;
-
-    this.player = {
-      x: this.canvas.width / 2,
-      y: this.canvas.height - 120,
-      targetX: this.canvas.width / 2,
-      targetY: this.canvas.height - 120,
-      hp: 100,
-      maxHp: 100,
-      shield: 100,
-      maxShield: 100,
-      bombs: 3,
-      maxBombs: 5,
-      mainWeaponLevel: 1,
-      subWeapon: 'none',
-      subWeaponLevel: 1,
-      shootCooldown: 0,
-      subWeaponCooldown: 0,
-      invulnerableTimer: 1000,
-      bankAngle: 0,
-      thrusterFrame: 0,
-      size: 44,
-      monkeId,
-    };
-
-    this.bullets = [];
-    this.enemyBullets = [];
-    this.droppedItems = [];
-    this.zombies = [];
-    this.particles = [];
-    this.floatingTexts = [];
-    this.distance = 0;
-    this.wave = 1;
-    this.score = 0;
-    this.zombiesKilled = 0;
-    this.combo = 0;
-    this.lastKillTime = 0;
-    this.feverTimer = 0;
-    this.nextZombieDistance = 80;
-    this.isFiringLaser = false;
-
+    this.currentStage = 1;
+    this.resetStage(1, false);
     this.loadMonkeImage(monkeId);
   }
 
@@ -279,17 +306,13 @@ export class ZombieEngine {
       this.spawnExplosion(xi, 180 + Math.random() * 250, 110);
     }
 
-    // 3. Deal massive 650 damage to all active enemy aircraft
+    // 3. Deal balanced 320 damage to all active enemy aircraft
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
-      z.hp -= 650;
+      z.hp -= 320;
       z.hitFlash = 1;
       if (z.hp <= 0) {
-        this.score += z.scoreValue;
-        this.zombiesKilled++;
-        this.spawnFlakParticles(z.x, z.y, z.color);
-        this.spawnExplosion(z.x, z.y, z.radius * 2);
-        this.zombies.splice(i, 1);
+        this.destroyEnemy(i);
       }
     }
 
@@ -302,14 +325,72 @@ export class ZombieEngine {
   }
 
   private update(dt: number) {
-    this.distance += this.speed * (dt / 16.66);
-    this.wave = 1 + Math.floor(this.distance / 1400);
+    const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
+    this.wave = this.currentStage;
+
+    // Stage State Machine (Intro -> Playing -> MidBoss -> StageBoss -> Clear -> Next Stage / All Clear)
+    if (this.stageState === 'intro') {
+      this.stageTimer -= dt;
+      if (this.stageTimer <= 0) {
+        this.stageState = 'playing';
+      }
+    } else if (this.stageState === 'clear') {
+      this.stageTimer -= dt;
+      // High speed afterburner trail effect on player
+      this.player.targetY = this.canvas.height - 160;
+      if (Math.random() < 0.6) {
+        this.particles.push({
+          x: this.player.x + (Math.random() - 0.5) * 22,
+          y: this.player.y + 20,
+          vx: (Math.random() - 0.5) * 2,
+          vy: 10 + Math.random() * 8,
+          color: '#38bdf8',
+          radius: 3.5,
+          alpha: 1,
+          life: 0,
+          maxLife: 280,
+        });
+      }
+
+      if (this.stageTimer <= 0) {
+        if (this.currentStage < 10) {
+          this.currentStage++;
+          this.resetStage(this.currentStage, true);
+        } else {
+          this.stageState = 'all_clear';
+        }
+      }
+    } else if (this.stageState === 'playing') {
+      this.stageDistance += this.speed * (dt / 16.66);
+      this.distance += this.speed * (dt / 16.66);
+
+      // Check Mid-Boss trigger at ~42% distance
+      if (this.stageDistance >= stageCfg.targetDistance * 0.42 && !this.midBossSpawned) {
+        this.stageState = 'midboss';
+        this.spawnMidBoss();
+      }
+
+      // Check Stage Boss trigger at 100% distance
+      if (this.stageDistance >= stageCfg.targetDistance && !this.stageBossSpawned) {
+        if (this.zombies.length === 0 || this.stageDistance >= stageCfg.targetDistance + 140) {
+          this.stageState = 'stageboss';
+          this.spawnStageBoss();
+        }
+      }
+    } else if (this.stageState === 'midboss') {
+      this.distance += this.speed * 0.35 * (dt / 16.66);
+    } else if (this.stageState === 'stageboss') {
+      this.distance += this.speed * 0.25 * (dt / 16.66);
+      if (this.bossWarningTimer > 0) {
+        this.bossWarningTimer -= dt;
+      }
+    }
 
     // Timers
     if (this.player.invulnerableTimer > 0) this.player.invulnerableTimer -= dt;
     if (this.feverTimer > 0) this.feverTimer -= dt;
 
-    // Shield auto-regen (+1/s if > 0 and not hit recently)
+    // Shield auto-regen (+1.5/s if > 0 and not hit recently)
     if (this.player.shield > 0 && this.player.shield < this.player.maxShield) {
       this.player.shield = Math.min(this.player.maxShield, this.player.shield + (dt / 1000) * 1.5);
     }
@@ -341,10 +422,10 @@ export class ZombieEngine {
     // Update Player Bullets & Homing Missiles
     this.updatePlayerBullets(dt);
 
-    // Spawn Enemy Aircraft waves
-    if (this.distance >= this.nextZombieDistance) {
+    // Spawn Enemy Aircraft waves (only during active playing mode)
+    if (this.stageState === 'playing' && this.distance >= this.nextZombieDistance) {
       this.spawnEnemyWave();
-      this.nextZombieDistance = this.distance + Math.max(80, 190 - this.wave * 8);
+      this.nextZombieDistance = this.distance + Math.max(90, 200 - this.currentStage * 6);
     }
 
     // Update Enemies & Enemy Shooting
@@ -424,7 +505,8 @@ export class ZombieEngine {
     this.audio.playShoot('pistol');
     const { x, y, mainWeaponLevel } = this.player;
     const bulletSpeed = 18;
-    const baseDamage = 24 + mainWeaponLevel * 6;
+    // Lowered, well-calibrated damage: Lv.1 is 8.5 dmg, Lv.5 is 14.5 dmg per bullet
+    const baseDamage = 7 + mainWeaponLevel * 1.5;
     const isGold = mainWeaponLevel >= 5 || this.feverTimer > 0;
     const color = isGold ? '#f59e0b' : '#38bdf8';
 
@@ -500,6 +582,7 @@ export class ZombieEngine {
     const { x, y } = this.player;
 
     // Launch 2 micro-missiles from left and right wing pods
+    const missileDmg = 18 + this.player.subWeaponLevel * 6;
     this.bullets.push(
       {
         id: Math.random(),
@@ -508,7 +591,7 @@ export class ZombieEngine {
         vx: -2.5,
         vy: -7,
         radius: 5,
-        damage: 55 + this.player.subWeaponLevel * 15,
+        damage: missileDmg,
         color: '#ef4444',
         pierce: 1,
         isPlayer: true,
@@ -522,7 +605,7 @@ export class ZombieEngine {
         vx: 2.5,
         vy: -7,
         radius: 5,
-        damage: 55 + this.player.subWeaponLevel * 15,
+        damage: missileDmg,
         color: '#ef4444',
         pierce: 1,
         isPlayer: true,
@@ -534,7 +617,8 @@ export class ZombieEngine {
 
   private fireLaserBeam(dt: number) {
     const { x, y, subWeaponLevel } = this.player;
-    const beamDmg = (14 + subWeaponLevel * 6) * (dt / 16.66);
+    // Balanced continuous piercing laser damage
+    const beamDmg = (2.2 + subWeaponLevel * 0.8) * (dt / 16.66);
     const leftBeamX = x - 16;
     const rightBeamX = x + 16;
 
@@ -657,12 +741,65 @@ export class ZombieEngine {
 
   private destroyEnemy(zi: number) {
     const z = this.zombies[zi];
-    this.audio.playZombieDie();
     this.score += z.scoreValue;
     this.zombiesKilled++;
     this.spawnFlakParticles(z.x, z.y, z.color);
     this.spawnExplosion(z.x, z.y, z.radius * 2);
     this.addFloatingText(z.x, z.y - 12, `+${z.scoreValue}`, '#fbbf24', 14);
+
+    if (z.isBoss) {
+      // Stage Boss Defeat Sequence
+      this.activeBoss = null;
+      this.audio.playBossDie();
+      this.screenShake = 18;
+
+      // Sequential explosions
+      for (let k = 1; k <= 5; k++) {
+        setTimeout(() => {
+          this.spawnExplosion(
+            z.x + (Math.random() - 0.5) * 60,
+            z.y + (Math.random() - 0.5) * 50,
+            65 + Math.random() * 20
+          );
+        }, k * 140);
+      }
+
+      // Convert all on-screen bullets to gold bonus points
+      for (const eb of this.enemyBullets) {
+        this.spawnSpark(eb.x, eb.y, '#f59e0b');
+        this.score += 20;
+      }
+      this.enemyBullets = [];
+
+      // Guaranteed 3 drops
+      this.spawnDroppedItem(z.x - 30, z.y, true);
+      this.spawnDroppedItem(z.x, z.y, true);
+      this.spawnDroppedItem(z.x + 30, z.y, true);
+
+      // Trigger Stage Clear celebration
+      this.stageState = 'clear';
+      this.stageTimer = 3400;
+      this.audio.playStageClear();
+      const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
+      this.score += stageCfg.clearBonus;
+      this.addFloatingText(this.canvas.width / 2, this.canvas.height / 2 - 40, 'STAGE CLEAR!!', '#22c55e', 32);
+    } else if (z.isMidBoss) {
+      // Mid-Boss Defeat Sequence
+      this.activeMidBoss = null;
+      this.audio.playZombieDie();
+      this.screenShake = 12;
+      this.spawnExplosion(z.x - 20, z.y, 50);
+      this.spawnExplosion(z.x + 20, z.y, 50);
+
+      // Guaranteed 2 drops
+      this.spawnDroppedItem(z.x - 22, z.y);
+      this.spawnDroppedItem(z.x + 22, z.y);
+
+      this.stageState = 'playing';
+      this.addFloatingText(z.x, z.y - 20, 'MID-BOSS DEFEATED!', '#38bdf8', 22);
+    } else {
+      this.audio.playZombieDie();
+    }
 
     // Combo system
     const now = performance.now();
@@ -679,13 +816,13 @@ export class ZombieEngine {
       this.addFloatingText(this.player.x, this.player.y - 60, '🔥 FEVER TIME! 🔥', '#ec4899', 24);
     }
 
-    // Dropped Powerup Item chance
-    let dropChance = 0.22;
-    if (z.type === 'gunship' || z.type === 'tank') dropChance = 0.95;
-    if (z.type === 'boss' || z.type === 'mothership') dropChance = 1.0;
-
-    if (Math.random() < dropChance) {
-      this.spawnDroppedItem(z.x, z.y, z.type === 'boss');
+    // Normal Dropped Powerup Item chance
+    if (!z.isBoss && !z.isMidBoss) {
+      let dropChance = 0.22;
+      if (z.type === 'gunship' || z.type === 'tank') dropChance = 0.95;
+      if (Math.random() < dropChance) {
+        this.spawnDroppedItem(z.x, z.y, false);
+      }
     }
 
     this.zombies.splice(zi, 1);
@@ -815,81 +952,134 @@ export class ZombieEngine {
   }
 
   /**
-   * Spawn Enemy Aircraft
+   * Spawn Mid-Stage Elite Prototype Assault Craft
+   */
+  private spawnMidBoss() {
+    const W = this.canvas.width;
+    const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
+    this.audio.playBossAlert();
+    this.screenShake = 12;
+    this.addFloatingText(W / 2, 90, `⚠️ 精英突袭: ${stageCfg.midBossNameZh} ⚠️`, '#f59e0b', 22);
+
+    const midBoss: Zombie = {
+      id: Math.random(),
+      type: 'midboss',
+      x: W / 2,
+      y: -60,
+      radius: 28,
+      hp: stageCfg.midBossHp,
+      maxHp: stageCfg.midBossHp,
+      speed: 0.35,
+      color: '#f59e0b',
+      skinId: 888,
+      hitFlash: 0,
+      scoreValue: 1200,
+      walkFrame: 0,
+      shootCooldown: 300,
+      shootInterval: 750,
+      isMidBoss: true,
+      bossName: stageCfg.midBossNameZh,
+      phase: 1,
+      maxPhase: 1,
+      attackTimer: 0,
+      attackPattern: 0,
+    };
+
+    this.zombies.push(midBoss);
+    this.activeMidBoss = midBoss;
+    this.midBossSpawned = true;
+  }
+
+  /**
+   * Spawn Stage Climax Titan Dreadnought Boss
+   */
+  private spawnStageBoss() {
+    const W = this.canvas.width;
+    const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
+    this.audio.playBossWarning();
+    this.screenShake = 18;
+    this.bossWarningTimer = 2600;
+    this.addFloatingText(W / 2, 90, `⚠️ 关底巨兽: ${stageCfg.bossNameZh} ⚠️`, '#ef4444', 26);
+
+    const boss: Zombie = {
+      id: Math.random(),
+      type: 'mothership',
+      x: W / 2,
+      y: -90,
+      radius: 42,
+      hp: stageCfg.bossHp,
+      maxHp: stageCfg.bossHp,
+      speed: 0.28,
+      color: '#dc2626',
+      skinId: 999,
+      hitFlash: 0,
+      scoreValue: 3500,
+      walkFrame: 0,
+      shootCooldown: 600,
+      shootInterval: 900,
+      isBoss: true,
+      bossName: stageCfg.bossNameZh,
+      phase: 1,
+      maxPhase: 2,
+      attackTimer: 0,
+      attackPattern: 0,
+    };
+
+    this.zombies.push(boss);
+    this.activeBoss = boss;
+    this.stageBossSpawned = true;
+  }
+
+  /**
+   * Spawn Enemy Aircraft Wave (Scaled to Current Stage)
    */
   private spawnEnemyWave() {
     const W = this.canvas.width;
-    const isEarly = this.wave === 1;
+    const stage = this.currentStage;
 
-    // Boss Titan Mothership spawn every 5 waves
-    if (this.wave % 5 === 0 && !this.zombies.some((z) => z.type === 'boss' || z.type === 'mothership')) {
-      this.audio.playBossAlert();
-      this.screenShake = 14;
-      this.addFloatingText(W / 2, 90, '⚠️ 敌军泰坦母舰降临 ⚠️', '#ef4444', 28);
-      const bossHp = 420 + this.wave * 120;
-      this.zombies.push({
-        id: Math.random(),
-        type: 'mothership',
-        x: W / 2,
-        y: -90,
-        radius: 40,
-        hp: bossHp,
-        maxHp: bossHp,
-        speed: 0.35,
-        color: '#dc2626',
-        skinId: 999,
-        hitFlash: 0,
-        scoreValue: 800,
-        walkFrame: 0,
-        shootCooldown: 60,
-        shootInterval: 750,
-      });
-      return;
-    }
-
-    // Standard squadron wave (3 to 8 craft)
-    const count = isEarly ? 3 : Math.min(8, 3 + Math.floor(this.wave * 0.8));
+    // Standard squadron wave (3 to 7 craft with scaled toughness)
+    const count = Math.min(7, 3 + Math.floor(stage * 0.45));
     for (let i = 0; i < count; i++) {
       const rand = Math.random();
       let type: Zombie['type'] = 'scout';
       let radius = 16;
-      let hp = 18 + this.wave * 5;
+      let hp = 45 + stage * 8; // takes ~4-6 player bullets to destroy
       let speed = 0.65 + Math.random() * 0.35;
       let color = '#22c55e';
-      let scoreVal = 30;
-      let interval = 1200;
+      let scoreVal = 35 + stage * 5;
+      let interval = Math.max(700, 1300 - stage * 45);
 
-      if (!isEarly && rand < 0.28) {
+      if (rand < 0.26) {
         type = 'interceptor';
         radius = 15;
-        hp = 22 + this.wave * 5;
-        speed = 1.25 + Math.random() * 0.4;
+        hp = 85 + stage * 12;
+        speed = 1.15 + Math.random() * 0.35;
         color = '#a855f7';
-        scoreVal = 45;
-        interval = 900;
-      } else if (!isEarly && rand < 0.52) {
+        scoreVal = 55 + stage * 8;
+        interval = Math.max(600, 1000 - stage * 40);
+      } else if (rand < 0.52) {
         type = 'gunship';
         radius = 24;
-        hp = 80 + this.wave * 25;
-        speed = 0.4 + Math.random() * 0.2;
+        hp = 220 + stage * 35; // mini-tank requires sustained focus
+        speed = 0.35 + Math.random() * 0.2;
         color = '#eab308';
-        scoreVal = 80;
-        interval = 1400;
-      } else if (!isEarly && rand < 0.68) {
+        scoreVal = 110 + stage * 15;
+        interval = Math.max(900, 1500 - stage * 45);
+      } else if (rand < 0.70) {
         type = 'kamikaze';
         radius = 16;
-        hp = 25 + this.wave * 6;
-        speed = 0.95;
+        hp = 70 + stage * 10;
+        speed = 0.95 + Math.random() * 0.3;
         color = '#f97316';
-        scoreVal = 50;
-        interval = 1100;
+        scoreVal = 65 + stage * 8;
+        interval = Math.max(800, 1200 - stage * 40);
       }
 
       this.zombies.push({
         id: Math.random(),
         type,
         x: 35 + Math.random() * (W - 70),
-        y: -35 - i * 40,
+        y: -35 - i * 45,
         radius,
         hp,
         maxHp: hp,
@@ -899,7 +1089,7 @@ export class ZombieEngine {
         hitFlash: 0,
         scoreValue: scoreVal,
         walkFrame: Math.random() * 10,
-        shootCooldown: 400 + Math.random() * 600,
+        shootCooldown: 350 + Math.random() * 550,
         shootInterval: interval,
       });
     }
@@ -910,10 +1100,41 @@ export class ZombieEngine {
    */
   private updateEnemies(dt: number) {
     const { player } = this;
+    const W = this.canvas.width;
+
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
-      z.y += z.speed * (dt / 16.66);
-      z.walkFrame += z.speed * (dt / 16.66) * 0.12;
+
+      // Mid-Boss & Stage Boss Special Hover Maneuvers
+      if (z.isMidBoss) {
+        if (z.y < 115) {
+          z.y += z.speed * (dt / 16.66);
+        } else {
+          z.y = 115 + Math.sin(performance.now() * 0.002) * 15;
+          z.x = W / 2 + Math.sin(performance.now() * 0.0018) * (W * 0.35);
+        }
+      } else if (z.isBoss) {
+        if (z.y < 125) {
+          z.y += z.speed * (dt / 16.66);
+        } else {
+          z.y = 125 + Math.sin(performance.now() * 0.0015) * 20;
+          z.x = W / 2 + Math.sin(performance.now() * 0.0012) * (W * 0.36);
+        }
+
+        // Stage Boss Phase 2 Enrage Trigger (HP <= 50%)
+        if (z.phase === 1 && z.hp <= z.maxHp * 0.5) {
+          z.phase = 2;
+          this.audio.playPhaseChange();
+          this.screenShake = 16;
+          this.flashAlpha = 0.45;
+          this.addFloatingText(z.x, z.y - 45, '⚠️ PHASE 2: OVERDRIVE! ⚠️', '#ef4444', 24);
+          z.shootInterval = Math.max(380, z.shootInterval * 0.65);
+        }
+      } else {
+        z.y += z.speed * (dt / 16.66);
+      }
+
+      z.walkFrame += (z.speed || 0.5) * (dt / 16.66) * 0.12;
       if (z.hitFlash > 0) z.hitFlash -= dt * 0.01;
 
       // Enemy Shooting logic
@@ -939,42 +1160,112 @@ export class ZombieEngine {
         }
       }
 
-      // Despawn off bottom screen
-      if (z.y > this.canvas.height + 60) {
+      // Despawn off bottom screen (Excludes Bosses)
+      if (!z.isBoss && !z.isMidBoss && z.y > this.canvas.height + 60) {
         this.zombies.splice(i, 1);
       }
     }
   }
 
   /**
-   * Enemy Firing System (Aimed shots, 3-way/5-way spread, Heavy plasma)
+   * Enemy Firing System (Danmaku Patterns: Aimed, Spread, Heavy, Spiral)
    */
   private enemyFire(z: Zombie) {
-    if (this.enemyBullets.length > 120) return;
+    if (this.enemyBullets.length > 150) return;
     const { player } = this;
 
-    if (z.type === 'mothership' || z.type === 'boss') {
-      // Titan Boss: Radial 8-bullet burst or heavy plasma twin orbs
-      const isBurst = Math.random() > 0.45;
-      if (isBurst) {
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+    if (z.isBoss) {
+      if (z.phase === 2) {
+        // Boss Phase 2 Danmaku: 12-way rotating spiral, 5-way spread, or twin heavy orbs
+        z.attackPattern = ((z.attackPattern || 0) + 1) % 3;
+        if (z.attackPattern === 0) {
+          // 12-way rotating spiral danmaku
+          const rotOffset = (performance.now() * 0.003) % (Math.PI * 2);
+          for (let k = 0; k < 12; k++) {
+            const a = rotOffset + (k * Math.PI * 2) / 12;
+            this.enemyBullets.push({
+              id: Math.random(),
+              x: z.x,
+              y: z.y + 15,
+              vx: Math.cos(a) * 3.6,
+              vy: Math.sin(a) * 3.6,
+              radius: 5,
+              damage: 16,
+              color: '#ec4899',
+              type: 'spiral',
+            });
+          }
+        } else if (z.attackPattern === 1) {
+          // 5-way aimed spread
+          const baseAngle = Math.atan2(player.y - z.y, player.x - z.x);
+          for (const sp of [-0.34, -0.17, 0, 0.17, 0.34]) {
+            const a = baseAngle + sp;
+            this.enemyBullets.push({
+              id: Math.random(),
+              x: z.x,
+              y: z.y + 15,
+              vx: Math.cos(a) * 4.6,
+              vy: Math.sin(a) * 4.6,
+              radius: 5.5,
+              damage: 18,
+              color: '#ef4444',
+              type: 'spread',
+            });
+          }
+        } else {
+          // Twin heavy cannon orbs
+          this.enemyBullets.push(
+            { id: Math.random(), x: z.x - 26, y: z.y + 22, vx: -0.6, vy: 5.2, radius: 10, damage: 32, color: '#dc2626', type: 'heavy' },
+            { id: Math.random(), x: z.x + 26, y: z.y + 22, vx: 0.6, vy: 5.2, radius: 10, damage: 32, color: '#dc2626', type: 'heavy' }
+          );
+        }
+      } else {
+        // Phase 1: 8-way radial ring burst or twin plasma cannons
+        const isBurst = Math.random() > 0.45;
+        if (isBurst) {
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            this.enemyBullets.push({
+              id: Math.random(),
+              x: z.x,
+              y: z.y + 12,
+              vx: Math.cos(a) * 3.8,
+              vy: Math.sin(a) * 3.8,
+              radius: 5,
+              damage: 16,
+              color: '#ef4444',
+              type: 'spread',
+            });
+          }
+        } else {
+          this.enemyBullets.push(
+            { id: Math.random(), x: z.x - 22, y: z.y + 20, vx: -0.8, vy: 4.8, radius: 9, damage: 28, color: '#f97316', type: 'heavy' },
+            { id: Math.random(), x: z.x + 22, y: z.y + 20, vx: 0.8, vy: 4.8, radius: 9, damage: 28, color: '#f97316', type: 'heavy' }
+          );
+        }
+      }
+    } else if (z.isMidBoss) {
+      // Mid-Boss: alternating 3-way aimed spread or twin plasma cannons
+      z.attackPattern = ((z.attackPattern || 0) + 1) % 2;
+      if (z.attackPattern === 0) {
+        const baseAngle = Math.atan2(player.y - z.y, player.x - z.x);
+        for (const sp of [-0.22, 0, 0.22]) {
+          const a = baseAngle + sp;
           this.enemyBullets.push({
             id: Math.random(),
             x: z.x,
-            y: z.y,
-            vx: Math.cos(a) * 3.8,
-            vy: Math.sin(a) * 3.8,
+            y: z.y + 16,
+            vx: Math.cos(a) * 4.4,
+            vy: Math.sin(a) * 4.4,
             radius: 5,
-            damage: 18,
-            color: '#ef4444',
+            damage: 16,
+            color: '#f59e0b',
             type: 'spread',
           });
         }
       } else {
-        // Twin Heavy Plasma Cannons
         this.enemyBullets.push(
-          { id: Math.random(), x: z.x - 22, y: z.y + 20, vx: -0.8, vy: 4.8, radius: 9, damage: 32, color: '#f97316', type: 'heavy' },
-          { id: Math.random(), x: z.x + 22, y: z.y + 20, vx: 0.8, vy: 4.8, radius: 9, damage: 32, color: '#f97316', type: 'heavy' }
+          { id: Math.random(), x: z.x - 20, y: z.y + 16, vx: -1.2, vy: 4.5, radius: 6, damage: 18, color: '#f59e0b', type: 'spread' },
+          { id: Math.random(), x: z.x + 20, y: z.y + 16, vx: 1.2, vy: 4.5, radius: 6, damage: 18, color: '#f59e0b', type: 'spread' }
         );
       }
     } else if (z.type === 'gunship' || z.type === 'tank') {
@@ -1172,13 +1463,14 @@ export class ZombieEngine {
     const { ctx, canvas, player } = this;
     const W = canvas.width;
     const H = canvas.height;
+    const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
 
-    // 1. Clear physical canvas with Deep Space gradient
+    // 1. Clear physical canvas with Stage-specific dynamic atmospheric gradient
     ctx.clearRect(0, 0, W, H);
     const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-    skyGrad.addColorStop(0, '#030712');
-    skyGrad.addColorStop(0.5, '#070e24');
-    skyGrad.addColorStop(1, '#0b1638');
+    skyGrad.addColorStop(0, '#020617');
+    skyGrad.addColorStop(0.5, stageCfg.bgColor);
+    skyGrad.addColorStop(1, '#030712');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, W, H);
 
@@ -1191,7 +1483,7 @@ export class ZombieEngine {
     }
     ctx.fillRect(-50, -50, W + 100, H + 100);
 
-    // Parallax Starfield & Speed streaks
+    // Parallax Starfield / Atmospheric particles
     for (const s of this.stars) {
       ctx.save();
       ctx.globalAlpha = s.alpha;
@@ -1201,8 +1493,8 @@ export class ZombieEngine {
       ctx.restore();
     }
 
-    // Dynamic cyber flight grid lines
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.07)';
+    // Dynamic cyber flight grid lines (tinted to current stage)
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
     ctx.lineWidth = 1;
     const gridOffset = (this.distance * 1.6) % 50;
     for (let y = gridOffset; y < H; y += 50) {
@@ -1299,13 +1591,104 @@ export class ZombieEngine {
       ctx.restore();
     }
 
-    // 10. Damage / Nuke Flash
+    // 10. Stage Banners Overlay (Intro, Warning, Clear, All Clear)
+    if (this.stageState === 'intro') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(3, 7, 18, 0.75)';
+      ctx.fillRect(0, H * 0.36, W, 105);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, H * 0.36, W, 105);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '900 14px monospace, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`STAGE 0${this.currentStage} // 关卡启动`, W / 2, H * 0.36 + 26);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 22px monospace, sans-serif';
+      ctx.fillText(stageCfg.nameZh, W / 2, H * 0.36 + 56);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 11px monospace, sans-serif';
+      ctx.fillText(stageCfg.nameEn.toUpperCase(), W / 2, H * 0.36 + 78);
+      ctx.fillText(stageCfg.subtitleZh, W / 2, H * 0.36 + 94);
+      ctx.restore();
+    } else if (this.bossWarningTimer > 0) {
+      const blink = Math.floor(performance.now() / 140) % 2 === 0;
+      if (blink) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.82)';
+        ctx.fillRect(0, H * 0.28, W, 70);
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(0, H * 0.28, W, 70);
+
+        ctx.fillStyle = '#fef08a';
+        ctx.font = '900 18px monospace, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ WARNING // 泰坦母舰迫近 ⚠️', W / 2, H * 0.28 + 28);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 12px monospace, sans-serif';
+        ctx.fillText(`TARGET: ${stageCfg.bossNameZh.toUpperCase()}`, W / 2, H * 0.28 + 52);
+        ctx.restore();
+      }
+    } else if (this.stageState === 'clear') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(6, 78, 59, 0.85)';
+      ctx.fillRect(0, H * 0.36, W, 100);
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(0, H * 0.36, W, 100);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = '900 14px monospace, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('MISSION COMPLETE // 关卡突破', W / 2, H * 0.36 + 28);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 24px monospace, sans-serif';
+      ctx.fillText(`STAGE ${this.currentStage} CLEARED!`, W / 2, H * 0.36 + 58);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '700 13px monospace, sans-serif';
+      ctx.fillText(`CLEAR BONUS +${stageCfg.clearBonus} PTS`, W / 2, H * 0.36 + 82);
+      ctx.restore();
+    } else if (this.stageState === 'all_clear') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.fillRect(0, H * 0.30, W, 140);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(0, H * 0.30, W, 140);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '900 16px monospace, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('★ ALL 10 STAGES CONQUERED ★', W / 2, H * 0.30 + 32);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 26px monospace, sans-serif';
+      ctx.fillText('全域突破 • 巅峰王牌', W / 2, H * 0.30 + 68);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '700 13px monospace, sans-serif';
+      ctx.fillText('THE MONKE MATRIX HAS BEEN LIBERATED!', W / 2, H * 0.30 + 96);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '900 15px monospace, sans-serif';
+      ctx.fillText(`FINAL SCORE: ${this.score}`, W / 2, H * 0.30 + 122);
+      ctx.restore();
+    }
+
+    // 11. Damage / Nuke Flash
     if (this.flashAlpha > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${this.flashAlpha})`;
       ctx.fillRect(0, 0, W, H);
     }
 
-    // 11. Fever Border Glow
+    // 12. Fever Border Glow
     if (this.feverTimer > 0) {
       ctx.strokeStyle = 'rgba(236, 72, 153, 0.45)';
       ctx.lineWidth = 6;
@@ -1343,20 +1726,21 @@ export class ZombieEngine {
 
     const walkCycle = Math.floor(z.walkFrame * 2) % 2;
     const isHit = z.hitFlash > 0;
-    const sprite = getZombieSprite(z.type, walkCycle, isHit);
+    const isEnraged = z.phase === 2;
+    const sprite = getZombieSprite(z.type, walkCycle, isHit, this.currentStage, isEnraged);
 
     const sw = sprite.width;
     const sh = sprite.height;
     ctx.drawImage(sprite, -sw / 2, -sh / 2, sw, sh);
 
     // HP bar if injured or boss
-    if (z.hp < z.maxHp || z.type === 'mothership' || z.type === 'boss') {
+    if (z.hp < z.maxHp || z.type === 'mothership' || z.type === 'boss' || z.isMidBoss) {
       const barW = Math.max(30, z.radius * 2.2);
       const barH = 4;
       const barY = -sh / 2 - 8;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(-barW / 2, barY, barW, barH);
-      ctx.fillStyle = z.color;
+      ctx.fillStyle = z.isBoss ? (isEnraged ? '#ef4444' : '#dc2626') : z.isMidBoss ? '#f59e0b' : z.color;
       ctx.fillRect(-barW / 2, barY, barW * Math.max(0, z.hp / z.maxHp), barH);
     }
     ctx.restore();
@@ -1414,10 +1798,14 @@ export class ZombieEngine {
   }
 
   public getStats(): GameStats {
+    const stageCfg = STAGE_CONFIGS[(this.currentStage - 1) % STAGE_CONFIGS.length];
+    const isBossActive = !!this.activeBoss || !!this.activeMidBoss;
+    const currentBoss = this.activeBoss || this.activeMidBoss;
+
     return {
       score: this.score,
       zombiesKilled: this.zombiesKilled,
-      wave: this.wave,
+      wave: this.currentStage,
       hp: this.player.hp,
       maxHp: this.player.maxHp,
       shield: Math.round(this.player.shield),
@@ -1435,6 +1823,17 @@ export class ZombieEngine {
       maxArmor: 0,
       nukeCharge: Math.min(100, Math.round((this.player.bombs / this.player.maxBombs) * 100)),
       freezeTimeLeft: 0,
+      // 10 Grand Stages & Boss Battle Metrics
+      currentStage: this.currentStage,
+      stageState: this.stageState,
+      stageProgress: Math.min(100, Math.round((this.stageDistance / stageCfg.targetDistance) * 100)),
+      stageNameZh: stageCfg.nameZh,
+      stageNameEn: stageCfg.nameEn,
+      bossHp: currentBoss ? Math.max(0, Math.round(currentBoss.hp)) : 0,
+      bossMaxHp: currentBoss ? currentBoss.maxHp : 1,
+      bossName: currentBoss ? (currentBoss.bossName || (this.activeBoss ? stageCfg.bossNameZh : stageCfg.midBossNameZh)) : '',
+      bossPhase: this.activeBoss ? (this.activeBoss.phase || 1) : 1,
+      isBossActive,
     };
   }
 }

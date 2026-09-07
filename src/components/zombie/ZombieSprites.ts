@@ -25,9 +25,11 @@ function pRect(
 export function getZombieSprite(
   type: ZombieType,
   frame: number, // animation frame
-  isHit: boolean
+  isHit: boolean,
+  stageNum: number = 1,
+  isEnraged: boolean = false
 ): HTMLCanvasElement {
-  const key = `${type}_${frame % 2}_${isHit ? 1 : 0}`;
+  const key = `${type}_${frame % 2}_${isHit ? 1 : 0}_${stageNum}_${isEnraged ? 1 : 0}`;
   const existing = spriteCache.get(key);
   if (existing) return existing;
 
@@ -39,10 +41,15 @@ export function getZombieSprite(
   const f = frame % 2;
 
   if (type === 'boss' || type === 'mothership') {
-    // 80x80 Colossal Sky Titan Mothership
+    // 80x80 Colossal Aerial Dreadnought Boss
     canvas.width = 80;
     canvas.height = 80;
-    renderMothershipSprite(ctx, f, isHit);
+    renderMothershipSprite(ctx, f, isHit, stageNum, isEnraged);
+  } else if (type === 'midboss') {
+    // 56x56 Heavy Prototype Assault Craft (Mini-Boss)
+    canvas.width = 56;
+    canvas.height = 56;
+    renderMiniBossSprite(ctx, f, isHit, stageNum);
   } else if (type === 'tank' || type === 'gunship') {
     // 48x48 Heavy Armored Flying Fortress Gunship
     canvas.width = 48;
@@ -223,15 +230,94 @@ function renderKamikazeSprite(ctx: CanvasRenderingContext2D, frame: number, isHi
 }
 
 /**
- * 5. COLOSSAL SKY TITAN MOTHERSHIP (80x80)
- * Massive aerial dreadnought with dark crimson armor, bridge towers, multiple heavy batteries and energy shields
+ * 4.5 HEAVY PROTOTYPE ASSAULT CRAFT (56x56) - MINI-BOSS
+ * Heavy mid-stage elite interceptor with dual rotating plasma generators and reinforced forward armor
  */
-function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const armor = isHit ? '#ffffff' : '#7f1d1d'; // dark crimson
-  const armorLight = isHit ? '#ffffff' : '#dc2626'; // bright red
-  const frameColor = isHit ? '#ffffff' : '#18181b'; // obsidian black
-  const shieldAura = isHit ? '#ffffff' : '#38bdf8'; // blue shield glow
-  const gold = isHit ? '#ffffff' : '#f59e0b';
+function renderMiniBossSprite(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  isHit: boolean,
+  stageNum: number = 1
+) {
+  const stagePalettes = [
+    { main: '#0369a1', light: '#38bdf8', core: '#e0f2fe' }, // st1
+    { main: '#6b21a8', light: '#c084fc', core: '#f3e8ff' }, // st2
+    { main: '#9a3412', light: '#fb923c', core: '#ffedd5' }, // st3
+    { main: '#be185d', light: '#f472b6', core: '#fdf2f8' }, // st4
+    { main: '#0e7490', light: '#22d3ee', core: '#ecfeff' }, // st5
+    { main: '#991b1b', light: '#f87171', core: '#fef2f2' }, // st6
+    { main: '#1e40af', light: '#60a5fa', core: '#eff6ff' }, // st7
+    { main: '#334155', light: '#94a3b8', core: '#f8fafc' }, // st8
+    { main: '#86198f', light: '#e879f9', core: '#fdf4ff' }, // st9
+    { main: '#92400e', light: '#fbbf24', core: '#fffbeb' }, // st10
+  ];
+  const p = stagePalettes[(stageNum - 1) % stagePalettes.length];
+  const armor = isHit ? '#ffffff' : p.main;
+  const armorLight = isHit ? '#ffffff' : p.light;
+  const frameColor = isHit ? '#ffffff' : '#0f172a';
+  const core = isHit ? '#ffffff' : p.core;
+  const warning = isHit ? '#ffffff' : frame === 0 ? '#ef4444' : '#f59e0b';
+
+  // Heavy Swept Mandibles
+  pRect(ctx, 4, 18, 10, 26, armor);
+  pRect(ctx, 42, 18, 10, 26, armor);
+  pRect(ctx, 2, 22, 6, 20, armorLight);
+  pRect(ctx, 48, 22, 6, 20, armorLight);
+
+  // Twin Wing Plasma Canister Cannons
+  pRect(ctx, 6, 8, 6, 12, frameColor);
+  pRect(ctx, 44, 8, 6, 12, frameColor);
+  pRect(ctx, 8, 4, 2, 8, warning);
+  pRect(ctx, 46, 4, 2, 8, warning);
+
+  // Armored Center Fuselage
+  pRect(ctx, 16, 12, 24, 36, armor);
+  pRect(ctx, 20, 4, 16, 12, armorLight); // armored prow
+  pRect(ctx, 24, 2, 8, 4, '#ffffff');
+  pRect(ctx, 18, 16, 20, 26, frameColor);
+
+  // Pulsing Mid-Boss Core Reactor
+  pRect(ctx, 22, 22, 12, 12, armorLight);
+  pRect(ctx, 25, 25, 6, 6, core);
+
+  // Dual Exhaust Thrusters
+  pRect(ctx, 18, 48, 6, 4, frameColor);
+  pRect(ctx, 32, 48, 6, 4, frameColor);
+  pRect(ctx, 19, 52, 4, frame === 0 ? 6 : 3, '#f97316');
+  pRect(ctx, 33, 52, 4, frame === 0 ? 6 : 3, '#f97316');
+}
+
+/**
+ * 5. COLOSSAL AERIAL DREADNOUGHT BOSS (80x80)
+ * Massive stage boss dreadnought with stage-themed armor, command tower, multiple batteries, and raging core in Phase 2
+ */
+function renderMothershipSprite(
+  ctx: CanvasRenderingContext2D,
+  frame: number,
+  isHit: boolean,
+  stageNum: number = 1,
+  isEnraged: boolean = false
+) {
+  const bossPalettes = [
+    { armor: '#0369a1', light: '#38bdf8', aura: '#7dd3fc', core: '#38bdf8' }, // 1. Skyward
+    { armor: '#581c87', light: '#a855f7', aura: '#e879f9', core: '#c084fc' }, // 2. Storm
+    { armor: '#7c2d12', light: '#ea580c', aura: '#fdba74', core: '#f97316' }, // 3. Canyon
+    { armor: '#831843', light: '#db2777', aura: '#06b6d4', core: '#f43f5e' }, // 4. Cyber
+    { armor: '#164e63', light: '#0891b2', aura: '#67e8f9', core: '#22d3ee' }, // 5. Arctic
+    { armor: '#7f1d1d', light: '#dc2626', aura: '#f87171', core: '#ef4444' }, // 6. Volcano
+    { armor: '#1e3a8a', light: '#2563eb', aura: '#93c5fd', core: '#60a5fa' }, // 7. Orbit
+    { armor: '#1e293b', light: '#475569', aura: '#f59e0b', core: '#94a3b8' }, // 8. Asteroid
+    { armor: '#701a75', light: '#c026d3', aura: '#f0abfc', core: '#e879f9' }, // 9. Void
+    { armor: '#78350f', light: '#d97706', aura: '#fde047', core: '#fbbf24' }, // 10. Omega Core
+  ];
+  const p = bossPalettes[(stageNum - 1) % bossPalettes.length];
+
+  const armor = isHit ? '#ffffff' : p.armor;
+  const armorLight = isHit ? '#ffffff' : (isEnraged && frame === 0 ? '#ffffff' : p.light);
+  const frameColor = isHit ? '#ffffff' : '#09090b';
+  const shieldAura = isHit ? '#ffffff' : p.aura;
+  const gold = isHit ? '#ffffff' : (isEnraged ? '#ef4444' : '#f59e0b');
+  const coreColor = isHit ? '#ffffff' : (isEnraged ? (frame === 0 ? '#ffffff' : '#ef4444') : p.core);
   const thruster = isHit ? '#ffffff' : frame === 0 ? '#ef4444' : '#f97316';
 
   // Massive Outer Wing Mandibles
@@ -249,7 +335,7 @@ function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, is
   // Main Dreadnought Hull
   pRect(ctx, 20, 14, 40, 54, armor);
   pRect(ctx, 26, 6, 28, 10, armorLight); // bow ram
-  pRect(ctx, 32, 2, 16, 6, '#ffffff'); // prow tip
+  pRect(ctx, 32, 2, 16, 6, isEnraged ? '#ef4444' : '#ffffff'); // prow tip
   pRect(ctx, 24, 20, 32, 42, frameColor);
 
   // Command Bridge Tower
@@ -257,9 +343,12 @@ function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, is
   pRect(ctx, 34, 26, 12, 4, shieldAura);
   pRect(ctx, 36, 27, 8, 2, '#ffffff');
 
-  // Heavy Central Plasma Core
+  // Heavy Central Plasma Core (Pulsating and enraged in phase 2)
   pRect(ctx, 30, 40, 20, 14, gold);
-  pRect(ctx, 34, 43, 12, 8, '#ffffff');
+  pRect(ctx, 34, 43, 12, 8, coreColor);
+  if (isEnraged) {
+    pRect(ctx, 37, 45, 6, 4, '#ffffff');
+  }
 
   // Flank Shield Emitters
   pRect(ctx, 16, 36, 4, 12, shieldAura);
@@ -269,7 +358,7 @@ function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, is
   const engineXs = [10, 24, 34, 42, 52, 66];
   for (const ex of engineXs) {
     pRect(ctx, ex, 68, 4, 4, frameColor);
-    pRect(ctx, ex + 1, 72, 2, frame === 0 ? 6 : 4, thruster);
+    pRect(ctx, ex + 1, 72, 2, frame === 0 ? 7 : 4, thruster);
   }
 }
 
@@ -527,6 +616,22 @@ export function renderEnemyBullet(ctx: CanvasRenderingContext2D, b: EnemyBullet)
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (b.type === 'spiral') {
+    // Diamond high-energy rotating spiral bullet
+    ctx.rotate((b.id * 100 + performance.now() * 0.008) % (Math.PI * 2));
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.moveTo(0, -b.radius * 1.3);
+    ctx.lineTo(b.radius, 0);
+    ctx.lineTo(0, b.radius * 1.3);
+    ctx.lineTo(-b.radius, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, b.radius * 0.45, 0, Math.PI * 2);
     ctx.fill();
   } else {
     // Round energy orb

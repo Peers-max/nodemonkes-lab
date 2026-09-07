@@ -66,6 +66,16 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     combo: 0,
     isFever: false,
     isPaused: false,
+    currentStage: 1,
+    stageState: 'intro',
+    stageProgress: 0,
+    stageNameZh: '平流层巡航',
+    stageNameEn: 'Stratosphere Patrol',
+    bossHp: 0,
+    bossMaxHp: 1,
+    bossName: '',
+    bossPhase: 1,
+    isBossActive: false,
   });
 
   const [highScore, setHighScore] = useState<number>(() => {
@@ -383,6 +393,54 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
           </div>
         </div>
 
+        {/* Stage Progress Bar */}
+        <div className="w-full flex items-center justify-between gap-2 px-3 py-1 mb-1.5 bg-slate-950/70 rounded-lg border border-slate-800 text-[11px] font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30">
+              STAGE {stats.currentStage || 1}/10
+            </span>
+            <span className="text-white font-semibold">{stats.stageNameZh}</span>
+            <span className="text-slate-500 text-[10px] hidden sm:inline">({stats.stageNameEn})</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-[10px]">{isZh ? '推进度' : 'Progress'}</span>
+            <div className="w-20 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div 
+                className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 rounded-full transition-all duration-300"
+                style={{ width: `${stats.stageProgress || 0}%` }}
+              />
+            </div>
+            <span className="text-sky-400 font-bold">{stats.stageProgress || 0}%</span>
+          </div>
+        </div>
+
+        {/* Boss Health Bar HUD */}
+        {stats.isBossActive && (
+          <div className="w-full flex flex-col gap-1 px-3 py-1.5 mb-2 bg-gradient-to-r from-rose-950/80 via-slate-950/90 to-rose-950/80 rounded-xl border border-rose-500/50 shadow-lg shadow-rose-950/50 animate-pulse font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-rose-400 font-black">⚠️ BOSS:</span>
+                <span className="text-white font-bold tracking-wide">{stats.bossName}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black">
+                  PHASE {stats.bossPhase}
+                </span>
+                <span className="text-rose-400 font-bold">
+                  {Math.round(((stats.bossHp || 0) / (stats.bossMaxHp || 1)) * 100)}%
+                </span>
+              </div>
+            </div>
+            <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-rose-600/50 p-0.5">
+              <div 
+                className="h-full bg-gradient-to-r from-amber-500 via-rose-500 to-red-600 rounded-full transition-all duration-150 shadow-sm shadow-rose-500/50"
+                style={{ width: `${Math.min(100, Math.max(0, ((stats.bossHp || 0) / (stats.bossMaxHp || 1)) * 100))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Fever Mode Alert Banner */}
         {stats.isFever && (
           <div className="w-full flex items-center justify-center px-3 py-1 mb-2 rounded-lg bg-gradient-to-r from-amber-600/30 via-rose-600/30 to-amber-600/30 border border-amber-500/50 text-amber-300 text-xs font-mono font-black tracking-wide animate-pulse">
@@ -532,6 +590,43 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
               >
                 <RotateCcw className="w-5 h-5" />
                 <span>{isZh ? '重新出击' : 'SCRAMBLE FIGHTER'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* All 10 Stages Cleared Victory Overlay */}
+          {stats.stageState === 'all_clear' && (
+            <div className="absolute inset-0 bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-25">
+              <div className="w-20 h-20 rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl mb-4 shadow-xl shadow-amber-500/30 animate-bounce">
+                👑
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-amber-300 mb-1">
+                {isZh ? '全域突破 • 巅峰传奇王牌！' : 'ALL 10 STAGES CONQUERED!'}
+              </h2>
+              <p className="text-xs text-slate-300 mb-6 max-w-xs leading-relaxed">
+                {isZh 
+                  ? '恭喜指挥官！您驾驶节点猴战机成功击溃了全部10大区域的敌军舰队与泰坦母舰，彻底解放了节点核心矩阵！' 
+                  : 'Mission accomplished! You and your NodeMonke fighter conquered all 10 stages and shattered the Matrix armada!'}
+              </p>
+
+              {/* Victory Stats */}
+              <div className="w-full max-w-xs grid grid-cols-2 gap-2 mb-6 font-mono text-xs">
+                <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30">
+                  <div className="text-amber-300 text-[10px]">{isZh ? '最终得分' : 'Final Score'}</div>
+                  <div className="text-xl font-black text-amber-400">{stats.score}</div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                  <div className="text-slate-400 text-[10px]">{isZh ? '击落敌机' : 'Enemies Downed'}</div>
+                  <div className="text-lg font-black text-emerald-400">{stats.zombiesKilled}</div>
+                </div>
+              </div>
+
+              <button
+                onClick={startGame}
+                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black text-base shadow-xl shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all"
+              >
+                <Sparkles className="w-5 h-5 fill-slate-950" />
+                <span>{isZh ? '再次征服宇宙！' : 'PLAY AGAIN'}</span>
               </button>
             </div>
           )}
