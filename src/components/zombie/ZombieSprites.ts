@@ -1,5 +1,5 @@
 // src/components/zombie/ZombieSprites.ts
-import type { ZombieType } from './types';
+import type { ZombieType, WeaponType } from './types';
 
 // Cache for all pre-rendered pixel sprites
 const spriteCache = new Map<string, HTMLCanvasElement>();
@@ -20,14 +20,14 @@ function pRect(
 }
 
 /**
- * Generates an authentic retro pixel-art zombie sprite offscreen canvas
+ * Generates an authentic retro pixel-art enemy aircraft sprite
  */
 export function getZombieSprite(
   type: ZombieType,
-  frame: number, // 0 or 1 for walk cycle
+  frame: number, // animation frame
   isHit: boolean
 ): HTMLCanvasElement {
-  const key = `${type}_${frame}_${isHit ? 1 : 0}`;
+  const key = `${type}_${frame % 2}_${isHit ? 1 : 0}`;
   const existing = spriteCache.get(key);
   if (existing) return existing;
 
@@ -38,31 +38,31 @@ export function getZombieSprite(
 
   const f = frame % 2;
 
-  if (type === 'boss') {
-    // 80x80 Colossal Titan Overlord
+  if (type === 'boss' || type === 'mothership') {
+    // 80x80 Colossal Sky Titan Mothership
     canvas.width = 80;
     canvas.height = 80;
-    renderBossSprite(ctx, f, isHit);
-  } else if (type === 'tank') {
-    // 48x48 Heavy Armored Goliath
+    renderMothershipSprite(ctx, f, isHit);
+  } else if (type === 'tank' || type === 'gunship') {
+    // 48x48 Heavy Armored Flying Fortress Gunship
     canvas.width = 48;
     canvas.height = 48;
-    renderTankSprite(ctx, f, isHit);
-  } else if (type === 'exploder') {
-    // 36x36 Bloated Acid Pustule Zombie
+    renderGunshipSprite(ctx, f, isHit);
+  } else if (type === 'exploder' || type === 'kamikaze') {
+    // 36x36 Volatile Plasma Bomb Drone
     canvas.width = 36;
     canvas.height = 36;
-    renderExploderSprite(ctx, f, isHit);
-  } else if (type === 'runner') {
-    // 32x32 Radioactive Toxic Sprinter
-    canvas.width = 32;
-    canvas.height = 32;
-    renderRunnerSprite(ctx, f, isHit);
+    renderKamikazeSprite(ctx, f, isHit);
+  } else if (type === 'runner' || type === 'interceptor') {
+    // 34x34 Supersonic Interceptor Fighter Jet
+    canvas.width = 34;
+    canvas.height = 34;
+    renderInterceptorSprite(ctx, f, isHit);
   } else {
-    // 32x32 Standard Walker Zombie Monke
+    // 32x32 Scout Drone Light Fighter
     canvas.width = 32;
     canvas.height = 32;
-    renderWalkerSprite(ctx, f, isHit);
+    renderScoutDroneSprite(ctx, f, isHit);
   }
 
   spriteCache.set(key, canvas);
@@ -70,290 +70,369 @@ export function getZombieSprite(
 }
 
 /**
- * 1. WALKER ZOMBIE MONKE (32x32)
- * Decayed green skin, hollow crimson eyes, snarling fangs with acid drool, shambling claws
+ * 1. SCOUT DRONE (32x32)
+ * Green/Cyan high-tech recon drone with swept wings, dual laser pods, and central sensor eye
  */
-function renderWalkerSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const base = isHit ? '#ffffff' : '#166534';
-  const shadow = isHit ? '#e2e8f0' : '#14532d';
-  const highlight = isHit ? '#ffffff' : '#22c55e';
-  const eye = isHit ? '#ffffff' : '#ef4444';
-  const fang = isHit ? '#ffffff' : '#fef08a';
-  const slime = isHit ? '#ffffff' : '#86efac';
+function renderScoutDroneSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
+  const armor = isHit ? '#ffffff' : '#0f766e'; // dark teal
+  const armorLight = isHit ? '#ffffff' : '#14b8a6'; // bright teal
+  const frameColor = isHit ? '#ffffff' : '#1e293b'; // slate dark
+  const eye = isHit ? '#ffffff' : '#22c55e'; // neon green optical core
+  const thruster = isHit ? '#ffffff' : frame === 0 ? '#38bdf8' : '#0284c7';
 
-  // Ears
-  pRect(ctx, 3, 7, 4, 6, shadow);
-  pRect(ctx, 4, 8, 2, 4, base);
-  pRect(ctx, 25, 7, 4, 6, shadow);
-  pRect(ctx, 26, 8, 2, 4, base);
+  // Forward wing pylons
+  pRect(ctx, 4, 12, 6, 8, armor);
+  pRect(ctx, 22, 12, 6, 8, armor);
+  pRect(ctx, 2, 14, 3, 10, armorLight);
+  pRect(ctx, 27, 14, 3, 10, armorLight);
 
-  // Head
-  pRect(ctx, 6, 4, 20, 18, base);
-  pRect(ctx, 7, 5, 18, 3, highlight);
-  pRect(ctx, 6, 18, 20, 4, shadow);
+  // Wingtip gun barrels
+  pRect(ctx, 3, 8, 2, 7, frameColor);
+  pRect(ctx, 27, 8, 2, 7, frameColor);
+  pRect(ctx, 3, 6, 2, 2, '#38bdf8');
+  pRect(ctx, 27, 6, 2, 2, '#38bdf8');
 
-  // Necrotic patches
-  pRect(ctx, 9, 7, 3, 3, '#052e16');
-  pRect(ctx, 19, 10, 4, 3, '#052e16');
+  // Central chassis
+  pRect(ctx, 10, 8, 12, 18, armor);
+  pRect(ctx, 12, 6, 8, 4, armorLight); // nose cone
+  pRect(ctx, 11, 10, 10, 12, frameColor);
 
-  // Sunken Eye Sockets & Glowing Eyes
-  pRect(ctx, 8, 9, 6, 5, '#022c22');
-  pRect(ctx, 18, 9, 6, 5, '#022c22');
-  pRect(ctx, 10, 10, 3, 3, eye);
-  pRect(ctx, 20, 10, 3, 3, eye);
+  // Optical sensor eye
+  pRect(ctx, 13, 12, 6, 5, eye);
+  pRect(ctx, 15, 13, 2, 3, '#ffffff');
 
-  // Gaping Snout & Snarl Mouth
-  pRect(ctx, 9, 15, 14, 6, shadow);
-  pRect(ctx, 11, 16, 10, 4, '#000000');
-  // Fangs
-  pRect(ctx, 12, 16, 2, 3, fang);
-  pRect(ctx, 18, 16, 2, 3, fang);
-  // Toxic Drool
-  pRect(ctx, 13, 19, 2, frame === 0 ? 3 : 2, slime);
+  // Rear thruster exhaust
+  pRect(ctx, 13, 26, 6, 3, frameColor);
+  pRect(ctx, 14, 28, 4, frame === 0 ? 4 : 2, thruster);
+}
 
-  // Torso
-  pRect(ctx, 8, 22, 16, 6, base);
-  pRect(ctx, 10, 23, 12, 5, shadow);
+/**
+ * 2. SUPERSONIC INTERCEPTOR (34x34)
+ * Dark purple/violet delta-wing high-speed fighter jet with sharp nose and dual thrusters
+ */
+function renderInterceptorSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
+  const armor = isHit ? '#ffffff' : '#581c87'; // deep violet
+  const armorLight = isHit ? '#ffffff' : '#9333ea'; // vivid purple
+  const frameColor = isHit ? '#ffffff' : '#1e1b4b'; // dark navy
+  const cockpit = isHit ? '#ffffff' : '#f43f5e'; // glowing red visor canopy
+  const thruster = isHit ? '#ffffff' : frame === 0 ? '#a855f7' : '#ec4899';
 
-  // Outstretched Zombie Arms / Claws (Walking Shambling)
-  if (frame === 0) {
-    pRect(ctx, 4, 18, 4, 10, base);
-    pRect(ctx, 3, 26, 4, 3, shadow); // claw
-    pRect(ctx, 24, 20, 4, 8, base);
-    pRect(ctx, 25, 27, 4, 3, shadow);
-  } else {
-    pRect(ctx, 4, 20, 4, 8, base);
-    pRect(ctx, 3, 27, 4, 3, shadow);
-    pRect(ctx, 24, 18, 4, 10, base);
-    pRect(ctx, 25, 26, 4, 3, shadow);
+  // Delta Wings
+  pRect(ctx, 2, 18, 8, 8, armor);
+  pRect(ctx, 24, 18, 8, 8, armor);
+  pRect(ctx, 0, 22, 4, 6, armorLight);
+  pRect(ctx, 30, 22, 4, 6, armorLight);
+
+  // Sharp Fuselage Body
+  pRect(ctx, 15, 2, 4, 6, armorLight); // needle tip
+  pRect(ctx, 13, 7, 8, 8, armor);
+  pRect(ctx, 11, 14, 12, 14, armor);
+  pRect(ctx, 12, 16, 10, 10, frameColor);
+
+  // Glowing Cockpit / Targeting Visor
+  pRect(ctx, 14, 10, 6, 6, cockpit);
+  pRect(ctx, 16, 11, 2, 2, '#ffffff');
+
+  // Twin Jet Afterburners
+  pRect(ctx, 11, 28, 4, 3, frameColor);
+  pRect(ctx, 19, 28, 4, 3, frameColor);
+  pRect(ctx, 12, 30, 2, frame === 0 ? 5 : 3, thruster);
+  pRect(ctx, 20, 30, 2, frame === 0 ? 5 : 3, thruster);
+}
+
+/**
+ * 3. HEAVY ARMORED GUNSHIP (48x48)
+ * Bronze/gold heavy flying fortress with reinforced armor plates and twin rotatable flak turrets
+ */
+function renderGunshipSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
+  const armor = isHit ? '#ffffff' : '#854d0e'; // bronze
+  const armorLight = isHit ? '#ffffff' : '#eab308'; // gold
+  const frameColor = isHit ? '#ffffff' : '#1c1917'; // stone dark
+  const glass = isHit ? '#ffffff' : '#38bdf8'; // blue sensor bridge
+  const thruster = isHit ? '#ffffff' : frame === 0 ? '#f97316' : '#eab308';
+
+  // Massive side wing sponsons
+  pRect(ctx, 2, 14, 10, 24, armor);
+  pRect(ctx, 36, 14, 10, 24, armor);
+  pRect(ctx, 4, 18, 6, 18, armorLight);
+  pRect(ctx, 38, 18, 6, 18, armorLight);
+
+  // Side Turret Cannons
+  pRect(ctx, 5, 8, 4, 8, frameColor);
+  pRect(ctx, 39, 8, 4, 8, frameColor);
+  pRect(ctx, 6, 6, 2, 4, '#f59e0b');
+  pRect(ctx, 40, 6, 2, 4, '#f59e0b');
+
+  // Main Fortress Hull
+  pRect(ctx, 12, 10, 24, 30, armor);
+  pRect(ctx, 16, 6, 16, 6, armorLight); // armored bow
+  pRect(ctx, 14, 14, 20, 22, frameColor);
+
+  // Command Bridge
+  pRect(ctx, 18, 12, 12, 5, glass);
+  pRect(ctx, 20, 13, 8, 2, '#ffffff');
+
+  // Heavy Center Cannon
+  pRect(ctx, 22, 2, 4, 6, '#475569');
+
+  // Heavy Quad Thruster Exhaust
+  pRect(ctx, 14, 40, 4, 3, frameColor);
+  pRect(ctx, 20, 40, 4, 3, frameColor);
+  pRect(ctx, 24, 40, 4, 3, frameColor);
+  pRect(ctx, 30, 40, 4, 3, frameColor);
+
+  const flameLen = frame === 0 ? 5 : 3;
+  pRect(ctx, 15, 43, 2, flameLen, thruster);
+  pRect(ctx, 21, 43, 2, flameLen + 1, thruster);
+  pRect(ctx, 25, 43, 2, flameLen + 1, thruster);
+  pRect(ctx, 31, 43, 2, flameLen, thruster);
+}
+
+/**
+ * 4. KAMIKAZE BOMB DRONE (36x36)
+ * Glowing red-orange floating bomb craft with pulsing hazardous fusion reactor
+ */
+function renderKamikazeSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
+  const armor = isHit ? '#ffffff' : '#9a3412'; // rust red
+  const armorLight = isHit ? '#ffffff' : '#ea580c'; // fiery orange
+  const core = isHit ? '#ffffff' : frame === 0 ? '#fbbf24' : '#ef4444'; // pulsing reactor core
+  const frameColor = isHit ? '#ffffff' : '#292524';
+
+  // Triangular Aerodynamic Stabilizers
+  pRect(ctx, 2, 14, 6, 12, armor);
+  pRect(ctx, 28, 14, 6, 12, armor);
+  pRect(ctx, 0, 20, 4, 6, armorLight);
+  pRect(ctx, 32, 20, 4, 6, armorLight);
+
+  // Main Bomb Fuselage
+  pRect(ctx, 8, 8, 20, 22, armor);
+  pRect(ctx, 12, 4, 12, 5, armorLight); // warhead detonator tip
+  pRect(ctx, 10, 11, 16, 16, frameColor);
+
+  // Pulsing Volatile Core
+  pRect(ctx, 12, 13, 12, 12, core);
+  pRect(ctx, 15, 16, 6, 6, '#ffffff');
+
+  // Hazard warning chevrons
+  pRect(ctx, 11, 24, 4, 2, '#000000');
+  pRect(ctx, 21, 24, 4, 2, '#000000');
+
+  // Rear exhaust
+  pRect(ctx, 15, 29, 6, 3, frameColor);
+  pRect(ctx, 16, 32, 4, frame === 0 ? 4 : 2, '#f97316');
+}
+
+/**
+ * 5. COLOSSAL SKY TITAN MOTHERSHIP (80x80)
+ * Massive aerial dreadnought with dark crimson armor, bridge towers, multiple heavy batteries and energy shields
+ */
+function renderMothershipSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
+  const armor = isHit ? '#ffffff' : '#7f1d1d'; // dark crimson
+  const armorLight = isHit ? '#ffffff' : '#dc2626'; // bright red
+  const frameColor = isHit ? '#ffffff' : '#18181b'; // obsidian black
+  const shieldAura = isHit ? '#ffffff' : '#38bdf8'; // blue shield glow
+  const gold = isHit ? '#ffffff' : '#f59e0b';
+  const thruster = isHit ? '#ffffff' : frame === 0 ? '#ef4444' : '#f97316';
+
+  // Massive Outer Wing Mandibles
+  pRect(ctx, 4, 20, 16, 46, armor);
+  pRect(ctx, 60, 20, 16, 46, armor);
+  pRect(ctx, 2, 28, 8, 32, armorLight);
+  pRect(ctx, 70, 28, 8, 32, armorLight);
+
+  // Wing Heavy Turret Pods
+  pRect(ctx, 6, 12, 8, 10, frameColor);
+  pRect(ctx, 66, 12, 8, 10, frameColor);
+  pRect(ctx, 8, 6, 4, 8, gold); // double barrels
+  pRect(ctx, 68, 6, 4, 8, gold);
+
+  // Main Dreadnought Hull
+  pRect(ctx, 20, 14, 40, 54, armor);
+  pRect(ctx, 26, 6, 28, 10, armorLight); // bow ram
+  pRect(ctx, 32, 2, 16, 6, '#ffffff'); // prow tip
+  pRect(ctx, 24, 20, 32, 42, frameColor);
+
+  // Command Bridge Tower
+  pRect(ctx, 32, 22, 16, 12, armorLight);
+  pRect(ctx, 34, 26, 12, 4, shieldAura);
+  pRect(ctx, 36, 27, 8, 2, '#ffffff');
+
+  // Heavy Central Plasma Core
+  pRect(ctx, 30, 40, 20, 14, gold);
+  pRect(ctx, 34, 43, 12, 8, '#ffffff');
+
+  // Flank Shield Emitters
+  pRect(ctx, 16, 36, 4, 12, shieldAura);
+  pRect(ctx, 60, 36, 4, 12, shieldAura);
+
+  // Massive Engine Array (6 Thrusters)
+  const engineXs = [10, 24, 34, 42, 52, 66];
+  for (const ex of engineXs) {
+    pRect(ctx, ex, 68, 4, 4, frameColor);
+    pRect(ctx, ex + 1, 72, 2, frame === 0 ? 6 : 4, thruster);
   }
-
-  // Shuffling Feet
-  pRect(ctx, 9, 28, 5, 3, shadow);
-  pRect(ctx, 18, 28, 5, 3, shadow);
 }
 
 /**
- * 2. RUNNER ZOMBIE (32x32)
- * Sleek radioactive purple body, hunched posture, blazing cyan streak eyes, razor talons
+ * 6. RETRO FIGHTER PLANE WITH NODEMONKE PILOT IN COCKPIT (38x38)
+ * The player's starfighter / jet! Features swept-back wings, wing cannons,
+ * twin pulsating jet exhausts, and the NodeMonke's face clearly visible inside the glass canopy!
  */
-function renderRunnerSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const base = isHit ? '#ffffff' : '#9333ea';
-  const shadow = isHit ? '#e2e8f0' : '#581c87';
-  const highlight = isHit ? '#ffffff' : '#c084fc';
-  const eye = isHit ? '#ffffff' : '#22d3ee';
-  const claw = isHit ? '#ffffff' : '#f43f5e';
+export function renderFighterJet(
+  ctx: CanvasRenderingContext2D,
+  monkeSprite: CanvasImageSource,
+  weapon: WeaponType,
+  thrusterFrame: number,
+  isAdrenaline: boolean,
+  isFever: boolean,
+  size: number = 38
+) {
+  const W = size;
+  const H = size;
+  ctx.save();
 
-  // Pointed Bat-like Ears
-  pRect(ctx, 4, 4, 4, 7, shadow);
-  pRect(ctx, 24, 4, 4, 7, shadow);
+  const isHyper = isAdrenaline || isFever;
+  const fuselageColor = isHyper ? '#1e1b4b' : '#1e293b'; // slate dark metal
+  const wingColor = isHyper ? '#4338ca' : '#334155'; // midnight / dark wing
+  const highlightColor = isHyper ? '#818cf8' : '#64748b';
+  const thrusterColor = isHyper ? '#f59e0b' : '#38bdf8'; // cyan vs intense gold
+  const thrusterCore = isHyper ? '#ffffff' : '#e0f2fe';
 
-  // Angular Head
-  pRect(ctx, 7, 6, 18, 14, base);
-  pRect(ctx, 9, 7, 14, 3, highlight);
+  // 1. Dual Jet Thruster Exhaust Flames (rendered underneath rear of jet)
+  const flamePulse = Math.sin(thrusterFrame * 12) * 3;
+  const flameLen = (isHyper ? 14 : 9) + flamePulse;
 
-  // Piercing Cyan Slit Eyes
-  pRect(ctx, 9, 10, 5, 3, '#1e1b4b');
-  pRect(ctx, 18, 10, 5, 3, '#1e1b4b');
-  pRect(ctx, 10, 11, 4, 2, eye);
-  pRect(ctx, 19, 11, 4, 2, eye);
+  // Left Jet Flame
+  ctx.fillStyle = thrusterColor;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.32, H * 0.88);
+  ctx.lineTo(W * 0.38, H * 0.88);
+  ctx.lineTo(W * 0.35, H * 0.88 + flameLen);
+  ctx.closePath();
+  ctx.fill();
 
-  // Feral Snarl
-  pRect(ctx, 11, 14, 10, 4, '#000000');
-  pRect(ctx, 12, 14, 2, 2, '#fff');
-  pRect(ctx, 18, 14, 2, 2, '#fff');
+  ctx.fillStyle = thrusterCore;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.33, H * 0.88);
+  ctx.lineTo(W * 0.37, H * 0.88);
+  ctx.lineTo(W * 0.35, H * 0.88 + flameLen * 0.6);
+  ctx.closePath();
+  ctx.fill();
 
-  // Slender Torso
-  pRect(ctx, 10, 20, 12, 7, shadow);
+  // Right Jet Flame
+  ctx.fillStyle = thrusterColor;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.62, H * 0.88);
+  ctx.lineTo(W * 0.68, H * 0.88);
+  ctx.lineTo(W * 0.65, H * 0.88 + flameLen);
+  ctx.closePath();
+  ctx.fill();
 
-  // Fast Scuttling Talons (Dynamic sprint pose)
-  if (frame === 0) {
-    pRect(ctx, 2, 17, 7, 4, base);
-    pRect(ctx, 1, 19, 3, 5, claw);
-    pRect(ctx, 23, 21, 7, 4, base);
-    pRect(ctx, 28, 23, 3, 5, claw);
-    // Legs
-    pRect(ctx, 8, 27, 4, 4, shadow);
-    pRect(ctx, 20, 26, 4, 5, shadow);
-  } else {
-    pRect(ctx, 2, 21, 7, 4, base);
-    pRect(ctx, 1, 23, 3, 5, claw);
-    pRect(ctx, 23, 17, 7, 4, base);
-    pRect(ctx, 28, 19, 3, 5, claw);
-    // Legs
-    pRect(ctx, 8, 26, 4, 5, shadow);
-    pRect(ctx, 20, 27, 4, 4, shadow);
-  }
-}
+  ctx.fillStyle = thrusterCore;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.63, H * 0.88);
+  ctx.lineTo(W * 0.67, H * 0.88);
+  ctx.lineTo(W * 0.65, H * 0.88 + flameLen * 0.6);
+  ctx.closePath();
+  ctx.fill();
 
-/**
- * 3. TANK GOLIATH (48x48)
- * Hulking yellow-amber decayed brute, heavy iron pauldrons, riveted metal jaw mask, dual optics
- */
-function renderTankSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const base = isHit ? '#ffffff' : '#ca8a04';
-  const shadow = isHit ? '#e2e8f0' : '#713f12';
-  const iron = isHit ? '#ffffff' : '#475569';
-  const ironHi = isHit ? '#ffffff' : '#94a3b8';
-  const eye = isHit ? '#ffffff' : '#f97316';
+  // 2. Swept-back Wings & Wingtips
+  ctx.fillStyle = wingColor;
+  ctx.beginPath();
+  // Left wing
+  ctx.moveTo(W * 0.5, H * 0.25);
+  ctx.lineTo(W * 0.04, H * 0.72);
+  ctx.lineTo(W * 0.16, H * 0.85);
+  ctx.lineTo(W * 0.36, H * 0.78);
+  // Right wing
+  ctx.lineTo(W * 0.64, H * 0.78);
+  ctx.lineTo(W * 0.84, H * 0.85);
+  ctx.lineTo(W * 0.96, H * 0.72);
+  ctx.closePath();
+  ctx.fill();
 
-  // Massive Shoulders / Iron Pauldrons
-  pRect(ctx, 2, 10, 12, 14, iron);
-  pRect(ctx, 4, 12, 8, 3, ironHi);
-  pRect(ctx, 34, 10, 12, 14, iron);
-  pRect(ctx, 36, 12, 8, 3, ironHi);
-  // Rivets
-  pRect(ctx, 5, 18, 2, 2, '#fff');
-  pRect(ctx, 41, 18, 2, 2, '#fff');
+  // Wing borders / trim
+  ctx.strokeStyle = highlightColor;
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  // Bulky Head
-  pRect(ctx, 12, 6, 24, 22, base);
-  pRect(ctx, 14, 8, 20, 4, '#eab308');
+  // Wingtip Navigation lights
+  pRect(ctx, W * 0.04, H * 0.70, 2.5, 3, '#ef4444'); // red port light
+  pRect(ctx, W * 0.93, H * 0.70, 2.5, 3, '#22c55e'); // green starboard light
 
-  // Heavy Brow & Glowing Amber Eyes
-  pRect(ctx, 14, 12, 20, 4, shadow);
-  pRect(ctx, 15, 14, 5, 4, '#000');
-  pRect(ctx, 28, 14, 5, 4, '#000');
-  pRect(ctx, 16, 15, 3, 2, eye);
-  pRect(ctx, 29, 15, 3, 2, eye);
+  // 3. Wing-Mounted Gun Cannons (visual reflects weapon)
+  let gunColor = '#38bdf8';
+  if (weapon === 'gatling') gunColor = '#f59e0b';
+  else if (weapon === 'shotgun') gunColor = '#ec4899';
+  else if (weapon === 'laser') gunColor = '#06b6d4';
+  else if (weapon === 'rocket') gunColor = '#ef4444';
 
-  // Armored Iron Jaw Mask
-  pRect(ctx, 13, 20, 22, 9, iron);
-  pRect(ctx, 15, 22, 18, 2, ironHi);
-  // Vent slits
-  pRect(ctx, 17, 25, 2, 3, '#0f172a');
-  pRect(ctx, 21, 25, 2, 3, '#0f172a');
-  pRect(ctx, 25, 25, 2, 3, '#0f172a');
-  pRect(ctx, 29, 25, 2, 3, '#0f172a');
+  // Left Gun
+  pRect(ctx, W * 0.18, H * 0.38, 3, 14, '#1e293b');
+  pRect(ctx, W * 0.18, H * 0.32, 3, 6, gunColor);
+  // Right Gun
+  pRect(ctx, W * 0.79, H * 0.38, 3, 14, '#1e293b');
+  pRect(ctx, W * 0.79, H * 0.32, 3, 6, gunColor);
 
-  // Colossal Torso
-  pRect(ctx, 10, 28, 28, 12, shadow);
-  pRect(ctx, 14, 30, 20, 8, base);
+  // 4. Main Fuselage Body
+  ctx.fillStyle = fuselageColor;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.5, H * 0.04); // Sharp aerodynamic nose
+  ctx.lineTo(W * 0.65, H * 0.35);
+  ctx.lineTo(W * 0.68, H * 0.86);
+  ctx.lineTo(W * 0.32, H * 0.86);
+  ctx.lineTo(W * 0.35, H * 0.35);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 
-  // Giant Heavy Fists
-  const stepOffset = frame === 0 ? 2 : -2;
-  pRect(ctx, 2, 24 + stepOffset, 10, 14, shadow);
-  pRect(ctx, 36, 24 - stepOffset, 10, 14, shadow);
+  // Fuselage armor panel stripes
+  pRect(ctx, W * 0.46, H * 0.08, W * 0.08, H * 0.22, highlightColor);
 
-  // Heavy Metal Stomp Feet
-  pRect(ctx, 12, 40, 10, 6, iron);
-  pRect(ctx, 26, 40, 10, 6, iron);
-}
+  // 5. Transparent Bubble Cockpit Canopy with the NodeMonke Pilot inside!
+  const cockpitW = W * 0.44;
+  const cockpitH = H * 0.40;
+  const cockpitX = (W - cockpitW) / 2;
+  const cockpitY = H * 0.34;
 
-/**
- * 4. EXPLODER ACID ZOMBIE (36x36)
- * Bloated orange slime carcass, pulsating green acid sacs, crazed eyes
- */
-function renderExploderSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const base = isHit ? '#ffffff' : '#ea580c';
-  const shadow = isHit ? '#e2e8f0' : '#7c2d12';
-  const acid = isHit ? '#ffffff' : '#84cc16';
-  const acidGlow = isHit ? '#ffffff' : '#bef264';
-  const eye = isHit ? '#ffffff' : '#facc15';
+  // Cockpit interior shadow
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(cockpitX, cockpitY, cockpitW, cockpitH);
 
-  // Bloated Asymmetrical Head
-  pRect(ctx, 8, 4, 20, 14, base);
-  pRect(ctx, 10, 5, 16, 3, '#f97316');
+  // DRAW NODEMONKE PILOT HEAD IN COCKPIT!
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  // Clip inside cockpit boundary
+  ctx.beginPath();
+  ctx.rect(cockpitX + 1, cockpitY + 1, cockpitW - 2, cockpitH - 2);
+  ctx.clip();
+  // Render scaled Monke face
+  ctx.drawImage(monkeSprite, cockpitX, cockpitY - 2, cockpitW, cockpitH + 6);
+  ctx.restore();
 
-  // Crazed Bulging Eyes
-  pRect(ctx, 9, 8, 6, 6, '#000000');
-  pRect(ctx, 20, 7, 7, 7, '#000000');
-  pRect(ctx, 10, 9, 4, 4, eye);
-  pRect(ctx, 21, 8, 5, 5, eye);
-  pRect(ctx, 12, 10, 2, 2, '#ef4444');
-  pRect(ctx, 23, 9, 2, 2, '#ef4444');
+  // Glass Canopy Dome with Cyan Gloss Reflection
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(cockpitX, cockpitY, cockpitW, cockpitH);
 
-  // Twisted Mouth
-  pRect(ctx, 12, 15, 12, 3, shadow);
-  pRect(ctx, 14, 16, 2, 3, acid); // acid drool
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+  ctx.fillRect(cockpitX, cockpitY, cockpitW, cockpitH);
 
-  // Swollen Bloated Torso with Acid Pustules
-  pRect(ctx, 4, 18, 28, 14, base);
-  pRect(ctx, 6, 20, 24, 10, shadow);
+  // Diagonal glass glare sheen
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.beginPath();
+  ctx.moveTo(cockpitX + 2, cockpitY + 2);
+  ctx.lineTo(cockpitX + cockpitW * 0.4, cockpitY + 2);
+  ctx.lineTo(cockpitX + 2, cockpitY + cockpitH * 0.6);
+  ctx.closePath();
+  ctx.fill();
 
-  // Pulsating Acid Bubbles
-  const pulse = frame === 0 ? 0 : 1;
-  pRect(ctx, 7, 21 - pulse, 6 + pulse, 6 + pulse, acid);
-  pRect(ctx, 8, 22 - pulse, 3, 3, acidGlow);
-
-  pRect(ctx, 21 - pulse, 22, 7 + pulse, 6 + pulse, acid);
-  pRect(ctx, 23, 23, 3, 3, acidGlow);
-
-  pRect(ctx, 14, 24 + pulse, 5, 5, acid);
-
-  // Tiny Flailing Limbs
-  pRect(ctx, 1, 20, 4, 7, shadow);
-  pRect(ctx, 31, 20, 4, 7, shadow);
-  pRect(ctx, 10, 32, 6, 3, shadow);
-  pRect(ctx, 20, 32, 6, 3, shadow);
-}
-
-/**
- * 5. TITAN BOSS OVERLORD (80x80)
- * Massive blood-crimson demon overlord, obsidian horn crown, cyber reactor core, lethal claws
- */
-function renderBossSprite(ctx: CanvasRenderingContext2D, frame: number, isHit: boolean) {
-  const base = isHit ? '#ffffff' : '#991b1b';
-  const shadow = isHit ? '#e2e8f0' : '#450a0a';
-  const highlight = isHit ? '#ffffff' : '#dc2626';
-  const horn = isHit ? '#ffffff' : '#1e1b4b';
-  const core = isHit ? '#ffffff' : '#f43f5e';
-  const eye = isHit ? '#ffffff' : '#fbbf24';
-
-  // Massive Barbed Crown / Horns
-  pRect(ctx, 8, 4, 6, 18, horn);
-  pRect(ctx, 14, 10, 6, 12, horn);
-  pRect(ctx, 66, 4, 6, 18, horn);
-  pRect(ctx, 60, 10, 6, 12, horn);
-  pRect(ctx, 36, 2, 8, 14, horn); // center horn
-
-  // Colossal Head
-  pRect(ctx, 18, 14, 44, 30, base);
-  pRect(ctx, 22, 16, 36, 6, highlight);
-
-  // Menacing Quad Eyes / Demonic Visor
-  pRect(ctx, 22, 24, 14, 6, '#000000');
-  pRect(ctx, 44, 24, 14, 6, '#000000');
-  pRect(ctx, 24, 25, 4, 4, eye);
-  pRect(ctx, 30, 25, 4, 4, '#ef4444');
-  pRect(ctx, 46, 25, 4, 4, '#ef4444');
-  pRect(ctx, 52, 25, 4, 4, eye);
-
-  // Skull Jaw & Massive Fangs
-  pRect(ctx, 22, 34, 36, 12, shadow);
-  pRect(ctx, 26, 36, 28, 6, '#000000');
-  for (let x = 27; x < 53; x += 5) {
-    pRect(ctx, x, 36, 3, 4, '#fef08a');
-    pRect(ctx, x + 2, 38, 2, 4, '#fef08a');
-  }
-
-  // Giant Armored Chest & Reactor Core
-  pRect(ctx, 14, 46, 52, 24, shadow);
-  pRect(ctx, 18, 48, 44, 18, base);
-
-  // Glowing Cyber Core (Pulses with walk frame)
-  const coreW = frame === 0 ? 14 : 16;
-  const coreH = frame === 0 ? 14 : 16;
-  pRect(ctx, 40 - coreW / 2, 54 - coreH / 2, coreW, coreH, '#450a0a');
-  pRect(ctx, 40 - (coreW - 4) / 2, 54 - (coreH - 4) / 2, coreW - 4, coreH - 4, core);
-  pRect(ctx, 38, 52, 4, 4, '#ffffff');
-
-  // Gigantic Claws on Sides
-  const armOffset = frame === 0 ? 3 : -3;
-  pRect(ctx, 2, 36 + armOffset, 14, 32, shadow);
-  pRect(ctx, 4, 64 + armOffset, 12, 8, horn); // lethal talons
-
-  pRect(ctx, 64, 36 - armOffset, 14, 32, shadow);
-  pRect(ctx, 64, 64 - armOffset, 12, 8, horn);
-
-  // Titan Stomp Feet
-  pRect(ctx, 22, 70, 14, 8, horn);
-  pRect(ctx, 44, 70, 14, 8, horn);
+  ctx.restore();
 }
 
 /**
  * Generates an authentic fallback pixel-art NodeMonke face (32x32)
- * Used if image is loading or network is slow so we NEVER display a plain orange box!
+ * Used if image is loading or network is slow so we NEVER display a plain box!
  */
 export function getFallbackMonkeSprite(id: number): HTMLCanvasElement {
   const key = `monke_fallback_${id % 5}`;
@@ -391,10 +470,10 @@ export function getFallbackMonkeSprite(id: number): HTMLCanvasElement {
   pRect(ctx, 10, 16, 12, 6, '#fde68a');
   pRect(ctx, 12, 18, 8, 2, darkSkin);
 
-  // Torso
+  // Torso / Flight Jacket
   pRect(ctx, 9, 24, 14, 6, darkSkin);
 
-  // Feet
+  // Feet / Controls
   pRect(ctx, 10, 29, 4, 3, skin);
   pRect(ctx, 18, 29, 4, 3, skin);
 

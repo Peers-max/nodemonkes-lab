@@ -13,14 +13,14 @@ import type {
 } from './types';
 import { ZombieAudio } from './ZombieAudio';
 import { getMonkeImageUrl } from '../../utils/api';
-import { getZombieSprite, getFallbackMonkeSprite, createMonkeCanvas } from './ZombieSprites';
+import { getZombieSprite, getFallbackMonkeSprite, createMonkeCanvas, renderFighterJet } from './ZombieSprites';
 
 export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   pistol: {
     type: 'pistol',
-    nameZh: '双枪速射',
-    nameEn: 'Dual Blasters',
-    icon: '🔫',
+    nameZh: '双联等离子航炮',
+    nameEn: 'Twin Plasma Blasters',
+    icon: '🛩️',
     fireInterval: 120,
     bulletSpeed: 16,
     damage: 22,
@@ -29,8 +29,8 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   },
   shotgun: {
     type: 'shotgun',
-    nameZh: '重型散弹',
-    nameEn: 'Heavy Shotgun',
+    nameZh: '空空散射破片炮',
+    nameEn: 'Spread Flak Cannon',
     icon: '💥',
     fireInterval: 320,
     bulletSpeed: 13,
@@ -43,8 +43,8 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   },
   gatling: {
     type: 'gatling',
-    nameZh: '加特林暴风',
-    nameEn: 'Gatling Storm',
+    nameZh: '旋转转管机炮',
+    nameEn: 'Rotary Vulcan',
     icon: '⚡',
     fireInterval: 75,
     bulletSpeed: 18,
@@ -55,8 +55,8 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   },
   laser: {
     type: 'laser',
-    nameZh: '贯穿激光',
-    nameEn: 'Piercing Laser',
+    nameZh: '高能光子光束',
+    nameEn: 'Photon Laser Beam',
     icon: '🔮',
     fireInterval: 240,
     bulletSpeed: 22,
@@ -68,8 +68,8 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   },
   rocket: {
     type: 'rocket',
-    nameZh: '高爆火箭筒',
-    nameEn: 'RPG Launcher',
+    nameZh: '微型空空飞弹',
+    nameEn: 'Micro Missiles',
     icon: '🚀',
     fireInterval: 450,
     bulletSpeed: 11,
@@ -140,6 +140,7 @@ export class ZombieEngine {
   private nextZombieDistance: number = 240;
   private screenShake: number = 0;
   private redFlashAlpha: number = 0;
+  private stars: Array<{ x: number; y: number; size: number; speed: number; alpha: number; color: string }> = [];
 
   // Callbacks
   public onStatsUpdate?: (stats: GameStats, crowdCount: number, weapon: WeaponType, weaponTimeLeft: number) => void;
@@ -189,6 +190,18 @@ export class ZombieEngine {
     this.playerY = this.canvas.height - 110;
     this.nextGateDistance = 60;
     this.nextZombieDistance = 240;
+    if (this.stars.length === 0) {
+      for (let i = 0; i < 75; i++) {
+        this.stars.push({
+          x: Math.random() * this.canvas.width,
+          y: Math.random() * this.canvas.height,
+          size: Math.random() < 0.25 ? 2.4 : 1.2,
+          speed: 0.4 + Math.random() * 1.4,
+          alpha: 0.3 + Math.random() * 0.7,
+          color: Math.random() < 0.3 ? '#38bdf8' : Math.random() < 0.6 ? '#e0f2fe' : '#ffffff',
+        });
+      }
+    }
     this.rebuildUnits();
     this.loadMonkeImage(monkeId);
   }
@@ -263,7 +276,7 @@ export class ZombieEngine {
     }
   }
 
-  // --- Formation algorithm for dynamic squad ---
+  // --- Formation algorithm for dynamic flight squad (Arrowhead / V-formation) ---
   private rebuildUnits() {
     const n = Math.max(1, this.crowdCount);
     if (n > this.maxCrowdReached) {
@@ -271,16 +284,20 @@ export class ZombieEngine {
     }
     const newUnits: MonkeUnit[] = [];
 
-    // Compact hexagonal / phyllotaxis layout (visual representation capped at 65 units for 60 FPS)
+    // V-formation flight wings: Leader Monke at point (0, 0), wingmen in staggered chevrons
+    // Visual representation capped at 65 units for smooth 60 FPS
     const visualCount = Math.min(65, n);
     for (let i = 0; i < visualCount; i++) {
       let ox = 0;
       let oy = 0;
       if (i > 0) {
-        const phi = i * 2.399963; // golden angle
-        const r = 16 * Math.sqrt(i); // packing radius
-        ox = Math.cos(phi) * r;
-        oy = Math.sin(phi) * r * 0.7; // slight vertical compression
+        const side = (i % 2 === 1) ? -1 : 1;
+        const pairIndex = Math.ceil(i / 2); // 1, 2, 3...
+        const row = Math.floor((pairIndex - 1) / 3);
+        const col = ((pairIndex - 1) % 3) + 1;
+
+        ox = side * (col * 24 + row * 16);
+        oy = col * 20 + row * 38;
       }
       newUnits.push({
         id: i,
@@ -288,10 +305,12 @@ export class ZombieEngine {
         offsetY: oy,
         x: this.playerX + ox,
         y: this.playerY + oy,
-        size: 32,
+        size: 36,
         shootCooldown: Math.random() * 80,
         monkeId: this.monkeId,
         walkFrame: Math.random() * 10,
+        bankAngle: 0,
+        thrusterFrame: Math.floor(Math.random() * 10),
       });
     }
     this.units = newUnits;
@@ -313,16 +332,16 @@ export class ZombieEngine {
       this.audio.playGatePass(true);
       const gained = this.crowdCount - old;
       if (this.crowdCount >= ZombieEngine.MAX_CROWD) {
-        this.addFloatingText(this.playerX, this.playerY - 40, `+${gained} (MAX SQUAD!)`, '#f59e0b', 20);
+        this.addFloatingText(this.playerX, this.playerY - 40, `+${gained} (战机满编!)`, '#f59e0b', 20);
       } else {
-        this.addFloatingText(this.playerX, this.playerY - 40, `+${gained} MONKES!`, '#4ade80', 20);
+        this.addFloatingText(this.playerX, this.playerY - 40, `+${gained} 战机扩编!`, '#4ade80', 20);
       }
       if (this.crowdCount > 15) {
         this.adrenalineUsedThisLife = false;
       }
     } else if (this.crowdCount < old) {
       this.audio.playGatePass(false);
-      this.addFloatingText(this.playerX, this.playerY - 40, `${this.crowdCount - old}`, '#ef4444', 22);
+      this.addFloatingText(this.playerX, this.playerY - 40, `${this.crowdCount - old} 战机受损`, '#ef4444', 22);
       this.redFlashAlpha = 0.35;
 
       // Adrenaline Clutch Mode!
@@ -378,7 +397,7 @@ export class ZombieEngine {
       } else {
         this.score += z.scoreValue;
         this.zombiesKilled++;
-        this.spawnBloodParticles(z.x, z.y, z.color);
+        this.spawnFlakParticles(z.x, z.y, z.color);
         this.zombies.splice(zi, 1);
       }
     }
@@ -491,6 +510,15 @@ export class ZombieEngine {
       this.shield = Math.min(this.maxShield, this.shield + (dt / 1000) * 1.5);
     }
 
+    // Starfield parallax scrolling update
+    for (const s of this.stars) {
+      s.y += (this.speed * s.speed + 1.2) * (dt / 16.66);
+      if (s.y > this.canvas.height) {
+        s.y = 0;
+        s.x = Math.random() * this.canvas.width;
+      }
+    }
+
     // Player position lerp
     this.playerX += (this.playerTargetX - this.playerX) * 0.22;
 
@@ -511,6 +539,10 @@ export class ZombieEngine {
     const fireInterval = this.adrenalineTimer > 0 ? weaponCfg.fireInterval * 0.5 : weaponCfg.fireInterval;
     const activeShooters = Math.min(this.units.length, 16);
 
+    // Dynamic banking tilt from horizontal steering
+    const steeringDelta = this.playerTargetX - this.playerX;
+    const targetBank = Math.max(-0.35, Math.min(0.35, steeringDelta * 0.012));
+
     for (let i = 0; i < this.units.length; i++) {
       const unit = this.units[i];
       // Clamped strictly to road bounds to prevent edge smear
@@ -519,6 +551,8 @@ export class ZombieEngine {
       unit.x += (tx - unit.x) * 0.28;
       unit.y += (ty - unit.y) * 0.28;
       unit.walkFrame += dt * 0.015;
+      unit.bankAngle = (unit.bankAngle || 0) + (targetBank - (unit.bankAngle || 0)) * 0.2;
+      unit.thrusterFrame = ((unit.thrusterFrame || 0) + dt * 0.04) % 10;
 
       unit.shootCooldown -= dt;
       if (unit.shootCooldown <= 0) {
@@ -613,8 +647,8 @@ export class ZombieEngine {
 
               this.updateCrowd(-penalty);
               this.invulnerableTimer = 800; // 0.8s mercy window
-              this.spawnBloodParticles(z.x, z.y, '#ef4444');
-              this.addFloatingText(z.x, z.y - 12, `-${penalty} 👥`, '#ef4444', 18);
+              this.spawnFlakParticles(z.x, z.y, '#ef4444');
+              this.addFloatingText(z.x, z.y - 12, `-${penalty} ✈️`, '#ef4444', 18);
             }
           }
           this.zombies.splice(i, 1);
@@ -640,7 +674,7 @@ export class ZombieEngine {
           this.screenShake = 5;
           this.updateCrowd(-breachPenalty);
           this.addFloatingText(z.x, this.playerY + 15, `BREACH! -${breachPenalty}`, '#f43f5e', 16);
-          this.spawnBloodParticles(z.x, this.playerY + 25, '#ef4444');
+          this.spawnFlakParticles(z.x, this.playerY + 25, '#ef4444');
         }
         this.zombies.splice(i, 1);
       }
@@ -818,7 +852,7 @@ export class ZombieEngine {
             this.audio.playZombieDie();
             this.score += z.scoreValue;
             this.zombiesKilled++;
-            this.spawnBloodParticles(z.x, z.y, z.color);
+            this.spawnFlakParticles(z.x, z.y, z.color);
             this.addFloatingText(z.x, z.y - 15, `+${z.scoreValue}`, '#fbbf24', 14);
 
             // Nuke charge gain
@@ -948,39 +982,36 @@ export class ZombieEngine {
     // 1. Special Item: Nano-Armor (18% chance)
     if (randType < 0.18) {
       const isLeft = Math.random() > 0.5;
-      const armorVal = this.wave >= 4 ? 3 : 2;
-      const bonus = Math.floor(Math.random() * 5) + 5;
+      const armorVal = Math.random() > 0.7 ? 3 : 2;
       this.gates.push(this.createGate('armor', armorVal, isLeft ? leftX : rightX));
-      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
+      this.gates.push(this.createGate('add', Math.floor(Math.random() * 5) + 3, isLeft ? rightX : leftX));
       return;
     }
 
-    // 2. Special Item: Cryo Freeze (15% chance)
-    if (randType < 0.33) {
+    // 2. Special Item: Cryo EMP Freeze (14% chance)
+    if (randType < 0.32) {
       const isLeft = Math.random() > 0.5;
-      const bonus = Math.floor(Math.random() * 5) + 4;
       this.gates.push(this.createGate('freeze', 5, isLeft ? leftX : rightX));
-      this.gates.push(this.createGate(Math.random() > 0.5 ? 'add' : 'multiply', Math.random() > 0.5 ? bonus : 2, isLeft ? rightX : leftX));
+      this.gates.push(this.createGate('add', Math.floor(Math.random() * 4) + 4, isLeft ? rightX : leftX));
       return;
     }
 
-    // 3. Special Item: Weapon Crate (22% chance)
-    if (randType < 0.55) {
-      const weapons: WeaponType[] = ['shotgun', 'gatling', 'laser', 'rocket'];
-      const pick = weapons[Math.floor(Math.random() * weapons.length)];
+    // 3. Special Item: Base Barrier Shield (14% chance)
+    if (randType < 0.46) {
       const isLeft = Math.random() > 0.5;
-      const bonus = Math.floor(Math.random() * 5) + 5;
-      this.gates.push(this.createGate('weapon', 1, isLeft ? leftX : rightX, pick));
-      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
+      const shieldVal = Math.random() > 0.6 ? 25 : 15;
+      this.gates.push(this.createGate('shield', shieldVal, isLeft ? leftX : rightX));
+      this.gates.push(this.createGate('add', Math.floor(Math.random() * 5) + 3, isLeft ? rightX : leftX));
       return;
     }
 
-    // 4. Defense Shield Repair (if shield < 80 and 15% chance)
-    if (this.shield < 80 && randType < 0.70) {
+    // 4. Weapon Crate (22% chance)
+    if (randType < 0.68) {
+      const weapons: WeaponType[] = ['gatling', 'shotgun', 'laser', 'rocket'];
+      const chosenWeapon = weapons[Math.floor(Math.random() * weapons.length)];
       const isLeft = Math.random() > 0.5;
-      const bonus = Math.floor(Math.random() * 5) + 4;
-      this.gates.push(this.createGate('shield', 35, isLeft ? leftX : rightX));
-      this.gates.push(this.createGate('add', bonus, isLeft ? rightX : leftX));
+      this.gates.push(this.createGate('weapon', 1, isLeft ? leftX : rightX, chosenWeapon));
+      this.gates.push(this.createGate('add', Math.floor(Math.random() * 6) + 3, isLeft ? rightX : leftX));
       return;
     }
 
@@ -1006,7 +1037,7 @@ export class ZombieEngine {
     if (this.wave % 5 === 0 && !this.zombies.some((z) => z.type === 'boss')) {
       this.audio.playBossAlert();
       this.screenShake = 14;
-      this.addFloatingText(W / 2, 80, '⚠️ BOSS INCOMING ⚠️', '#ef4444', 28);
+      this.addFloatingText(W / 2, 80, '⚠️ 敌军泰坦母舰降临 ⚠️', '#ef4444', 28);
       const bossHp = 280 + this.wave * 80;
       this.zombies.push({
         id: Math.random(),
@@ -1094,20 +1125,22 @@ export class ZombieEngine {
     }
   }
 
-  private spawnBloodParticles(x: number, y: number, color: string) {
+  private spawnFlakParticles(x: number, y: number, color: string) {
     if (this.particles.length > 90) return;
-    const count = this.particles.length > 50 ? 4 : 8;
+    const count = this.particles.length > 50 ? 5 : 10;
     for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 6;
       this.particles.push({
         x,
         y,
-        vx: (Math.random() - 0.5) * 8,
-        vy: (Math.random() - 0.5) * 8,
-        color,
-        radius: 3 + Math.random() * 3,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed + 1,
+        color: Math.random() < 0.4 ? '#f59e0b' : Math.random() < 0.7 ? color : '#94a3b8',
+        radius: 2 + Math.random() * 3,
         alpha: 1,
         life: 0,
-        maxLife: 300 + Math.random() * 150,
+        maxLife: 250 + Math.random() * 200,
       });
     }
   }
@@ -1175,7 +1208,12 @@ export class ZombieEngine {
 
     // 1. CLEAR FULL PHYSICAL CANVAS UNCONDITIONALLY (Fixes red box edge smear bug!)
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#090d16'; // dark cyberpunk navy
+    // Deep atmospheric space / flight corridor gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0, '#030712');
+    skyGrad.addColorStop(0.5, '#070e24');
+    skyGrad.addColorStop(1, '#0b1638');
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, W, H);
 
     ctx.save();
@@ -1188,30 +1226,53 @@ export class ZombieEngine {
     // Oversized background to guarantee full coverage even during large shakes
     ctx.fillRect(-50, -50, W + 100, H + 100);
 
-    // Dynamic grid lines scrolling down
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+    // Parallax Starfield & High-Altitude Speed Streaks
+    for (const s of this.stars) {
+      ctx.save();
+      ctx.globalAlpha = s.alpha;
+      ctx.fillStyle = s.color;
+      const streakLen = s.size * (1.8 + s.speed * 1.5);
+      ctx.fillRect(s.x, s.y, s.size, streakLen);
+      ctx.restore();
+    }
+
+    // Dynamic cyber flight grid lines scrolling down
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.07)';
     ctx.lineWidth = 1;
-    const gridOffset = (this.distance * 1.5) % 40;
-    for (let y = gridOffset; y < H; y += 40) {
+    const gridOffset = (this.distance * 1.6) % 50;
+    for (let y = gridOffset; y < H; y += 50) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
       ctx.stroke();
     }
-    for (let x = 0; x < W; x += 40) {
+    for (let x = 0; x < W; x += 48) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
     }
 
-    // Roadside laser border lines
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
-    ctx.lineWidth = 3;
+    // High-altitude flight corridor boundary laser guides
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(10, 0); ctx.lineTo(10, H);
     ctx.moveTo(W - 10, 0); ctx.lineTo(W - 10, H);
     ctx.stroke();
+
+    // Flight corridor side chevron marks
+    const chevronOffset = (this.distance * 2) % 60;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+    ctx.lineWidth = 1.5;
+    for (let y = chevronOffset; y < H; y += 60) {
+      ctx.beginPath();
+      ctx.moveTo(12, y); ctx.lineTo(18, y + 8); ctx.lineTo(12, y + 16);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(W - 12, y); ctx.lineTo(W - 18, y + 8); ctx.lineTo(W - 12, y + 16);
+      ctx.stroke();
+    }
 
     // 2. Render Bottom Laser Defense Barrier
     this.renderDefenseBarrier();
@@ -1306,7 +1367,7 @@ export class ZombieEngine {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.strokeStyle = barrierColor;
       ctx.lineWidth = 1;
-      const bw = 90;
+      const bw = 114;
       const bh = 18;
       this.roundRect(ctx, (W - bw) / 2, barrierY - 9, bw, bh, 9);
       ctx.fill();
@@ -1316,13 +1377,13 @@ export class ZombieEngine {
       ctx.font = '900 10px monospace, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`🛡️ SHIELD ${Math.round(shieldRatio * 100)}%`, W / 2, barrierY);
+      ctx.fillText(`🛡️ 空天防空网 ${Math.round(shieldRatio * 100)}%`, W / 2, barrierY);
     } else {
       ctx.fillStyle = '#ef4444';
       ctx.font = '900 10px monospace, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('⚠️ BARRIER OFFLINE ⚠️', W / 2, barrierY);
+      ctx.fillText('⚠️ 防空护盾离线 ⚠️', W / 2, barrierY);
     }
     ctx.restore();
   }
@@ -1471,7 +1532,6 @@ export class ZombieEngine {
 
     ctx.save();
     const sprite = this.monkeCanvas || getFallbackMonkeSprite(this.monkeId);
-    const cfg = WEAPON_CONFIGS[this.currentWeapon];
     let minY = this.playerY - 20;
 
     const isInvul = this.invulnerableTimer > 0;
@@ -1480,7 +1540,7 @@ export class ZombieEngine {
     // Nano-Armor Forcefield Shield Dome around squad
     if (this.armor > 0) {
       ctx.save();
-      const squadRadius = Math.min(80, 26 + Math.sqrt(this.units.length) * 7.5);
+      const squadRadius = Math.min(85, 28 + Math.sqrt(this.units.length) * 8);
       const pulse = Math.sin(performance.now() * 0.006) * 3;
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2.5;
@@ -1506,32 +1566,32 @@ export class ZombieEngine {
         ctx.globalAlpha = 0.4;
       }
 
-      const bob = Math.sin(unit.walkFrame) * 2;
-      const stepTilt = Math.sin(unit.walkFrame * 2) * 0.04;
-      ctx.translate(unit.x, unit.y + bob);
-      ctx.rotate(stepTilt);
+      ctx.translate(unit.x, unit.y);
+      ctx.rotate(unit.bankAngle || 0);
 
-      // Adrenaline golden flaming aura under unit
+      // Adrenaline golden boost flame ring under unit
       if (isAdrenaline) {
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.35)';
         ctx.beginPath();
-        ctx.arc(0, 0, unit.size * 0.75, 0, Math.PI * 2);
+        ctx.arc(0, 0, unit.size * 0.8, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Subtle shadow under unit
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-      ctx.fillRect(-12, 14, 24, 4);
+      // Shadow below aircraft
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fillRect(-unit.size * 0.35, unit.size * 0.4, unit.size * 0.7, 4);
 
-      // Draw pixel-sharp Monke
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sprite, -unit.size / 2, -unit.size / 2, unit.size, unit.size);
-
-      // Small equipped gun in hand
-      ctx.fillStyle = cfg.bulletColor;
-      ctx.fillRect(unit.size * 0.22, -unit.size * 0.45, 4, 8);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(unit.size * 0.22, -unit.size * 0.45, 4, 2);
+      // Render Fighter Jet with NodeMonke Pilot in the cockpit!
+      ctx.translate(-unit.size / 2, -unit.size / 2);
+      renderFighterJet(
+        ctx,
+        sprite,
+        this.currentWeapon,
+        unit.thrusterFrame || 0,
+        isAdrenaline,
+        this.feverTimer > 0,
+        unit.size
+      );
 
       ctx.restore();
     }
@@ -1541,7 +1601,7 @@ export class ZombieEngine {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
-    const badgeW = this.armor > 0 ? 104 : 74;
+    const badgeW = this.armor > 0 ? 104 : 76;
     const badgeH = 22;
     const badgeY = minY - 28;
     this.roundRect(ctx, this.playerX - badgeW / 2, badgeY, badgeW, badgeH, 11);
@@ -1552,7 +1612,7 @@ export class ZombieEngine {
     ctx.font = '900 12px monospace, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const badgeText = this.armor > 0 ? `👥 ${this.crowdCount} | 🛡️ ${this.armor}` : `👥 ${this.crowdCount}`;
+    const badgeText = this.armor > 0 ? `✈️ ${this.crowdCount} | 🛡️ ${this.armor}` : `✈️ ${this.crowdCount}`;
     ctx.fillText(badgeText, this.playerX, badgeY + badgeH / 2);
     ctx.restore();
   }

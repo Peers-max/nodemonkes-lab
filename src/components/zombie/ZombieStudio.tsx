@@ -11,6 +11,7 @@ import {
   VolumeX, 
   ShieldAlert, 
   Users, 
+  Plane,
   Zap, 
   Flame, 
   Crosshair,
@@ -89,9 +90,9 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     const nextPaused = engineRef.current.togglePause();
     setIsPaused(nextPaused);
     if (nextPaused) {
-      onToast(isZh ? '⏸️ 游戏已暂停' : '⏸️ Game Paused', '', 'info');
+      onToast(isZh ? '⏸️ 巡航已暂停' : '⏸️ Flight Paused', '', 'info');
     } else {
-      onToast(isZh ? '▶️ 游戏继续' : '▶️ Game Resumed', '', 'info');
+      onToast(isZh ? '▶️ 巡航继续' : '▶️ Flight Resumed', '', 'info');
     }
   }, [isPlaying, isGameOver, isZh, onToast]);
 
@@ -101,7 +102,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     setIsPlaying(true);
     setIsGameOver(false);
     setIsPaused(false);
-    onToast(isZh ? '🔄 战队已重新集结！' : '🔄 Squad Redeployed!', '', 'info');
+    onToast(isZh ? '🔄 战机编队已重新集结！' : '🔄 Squadron Redeployed!', '', 'info');
   }, [isZh, onToast]);
 
   const handleStop = useCallback(() => {
@@ -110,7 +111,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     setIsPlaying(false);
     setIsGameOver(false);
     setIsPaused(false);
-    onToast(isZh ? '⏹️ 战斗已停止，返回整备' : '⏹️ Game Stopped', '', 'info');
+    onToast(isZh ? '⏹️ 巡航已停止，返航整备' : '⏹️ Mission Aborted', '', 'info');
   }, [isZh, onToast]);
 
   // Initialize Game Engine
@@ -216,21 +217,21 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
     <div className="w-full max-w-6xl mx-auto px-4 py-6 flex flex-col items-center">
       {/* Top Banner */}
       <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-3">
           <Zap className="w-3.5 h-3.5" />
-          <span>{isZh ? '全新原创街机 • 算数射击突围' : 'Original Arcade • Crowd Math Shooter'}</span>
+          <span>{isZh ? '原创街机 • 战机编队突围' : 'Original Arcade • Flight Squadron Combat'}</span>
         </div>
         <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight flex items-center justify-center gap-3">
-          <span>🧟</span>
-          <span>{isZh ? '节点猴：僵尸突围' : 'NodeMonkes: Zombie Horde'}</span>
-          <span className="text-xs px-2.5 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono">
-            DEFENSE
+          <span>✈️</span>
+          <span>{isZh ? '节点猴：空战突围' : 'NodeMonkes: Sky Squadron'}</span>
+          <span className="text-xs px-2.5 py-0.5 rounded-md bg-sky-500/20 border border-sky-500/40 text-sky-300 font-mono">
+            AIR COMBAT
           </span>
         </h1>
         <p className="text-slate-400 text-sm mt-2 max-w-xl mx-auto">
           {isZh 
-            ? '控制原版大猴小队在下方左右滑移射击，击中蓝色门扩编人数，打爆负面门削弱惩罚，夺取重火力补给粉碎僵尸大潮！'
-            : 'Slide your NodeMonke squad to shoot upwards! Hit math gates to multiply crowd, crack weapon crates, and eliminate the zombie swarm!'}
+            ? '驾驶节点猴战机编队，在苍穹中左右滑移拦截，射击补给门扩编战机战队，打爆负面门削弱惩罚，消灭敌机舰队群！'
+            : 'Pilot your NodeMonke fighter squadron! Slide left and right to intercept, blast supply gates to expand your air wing, and eliminate enemy armadas!'}
         </p>
       </div>
 
@@ -240,8 +241,8 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
         <div className="w-full flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 mb-2 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs font-mono">
           {/* Crowd count & Armor & Base Defense Shield */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold" title={isZh ? '小队猴子人数' : 'Squad Monke Count'}>
-              <Users className="w-3.5 h-3.5 text-sky-400" />
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold" title={isZh ? '战机编队数量' : 'Squadron Flight Count'}>
+              <Plane className="w-3.5 h-3.5 text-sky-400" />
               <span>{crowdCount}</span>
             </div>
 
@@ -249,7 +250,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
             {stats.armor > 0 && (
               <div 
                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/40 font-bold animate-pulse shadow-sm shadow-blue-500/20"
-                title={isZh ? `纳米装甲板: 可抵挡 ${stats.armor} 次僵尸致命撞击` : `Nano-Armor: absorbs ${stats.armor} hits`}
+                title={isZh ? `纳米偏折护甲: 可抵挡 ${stats.armor} 次敌机致命撞击` : `Deflector Armor: absorbs ${stats.armor} hits`}
               >
                 <span>🛡️</span>
                 <span>{stats.armor}/{stats.maxArmor || 5}</span>
@@ -266,7 +267,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   ? "bg-amber-500/15 text-amber-300 border-amber-500/30" 
                   : "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
               )}
-              title={isZh ? '基地激光防线耐久度（抵挡漏网僵尸）' : 'Base Defense Shield'}
+              title={isZh ? '空天防空网耐久度（拦截突防敌机）' : 'Air Defense Barrier'}
             >
               <span>🏰</span>
               <span>{stats.shield}%</span>
@@ -287,7 +288,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
           {/* Score & Kills & Wave */}
           <div className="flex items-center gap-2 text-slate-300 font-semibold">
             <span className="text-amber-400">⚡ {stats.score}</span>
-            <span className="text-emerald-400">🧟 {stats.zombiesKilled}</span>
+            <span className="text-emerald-400">🛸 {stats.zombiesKilled}</span>
             <span className="text-purple-400">W{stats.wave}</span>
             {stats.combo >= 3 && (
               <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30 text-[11px] animate-bounce">
@@ -412,10 +413,10 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 ⏸️
               </div>
               <h2 className="text-2xl font-black text-white mb-1">
-                {isZh ? '战斗暂停 • PAUSED' : 'GAME PAUSED'}
+                {isZh ? '空战暂停 • PAUSED' : 'FLIGHT PAUSED'}
               </h2>
               <p className="text-xs text-slate-400 mb-6 font-mono">
-                {isZh ? `当前波次: Wave ${stats.wave} | 战队人数: ${crowdCount} | 得分: ${stats.score}` : `Wave ${stats.wave} | Squad: ${crowdCount} | Score: ${stats.score}`}
+                {isZh ? `当前波次: Wave ${stats.wave} | 战机数: ${crowdCount} | 得分: ${stats.score}` : `Wave ${stats.wave} | Squadron: ${crowdCount} | Score: ${stats.score}`}
               </p>
 
               <div className="flex flex-col gap-3 w-full max-w-xs font-bold text-sm">
@@ -424,7 +425,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
                 >
                   <Play className="w-4 h-4 fill-slate-950" />
-                  <span>{isZh ? '继续战斗 [P / Esc]' : 'RESUME GAME'}</span>
+                  <span>{isZh ? '继续巡航 [P / Esc]' : 'RESUME FLIGHT'}</span>
                 </button>
 
                 <button
@@ -432,7 +433,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>{isZh ? '重来本关 [R]' : 'RESTART GAME'}</span>
+                  <span>{isZh ? '重整编队 [R]' : 'REDEPLOY SQUADRON'}</span>
                 </button>
 
                 <button
@@ -440,7 +441,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 active:scale-95 transition-all"
                 >
                   <Square className="w-4 h-4 fill-current" />
-                  <span>{isZh ? '停止退出' : 'STOP & EXIT'}</span>
+                  <span>{isZh ? '返航退出' : 'ABORT & EXIT'}</span>
                 </button>
               </div>
             </div>
@@ -449,24 +450,24 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
           {/* Start Screen Overlay */}
           {!isPlaying && !isGameOver && (
             <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-10">
-              <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 flex items-center justify-center text-4xl mb-4 shadow-lg shadow-amber-500/20">
-                🧟
+              <div className="w-20 h-20 rounded-2xl bg-sky-500/10 border-2 border-sky-500/30 flex items-center justify-center text-4xl mb-4 shadow-lg shadow-sky-500/20">
+                ✈️
               </div>
               <h2 className="text-2xl font-black text-white mb-2">
-                {isZh ? '节点猴：僵尸突围' : 'NodeMonkes: Zombie Horde'}
+                {isZh ? '节点猴：空战突围' : 'NodeMonkes: Sky Squadron'}
               </h2>
               <p className="text-xs text-slate-400 mb-6 max-w-xs leading-relaxed">
                 {isZh 
-                  ? '手指或鼠标左右拖动移动战队，自动全员开火！射击增益门升级倍率，消灭僵尸大潮守住节点！'
-                  : 'Drag left/right to position squad. Continuous auto-fire! Shoot gates to multiply units, grab heavy weapons, and wipe out zombies!'}
+                  ? '滑动或按键控制战机左右翱翔，节点猴飞行员全员自动开火！射击航路补给门扩充战机编队，夺取重型机炮粉碎敌军空天舰队！'
+                  : 'Slide to pilot fighter formation. Continuous aerial auto-fire! Blast math gates to expand your air wing and eliminate enemy armadas!'}
               </p>
 
               <button
                 onClick={startGame}
-                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-base shadow-lg shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all"
+                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-base shadow-lg shadow-sky-500/30 hover:scale-105 active:scale-95 transition-all"
               >
                 <Play className="w-5 h-5 fill-slate-950" />
-                <span>{isZh ? '开始保卫节点' : 'START DEFENSE'}</span>
+                <span>{isZh ? '升空起飞巡航' : 'LAUNCH SQUADRON'}</span>
               </button>
 
               <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400 font-mono">
@@ -476,11 +477,11 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">A / D</span>
-                  {isZh ? '左右移' : 'Arrow Keys'}
+                  {isZh ? '机动移位' : 'Maneuver'}
                 </span>
                 <span className="flex items-center gap-1 text-amber-400">
                   <span className="px-1.5 py-0.5 bg-slate-800 rounded border border-amber-500/40 font-bold">SPACE</span>
-                  {isZh ? '战术核弹' : 'Nuke'}
+                  {isZh ? '轨道轰炸' : 'Strike'}
                 </span>
               </div>
             </div>
@@ -490,13 +491,13 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
           {isGameOver && (
             <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10">
               <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border-2 border-rose-500/40 flex items-center justify-center text-3xl mb-3 shadow-lg shadow-rose-500/20">
-                💀
+                💥
               </div>
               <h2 className="text-2xl font-black text-white mb-1">
-                {isZh ? '战线失守 • GAME OVER' : 'DEFENSE BREACHED'}
+                {isZh ? '编队失守 • MISSION FAILED' : 'MISSION FAILED'}
               </h2>
               <p className="text-xs text-slate-400 mb-6">
-                {isZh ? '节点猴防线被僵尸军团击溃！' : 'Your squad was overwhelmed by the horde!'}
+                {isZh ? '节点猴战机编队在敌军舰队围攻下陨落！' : 'Your fighter squadron was shot down by the armada!'}
               </p>
 
               {/* Stats Summary Grid */}
@@ -506,7 +507,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   <div className="text-lg font-black text-amber-400">{stats.score}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">{isZh ? '击杀僵尸' : 'Zombies Killed'}</div>
+                  <div className="text-slate-400 text-[10px]">{isZh ? '击落敌机' : 'Armada Downed'}</div>
                   <div className="text-lg font-black text-emerald-400">{stats.zombiesKilled}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -514,17 +515,17 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                   <div className="text-base font-bold text-purple-400">WAVE {stats.wave}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">{isZh ? '战队巅峰' : 'Max Crowd'}</div>
-                  <div className="text-base font-bold text-sky-400">👥 {stats.maxCrowd}</div>
+                  <div className="text-slate-400 text-[10px]">{isZh ? '巅峰战机数' : 'Peak Squadron'}</div>
+                  <div className="text-base font-bold text-sky-400">✈️ {stats.maxCrowd}</div>
                 </div>
               </div>
 
               <button
                 onClick={startGame}
-                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-base shadow-lg shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all"
+                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-slate-950 font-black text-base shadow-lg shadow-sky-500/30 hover:scale-105 active:scale-95 transition-all"
               >
                 <RotateCcw className="w-5 h-5" />
-                <span>{isZh ? '重新集结战队' : 'REDEPLOY SQUAD'}</span>
+                <span>{isZh ? '重新升空起飞' : 'SCRAMBLE SQUADRON'}</span>
               </button>
             </div>
           )}
@@ -540,7 +541,7 @@ export const ZombieStudio: React.FC<ZombieStudioProps> = ({
                 className="w-full h-full object-contain pixelated"
               />
             </div>
-            <span className="text-slate-400 font-semibold">{isZh ? '指挥官猴 ID:' : 'Commander Monke:'}</span>
+            <span className="text-slate-400 font-semibold">{isZh ? '王牌飞行员猴 ID:' : 'Ace Pilot Monke:'}</span>
             <input
               type="number"
               value={monkeInput}

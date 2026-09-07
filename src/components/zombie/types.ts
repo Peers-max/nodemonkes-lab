@@ -42,7 +42,8 @@ export interface Gate {
   isConverted?: boolean;
 }
 
-export type ZombieType = 'walker' | 'runner' | 'tank' | 'exploder' | 'boss';
+export type EnemyAircraftType = 'walker' | 'runner' | 'tank' | 'exploder' | 'boss' | 'scout' | 'interceptor' | 'gunship' | 'kamikaze' | 'mothership';
+export type ZombieType = EnemyAircraftType;
 
 export interface Zombie {
   id: number;
@@ -54,10 +55,11 @@ export interface Zombie {
   maxHp: number;
   speed: number;
   color: string;
-  skinId: number; // for rendering zombie pixel aesthetics
+  skinId: number; // for rendering craft pixel aesthetics
   hitFlash: number;
   scoreValue: number;
   walkFrame: number;
+  bankAngle?: number;
 }
 
 export interface Bullet {
@@ -84,6 +86,8 @@ export interface MonkeUnit {
   shootCooldown: number;
   monkeId: number;
   walkFrame: number;
+  bankAngle: number; // banking tilt when moving left/right
+  thrusterFrame: number;
 }
 
 export interface Particle {
