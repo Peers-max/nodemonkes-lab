@@ -253,4 +253,97 @@ export class ZombieAudio {
     osc.start(t);
     osc.stop(t + 0.45);
   }
+
+  public playShieldHit() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.08);
+    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  }
+
+  public playShieldRepair() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, t);
+    osc.frequency.setValueAtTime(780, t + 0.08);
+    osc.frequency.setValueAtTime(1040, t + 0.16);
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.25);
+  }
+
+  public playNuke() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.exponentialRampToValueAtTime(25, t + 0.7);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.7);
+  }
+
+  public playAdrenaline() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(240, t);
+    osc.frequency.setValueAtTime(480, t + 0.1);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  }
+
+  public playFever() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(440, t);
+    osc.frequency.setValueAtTime(554.37, t + 0.06);
+    osc.frequency.setValueAtTime(659.25, t + 0.12);
+    osc.frequency.setValueAtTime(880, t + 0.18);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.32);
+  }
 }

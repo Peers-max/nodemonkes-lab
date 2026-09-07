@@ -19,7 +19,7 @@ export interface WeaponConfig {
   durationMs?: number; // active duration if picked up as buff
 }
 
-export type GateOp = 'add' | 'multiply' | 'subtract' | 'divide' | 'weapon';
+export type GateOp = 'add' | 'multiply' | 'subtract' | 'divide' | 'weapon' | 'shield';
 
 export interface Gate {
   id: number;
@@ -115,4 +115,9 @@ export interface GameStats {
   wave: number;
   maxCrowd: number;
   gatesPassed: number;
+  shield: number;
+  maxShield: number;
+  nukeCharge: number;
+  combo: number;
+  isFever: boolean;
 }

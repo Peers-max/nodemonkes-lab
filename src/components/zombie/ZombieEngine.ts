@@ -97,13 +97,25 @@ export class ZombieEngine {
   public playerX: number = 240;
   public playerTargetX: number = 240;
   public playerY: number = 680;
-  public crowdCount: number = 3;
+  public crowdCount: number = 10;
   public units: MonkeUnit[] = [];
   public currentWeapon: WeaponType = 'pistol';
   public weaponExpiresAt: number = 0;
   public monkeImage: HTMLImageElement | null = null;
   public monkeCanvas: HTMLCanvasElement | null = null;
   public monkeId: number = 209;
+
+  // Defense Barrier, Nuke, Combo & Mercy state
+  public shield: number = 100;
+  public maxShield: number = 100;
+  public nukeCharge: number = 0; // 0 to 100%
+  public combo: number = 0;
+  public lastKillTime: number = 0;
+  public feverTimer: number = 0;
+  public invulnerableTimer: number = 0;
+  public adrenalineTimer: number = 0;
+  public adrenalineUsedThisLife: boolean = false;
+  private lastShieldHitTime: number = 0;
 
   // Entities
   public bullets: Bullet[] = [];
@@ -119,10 +131,10 @@ export class ZombieEngine {
   public score: number = 0;
   public zombiesKilled: number = 0;
   public gatesPassed: number = 0;
-  public maxCrowdReached: number = 5;
+  public maxCrowdReached: number = 10;
 
-  private nextGateDistance: number = 80;
-  private nextZombieDistance: number = 260;
+  private nextGateDistance: number = 60;
+  private nextZombieDistance: number = 240;
   private screenShake: number = 0;
   private redFlashAlpha: number = 0;
 
@@ -143,7 +155,17 @@ export class ZombieEngine {
     this.monkeId = monkeId;
     this.isGameOver = false;
     this.isPaused = false;
-    this.crowdCount = 5;
+    this.crowdCount = 10;
+    this.shield = 100;
+    this.maxShield = 100;
+    this.nukeCharge = 0;
+    this.combo = 0;
+    this.lastKillTime = 0;
+    this.feverTimer = 0;
+    this.invulnerableTimer = 0;
+    this.adrenalineTimer = 0;
+    this.adrenalineUsedThisLife = false;
+    this.lastShieldHitTime = 0;
     this.currentWeapon = 'pistol';
     this.weaponExpiresAt = 0;
     this.distance = 0;
@@ -151,7 +173,7 @@ export class ZombieEngine {
     this.score = 0;
     this.zombiesKilled = 0;
     this.gatesPassed = 0;
-    this.maxCrowdReached = 5;
+    this.maxCrowdReached = 10;
     this.bullets = [];
     this.gates = [];
     this.zombies = [];
@@ -160,8 +182,8 @@ export class ZombieEngine {
     this.playerX = this.canvas.width / 2;
     this.playerTargetX = this.canvas.width / 2;
     this.playerY = this.canvas.height - 110;
-    this.nextGateDistance = 80;
-    this.nextZombieDistance = 260;
+    this.nextGateDistance = 60;
+    this.nextZombieDistance = 240;
     this.rebuildUnits();
     this.loadMonkeImage(monkeId);
   }
@@ -186,7 +208,7 @@ export class ZombieEngine {
   }
 
   public setPlayerTargetX(x: number) {
-    this.playerTargetX = Math.max(35, Math.min(this.canvas.width - 35, x));
+    this.playerTargetX = Math.max(45, Math.min(this.canvas.width - 45, x));
   }
 
   public movePlayerBy(deltaX: number) {
@@ -262,10 +284,23 @@ export class ZombieEngine {
       } else {
         this.addFloatingText(this.playerX, this.playerY - 40, `+${gained} MONKES!`, '#4ade80', 20);
       }
+      if (this.crowdCount > 15) {
+        this.adrenalineUsedThisLife = false;
+      }
     } else if (this.crowdCount < old) {
       this.audio.playGatePass(false);
       this.addFloatingText(this.playerX, this.playerY - 40, `${this.crowdCount - old}`, '#ef4444', 22);
       this.redFlashAlpha = 0.35;
+
+      // Adrenaline Clutch Mode!
+      if (this.crowdCount > 0 && this.crowdCount <= 5 && !this.adrenalineUsedThisLife) {
+        this.adrenalineUsedThisLife = true;
+        this.adrenalineTimer = 4500;
+        this.invulnerableTimer = 2200;
+        this.audio.playAdrenaline();
+        this.screenShake = 10;
+        this.addFloatingText(this.playerX, this.playerY - 60, '⚡ ADRENALINE! 2X FIRE ⚡', '#f59e0b', 22);
+      }
     }
 
     if (this.crowdCount <= 0) {
@@ -279,9 +314,44 @@ export class ZombieEngine {
   public setWeapon(type: WeaponType) {
     this.currentWeapon = type;
     const config = WEAPON_CONFIGS[type];
-    this.weaponExpiresAt = performance.now() + (config.durationMs || 12000);
+    this.weaponExpiresAt = performance.now() + (config.durationMs || 15000);
     this.audio.playPowerup();
     this.addFloatingText(this.playerX, this.playerY - 60, `${config.icon} ${config.nameZh}!`, config.bulletColor, 22);
+  }
+
+  public triggerNuke(): boolean {
+    if (this.nukeCharge < 100 || this.isGameOver || !this.isRunning) return false;
+    this.nukeCharge = 0;
+    this.audio.playNuke();
+    this.screenShake = 22;
+    this.redFlashAlpha = 0.5;
+
+    // Drop orbital cruise strikes across the screen
+    for (let xi = 60; xi <= this.canvas.width - 60; xi += 100) {
+      this.spawnExplosion(xi, 200 + Math.random() * 200, 120);
+    }
+
+    // Wipe all standard zombies, heavily damage bosses
+    for (let zi = this.zombies.length - 1; zi >= 0; zi--) {
+      const z = this.zombies[zi];
+      if (z.type === 'boss') {
+        z.hp -= 600;
+        z.hitFlash = 1;
+        if (z.hp <= 0) {
+          this.score += z.scoreValue;
+          this.zombiesKilled++;
+          this.zombies.splice(zi, 1);
+        }
+      } else {
+        this.score += z.scoreValue;
+        this.zombiesKilled++;
+        this.spawnBloodParticles(z.x, z.y, z.color);
+        this.zombies.splice(zi, 1);
+      }
+    }
+
+    this.addFloatingText(this.canvas.width / 2, 140, '☢️ ORBITAL STRIKE CLEARED! ☢️', '#facc15', 24);
+    return true;
   }
 
   public triggerGameOver() {
@@ -300,6 +370,11 @@ export class ZombieEngine {
       wave: this.wave,
       maxCrowd: this.maxCrowdReached,
       gatesPassed: this.gatesPassed,
+      shield: Math.round(this.shield),
+      maxShield: this.maxShield,
+      nukeCharge: Math.floor(this.nukeCharge),
+      combo: this.combo,
+      isFever: this.feverTimer > 0,
     };
   }
 
@@ -322,6 +397,21 @@ export class ZombieEngine {
     this.distance += this.speed * (dt / 16.66);
     this.wave = 1 + Math.floor(this.distance / 1200);
 
+    // Timers
+    if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
+    if (this.adrenalineTimer > 0) this.adrenalineTimer -= dt;
+    if (this.feverTimer > 0) this.feverTimer -= dt;
+
+    // Combo decay
+    if (this.combo > 0 && performance.now() - this.lastKillTime > 1600) {
+      this.combo = 0;
+    }
+
+    // Shield auto-regen (+1.5/sec if not hit in last 3.5s)
+    if (this.shield < this.maxShield && performance.now() - this.lastShieldHitTime > 3500) {
+      this.shield = Math.min(this.maxShield, this.shield + (dt / 1000) * 1.5);
+    }
+
     // Player position lerp
     this.playerX += (this.playerTargetX - this.playerX) * 0.22;
 
@@ -335,12 +425,17 @@ export class ZombieEngine {
     const weaponCfg = WEAPON_CONFIGS[this.currentWeapon];
     const totalCrowd = Math.max(1, this.crowdCount);
     // Controlled logarithmic firepower scaling: 1x to 8.5x max
-    const crowdDamageMult = 1 + Math.log2(totalCrowd) * 0.92;
-    const activeShooters = Math.min(this.units.length, 14);
+    let crowdDamageMult = 1 + Math.log2(totalCrowd) * 0.92;
+    if (this.feverTimer > 0) crowdDamageMult *= 1.5; // Fever mode damage boost!
+
+    // Adrenaline fire rate boost (2x fire rate)
+    const fireInterval = this.adrenalineTimer > 0 ? weaponCfg.fireInterval * 0.5 : weaponCfg.fireInterval;
+    const activeShooters = Math.min(this.units.length, 16);
 
     for (let i = 0; i < this.units.length; i++) {
       const unit = this.units[i];
-      const tx = this.playerX + unit.offsetX;
+      // Clamped strictly to road bounds to prevent edge smear
+      const tx = Math.max(26, Math.min(this.canvas.width - 26, this.playerX + unit.offsetX));
       const ty = this.playerY + unit.offsetY;
       unit.x += (tx - unit.x) * 0.28;
       unit.y += (ty - unit.y) * 0.28;
@@ -348,20 +443,20 @@ export class ZombieEngine {
 
       unit.shootCooldown -= dt;
       if (unit.shootCooldown <= 0) {
-        if (i < activeShooters || this.units.length <= 14) {
+        if (i < activeShooters || this.units.length <= 16) {
           this.fireBullet(unit, weaponCfg, crowdDamageMult);
         }
-        unit.shootCooldown = weaponCfg.fireInterval;
+        unit.shootCooldown = fireInterval;
       }
     }
 
-    // Bullets update
+    // Bullets update - strictly clamped inside road borders
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
       b.x += b.vx * (dt / 16.66);
       b.y += b.vy * (dt / 16.66);
 
-      if (b.y < -30 || b.x < -20 || b.x > this.canvas.width + 20) {
+      if (b.y < -30 || b.x < 5 || b.x > this.canvas.width - 5) {
         this.bullets.splice(i, 1);
       }
     }
@@ -369,13 +464,13 @@ export class ZombieEngine {
     // Spawning gates
     if (this.distance >= this.nextGateDistance) {
       this.spawnGatePair();
-      this.nextGateDistance = this.distance + 480 + Math.random() * 200;
+      this.nextGateDistance = this.distance + 460 + Math.random() * 180;
     }
 
     // Spawning zombies
     if (this.distance >= this.nextZombieDistance) {
       this.spawnZombieWave();
-      this.nextZombieDistance = this.distance + Math.max(70, 160 - this.wave * 12);
+      this.nextZombieDistance = this.distance + Math.max(75, 170 - this.wave * 10);
     }
 
     // Update Gates
@@ -387,13 +482,17 @@ export class ZombieEngine {
       // Check if squad passed gate
       if (g.y + g.height >= this.playerY - 20 && g.y <= this.playerY + 30) {
         // Check X overlap
-        const squadLeft = this.playerX - 25;
-        const squadRight = this.playerX + 25;
+        const squadLeft = this.playerX - 35;
+        const squadRight = this.playerX + 35;
         if (squadRight >= g.x && squadLeft <= g.x + g.width) {
           // Trigger Gate!
           this.gatesPassed++;
           if (g.op === 'weapon' && g.weaponType) {
             this.setWeapon(g.weaponType);
+          } else if (g.op === 'shield') {
+            this.shield = Math.min(this.maxShield, this.shield + g.value);
+            this.audio.playShieldRepair();
+            this.addFloatingText(this.playerX, this.playerY - 40, `🛡️ SHIELD +${g.value}!`, '#38bdf8', 20);
           } else if (g.op === 'multiply') {
             this.updateCrowd(g.value, true);
           } else if (g.op === 'add') {
@@ -416,11 +515,11 @@ export class ZombieEngine {
     }
 
     // Update Zombies
-    const squadRadius = Math.min(110, 24 + Math.sqrt(this.units.length) * 11);
+    const squadRadius = Math.min(85, 20 + Math.sqrt(this.units.length) * 8);
     const squadLeft = this.playerX - squadRadius;
     const squadRight = this.playerX + squadRadius;
-    const squadTop = this.playerY - 26;
-    const squadBottom = this.playerY + 36;
+    const squadTop = this.playerY - 22;
+    const squadBottom = this.playerY + 30;
 
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
@@ -428,34 +527,48 @@ export class ZombieEngine {
       z.walkFrame += (this.speed + z.speed) * (dt / 16.66) * 0.12;
       if (z.hitFlash > 0) z.hitFlash -= dt * 0.01;
 
-      // Zombie reaches player squad line
+      // 1. Direct collision with player Monke squad (physical contact)
       if (z.y + z.radius >= squadTop && z.y - z.radius <= squadBottom) {
         if (z.x + z.radius >= squadLeft && z.x - z.radius <= squadRight) {
-          // Collision attack with differentiated casualties
-          this.audio.playHit();
-          this.screenShake = 8;
-          let penalty = 2; // Walker default -2
-          if (z.type === 'runner') penalty = 3;
-          else if (z.type === 'tank') penalty = 8;
-          else if (z.type === 'exploder') penalty = 12;
-          else if (z.type === 'boss') penalty = 25;
+          if (this.invulnerableTimer <= 0) {
+            this.audio.playHit();
+            this.screenShake = 6;
+            let penalty = 1; // Walker default -1
+            if (z.type === 'runner') penalty = 1;
+            else if (z.type === 'tank') penalty = 3;
+            else if (z.type === 'exploder') penalty = 4;
+            else if (z.type === 'boss') penalty = 8;
 
-          this.updateCrowd(-penalty);
-          this.spawnBloodParticles(z.x, z.y, '#ef4444');
-          this.addFloatingText(z.x, z.y - 12, `-${penalty}`, '#ef4444', 18);
+            this.updateCrowd(-penalty);
+            this.invulnerableTimer = 800; // 0.8s mercy window
+            this.spawnBloodParticles(z.x, z.y, '#ef4444');
+            this.addFloatingText(z.x, z.y - 12, `-${penalty} 👥`, '#ef4444', 18);
+          }
           this.zombies.splice(i, 1);
           continue;
         }
       }
 
-      // Past player line (Defense breach penalty - immediate removal, no bottom pileup!)
+      // 2. Past player line (Defense barrier interception - NO instant death!)
       if (z.y > this.playerY + 45) {
-        const breachPenalty = z.type === 'boss' ? 15 : z.type === 'tank' ? 5 : 2;
-        this.audio.playHit();
-        this.screenShake = 5;
-        this.updateCrowd(-breachPenalty);
-        this.addFloatingText(z.x, this.playerY + 15, `BREACH! -${breachPenalty}`, '#f43f5e', 16);
-        this.spawnBloodParticles(z.x, this.playerY + 25, '#ef4444');
+        if (this.shield > 0) {
+          // Absorbed by Base Laser Shield!
+          this.lastShieldHitTime = performance.now();
+          const shieldDmg = z.type === 'boss' ? 25 : z.type === 'tank' ? 12 : z.type === 'exploder' ? 10 : z.type === 'runner' ? 6 : 4;
+          this.shield = Math.max(0, this.shield - shieldDmg);
+          this.audio.playShieldHit();
+          this.screenShake = 4;
+          this.spawnSpark(z.x, this.canvas.height - 24, '#38bdf8');
+          this.addFloatingText(z.x, this.canvas.height - 35, `🛡️ BARRIER -${shieldDmg}`, '#38bdf8', 14);
+        } else {
+          // Shield broken / overloaded: leaks inflict small squad damage
+          const breachPenalty = z.type === 'boss' ? 6 : z.type === 'tank' ? 3 : 1;
+          this.audio.playHit();
+          this.screenShake = 5;
+          this.updateCrowd(-breachPenalty);
+          this.addFloatingText(z.x, this.playerY + 15, `BREACH! -${breachPenalty}`, '#f43f5e', 16);
+          this.spawnBloodParticles(z.x, this.playerY + 25, '#ef4444');
+        }
         this.zombies.splice(i, 1);
       }
     }
@@ -622,6 +735,25 @@ export class ZombieEngine {
             this.spawnBloodParticles(z.x, z.y, z.color);
             this.addFloatingText(z.x, z.y - 15, `+${z.scoreValue}`, '#fbbf24', 14);
 
+            // Nuke charge gain
+            const nukeGain = z.type === 'boss' ? 35 : z.type === 'tank' ? 7 : z.type === 'exploder' ? 7 : 3;
+            this.nukeCharge = Math.min(100, this.nukeCharge + nukeGain);
+
+            // Combo & Fever System
+            const now = performance.now();
+            if (now - this.lastKillTime < 1400) {
+              this.combo++;
+            } else {
+              this.combo = 1;
+            }
+            this.lastKillTime = now;
+
+            if (this.combo === 15 || this.combo === 30) {
+              this.feverTimer = 6000;
+              this.audio.playFever();
+              this.addFloatingText(this.playerX, this.playerY - 60, '🔥 FEVER TIME! 🔥', '#ec4899', 24);
+            }
+
             if (z.type === 'exploder') {
               this.audio.playExplosion();
               this.screenShake = 10;
@@ -655,11 +787,98 @@ export class ZombieEngine {
   }
 
   // --- Spawners ---
+  // --- Spawners ---
   private spawnGatePair() {
     const W = this.canvas.width;
     const gateW = (W - 40) / 2;
-    const isWeaponGate = Math.random() < 0.28;
+    const isEarlyWave = this.wave === 1 && this.gatesPassed < 2;
 
+    if (isEarlyWave) {
+      // Guaranteed beginner buffet: +10 and x2 / Gatling!
+      this.gates.push({
+        id: Math.random(),
+        x: 15,
+        y: -90,
+        width: gateW,
+        height: 60,
+        op: 'add',
+        value: 10,
+        speed: this.speed,
+        hp: 15,
+        maxHp: 15,
+        hitFlash: 0,
+        hitsReceived: 0,
+        hitsRequired: 18,
+        maxUpgrades: 3,
+        upgradesDone: 0,
+        originalValue: 10,
+      });
+
+      this.gates.push({
+        id: Math.random(),
+        x: 25 + gateW,
+        y: -90,
+        width: gateW,
+        height: 60,
+        op: Math.random() > 0.5 ? 'multiply' : 'weapon',
+        value: 2,
+        weaponType: 'gatling',
+        speed: this.speed,
+        hp: 15,
+        maxHp: 15,
+        hitFlash: 0,
+        hitsReceived: 0,
+        hitsRequired: 30,
+        maxUpgrades: 1,
+        upgradesDone: 0,
+        originalValue: 2,
+      });
+      return;
+    }
+
+    // Occasional Shield Repair gate (22% chance if shield < 80)
+    if (this.shield < 80 && Math.random() < 0.22) {
+      this.gates.push({
+        id: Math.random(),
+        x: 15,
+        y: -90,
+        width: gateW,
+        height: 60,
+        op: 'shield',
+        value: 35,
+        speed: this.speed,
+        hp: 15,
+        maxHp: 15,
+        hitFlash: 0,
+        hitsReceived: 0,
+        hitsRequired: 999,
+        maxUpgrades: 0,
+        upgradesDone: 0,
+        originalValue: 35,
+      });
+      const bonus = Math.floor(Math.random() * 5) + 5;
+      this.gates.push({
+        id: Math.random(),
+        x: 25 + gateW,
+        y: -90,
+        width: gateW,
+        height: 60,
+        op: 'add',
+        value: bonus,
+        speed: this.speed,
+        hp: 15,
+        maxHp: 15,
+        hitFlash: 0,
+        hitsReceived: 0,
+        hitsRequired: 18,
+        maxUpgrades: 3,
+        upgradesDone: 0,
+        originalValue: bonus,
+      });
+      return;
+    }
+
+    const isWeaponGate = Math.random() < 0.28;
     if (isWeaponGate) {
       const weapons: WeaponType[] = ['shotgun', 'gatling', 'laser', 'rocket'];
       const pick = weapons[Math.floor(Math.random() * weapons.length)];
@@ -684,7 +903,7 @@ export class ZombieEngine {
       });
 
       // Other side positive buff
-      const bonus = Math.floor(Math.random() * 4) + 3; // +3 to +6
+      const bonus = Math.floor(Math.random() * 5) + 5; // +5 to +9
       this.gates.push({
         id: Math.random(),
         x: 25 + gateW,
@@ -707,23 +926,23 @@ export class ZombieEngine {
       // One positive, one negative / challenge gate
       const isLeftGood = Math.random() > 0.5;
       const goodOp: GateOp = Math.random() > 0.65 ? 'multiply' : 'add';
-      const goodVal = goodOp === 'multiply' ? 2 : Math.floor(Math.random() * 5) + 3;
+      const goodVal = goodOp === 'multiply' ? 2 : Math.floor(Math.random() * 6) + 4;
 
-      const badOp: GateOp = Math.random() > 0.75 ? 'divide' : 'subtract';
-      const badVal = badOp === 'divide' ? 2 : Math.floor(Math.random() * 6) + 4; // -4 to -9
+      const badOp: GateOp = Math.random() > 0.8 ? 'divide' : 'subtract';
+      const badVal = badOp === 'divide' ? 2 : Math.floor(Math.random() * 5) + 3;
 
       const createGateObj = (op: GateOp, val: number, xPos: number): Gate => {
         let hitsReq = 18;
         let maxUp = 3;
         if (op === 'multiply') {
           hitsReq = 35;
-          maxUp = 1; // Can at most reach x3
+          maxUp = 1;
         } else if (op === 'divide') {
           hitsReq = 999;
-          maxUp = 0; // Division penalty cannot be shot away
+          maxUp = 0;
         } else if (op === 'subtract') {
           hitsReq = 16;
-          maxUp = 2; // Can weaken at most twice, down to 50%
+          maxUp = 2;
         }
         return {
           id: Math.random(),
@@ -752,15 +971,16 @@ export class ZombieEngine {
 
   private spawnZombieWave() {
     const W = this.canvas.width;
-    // Dynamic wave density scaling: 3 to 14 zombies
-    const count = Math.min(14, Math.max(3, Math.floor(2 + this.wave * 1.3 + Math.random() * 1.5)));
+    const isEarly = this.wave === 1;
+    // Early waves have 3-5 gentle walkers, scaling upwards to max 12
+    const count = isEarly ? Math.floor(3 + Math.random() * 2) : Math.min(12, Math.max(3, Math.floor(2 + this.wave * 1.1 + Math.random() * 1.5)));
 
     // Boss check every 5 waves
     if (this.wave % 5 === 0 && !this.zombies.some((z) => z.type === 'boss')) {
       this.audio.playBossAlert();
       this.screenShake = 14;
       this.addFloatingText(W / 2, 80, '⚠️ BOSS INCOMING ⚠️', '#ef4444', 28);
-      const bossHp = 350 + this.wave * 90;
+      const bossHp = 280 + this.wave * 80;
       this.zombies.push({
         id: Math.random(),
         type: 'boss',
@@ -769,7 +989,7 @@ export class ZombieEngine {
         radius: 38,
         hp: bossHp,
         maxHp: bossHp,
-        speed: 0.42,
+        speed: 0.38,
         color: '#dc2626',
         skinId: 999,
         hitFlash: 0,
@@ -783,30 +1003,30 @@ export class ZombieEngine {
       const rand = Math.random();
       let type: Zombie['type'] = 'walker';
       let radius = 16;
-      let hp = 25 + this.wave * 8;
-      let speed = 0.6 + Math.random() * 0.35;
+      let hp = isEarly ? 16 : 22 + this.wave * 6;
+      let speed = isEarly ? 0.45 + Math.random() * 0.2 : 0.55 + Math.random() * 0.3;
       let color = '#22c55e'; // green
       let scoreVal = 20;
 
-      if (rand < 0.28) {
+      if (!isEarly && rand < 0.26) {
         type = 'runner';
         radius = 13;
-        hp = 18 + this.wave * 5;
-        speed = 1.35 + Math.random() * 0.45;
+        hp = 16 + this.wave * 4;
+        speed = 1.25 + Math.random() * 0.35;
         color = '#a855f7'; // purple
         scoreVal = 35;
-      } else if (rand < 0.48) {
+      } else if (!isEarly && rand < 0.45) {
         type = 'tank';
         radius = 24;
-        hp = 70 + this.wave * 25;
-        speed = 0.4 + Math.random() * 0.15;
+        hp = 60 + this.wave * 20;
+        speed = 0.35 + Math.random() * 0.15;
         color = '#eab308'; // yellow brute
         scoreVal = 60;
-      } else if (rand < 0.62) {
+      } else if (!isEarly && rand < 0.58) {
         type = 'exploder';
         radius = 16;
-        hp = 30 + this.wave * 7;
-        speed = 0.8;
+        hp = 25 + this.wave * 5;
+        speed = 0.75;
         color = '#f97316'; // orange
         scoreVal = 45;
       }
@@ -814,8 +1034,8 @@ export class ZombieEngine {
       this.zombies.push({
         id: Math.random(),
         type,
-        x: 30 + Math.random() * (W - 60),
-        y: -30 - i * 32,
+        x: 35 + Math.random() * (W - 70),
+        y: -30 - i * 36,
         radius,
         hp,
         maxHp: hp,
@@ -926,6 +1146,11 @@ export class ZombieEngine {
     const W = canvas.width;
     const H = canvas.height;
 
+    // 1. CLEAR FULL PHYSICAL CANVAS UNCONDITIONALLY (Fixes red box edge smear bug!)
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#090d16'; // dark cyberpunk navy
+    ctx.fillRect(0, 0, W, H);
+
     ctx.save();
     // Screen shake
     if (this.screenShake > 0.5) {
@@ -933,10 +1158,8 @@ export class ZombieEngine {
       const sy = (Math.random() - 0.5) * this.screenShake;
       ctx.translate(sx, sy);
     }
-
-    // 1. Background Grid & Runway
-    ctx.fillStyle = '#090d16'; // dark cyberpunk navy
-    ctx.fillRect(0, 0, W, H);
+    // Oversized background to guarantee full coverage even during large shakes
+    ctx.fillRect(-50, -50, W + 100, H + 100);
 
     // Dynamic grid lines scrolling down
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
@@ -963,31 +1186,32 @@ export class ZombieEngine {
     ctx.moveTo(W - 10, 0); ctx.lineTo(W - 10, H);
     ctx.stroke();
 
-    // 2. Render Gates
+    // 2. Render Bottom Laser Defense Barrier
+    this.renderDefenseBarrier();
+
+    // 3. Render Gates
     for (const g of this.gates) {
       this.renderGate(g);
     }
 
-    // 3. Render Zombies
+    // 4. Render Zombies
     for (const z of this.zombies) {
       this.renderZombie(z);
     }
 
-    // 4. Render Bullets (High-speed batch neon capsule rendering)
+    // 5. Render Bullets
     for (const b of this.bullets) {
       const r = b.radius;
-      // Outer bright colored capsule
-      ctx.fillStyle = b.color;
+      ctx.fillStyle = this.feverTimer > 0 ? '#ec4899' : b.color;
       ctx.fillRect(b.x - r, b.y - r * 1.6, r * 2, r * 3.2);
-      // Inner glowing white core
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(b.x - r * 0.4, b.y - r * 1.1, r * 0.8, r * 2.2);
     }
 
-    // 5. Render Player Crowd Squad
+    // 6. Render Player Crowd Squad
     this.renderCrowd();
 
-    // 6. Render Particles
+    // 7. Render Particles
     for (const p of this.particles) {
       ctx.save();
       ctx.globalAlpha = p.alpha;
@@ -998,7 +1222,7 @@ export class ZombieEngine {
       ctx.restore();
     }
 
-    // 7. Render Floating Texts
+    // 8. Render Floating Texts
     for (const ft of this.floatingTexts) {
       ctx.save();
       ctx.globalAlpha = ft.alpha;
@@ -1011,12 +1235,68 @@ export class ZombieEngine {
       ctx.restore();
     }
 
-    // 8. Damage red flash overlay
+    // 9. Damage red flash overlay
     if (this.redFlashAlpha > 0) {
       ctx.fillStyle = `rgba(239, 68, 68, ${this.redFlashAlpha})`;
       ctx.fillRect(0, 0, W, H);
     }
 
+    // 10. Fever Screen Border Glow
+    if (this.feverTimer > 0) {
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.45)';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(4, 4, W - 8, H - 8);
+    }
+
+    ctx.restore();
+  }
+
+  private renderDefenseBarrier() {
+    const { ctx } = this;
+    const W = this.canvas.width;
+    const barrierY = this.canvas.height - 24;
+    const shieldRatio = Math.max(0, this.shield / this.maxShield);
+
+    ctx.save();
+    let barrierColor = '#38bdf8'; // sky blue (healthy)
+    if (shieldRatio < 0.3) barrierColor = '#ef4444'; // red (danger)
+    else if (shieldRatio < 0.6) barrierColor = '#f59e0b'; // amber
+
+    // Glowing laser beam
+    ctx.strokeStyle = barrierColor;
+    ctx.lineWidth = shieldRatio > 0 ? 3 : 1;
+    ctx.shadowColor = barrierColor;
+    ctx.shadowBlur = shieldRatio > 0 ? 8 : 2;
+    ctx.setLineDash(shieldRatio > 0 ? [] : [4, 4]);
+
+    ctx.beginPath();
+    ctx.moveTo(10, barrierY);
+    ctx.lineTo(W - 10, barrierY);
+    ctx.stroke();
+
+    // Shield status badge in center
+    if (shieldRatio > 0) {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.strokeStyle = barrierColor;
+      ctx.lineWidth = 1;
+      const bw = 90;
+      const bh = 18;
+      this.roundRect(ctx, (W - bw) / 2, barrierY - 9, bw, bh, 9);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = barrierColor;
+      ctx.font = '900 10px monospace, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`🛡️ SHIELD ${Math.round(shieldRatio * 100)}%`, W / 2, barrierY);
+    } else {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '900 10px monospace, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚠️ BARRIER OFFLINE ⚠️', W / 2, barrierY);
+    }
     ctx.restore();
   }
 
@@ -1024,12 +1304,17 @@ export class ZombieEngine {
     const { ctx } = this;
     const isBad = g.op === 'subtract' || g.op === 'divide';
     const isWeapon = g.op === 'weapon';
+    const isShield = g.op === 'shield';
 
     let mainColor = '#38bdf8'; // sky blue
     let glowColor = 'rgba(56, 189, 248, 0.4)';
     let text = `+${g.value}`;
 
-    if (isWeapon) {
+    if (isShield) {
+      mainColor = '#06b6d4'; // cyan
+      glowColor = 'rgba(6, 182, 212, 0.5)';
+      text = `🛡️ +${g.value}`;
+    } else if (isWeapon) {
       mainColor = '#f59e0b'; // amber gold
       glowColor = 'rgba(245, 158, 11, 0.5)';
       const cfg = g.weaponType ? WEAPON_CONFIGS[g.weaponType] : null;
@@ -1074,7 +1359,7 @@ export class ZombieEngine {
     ctx.fillText(text, g.x + g.width / 2, g.y + g.height / 2);
 
     // Gate upgrade hits progress indicator if upgradable
-    if (!isWeapon && g.maxUpgrades > 0) {
+    if (!isWeapon && !isShield && g.maxUpgrades > 0) {
       const barW = g.width * 0.7;
       const barH = 3;
       const bx = g.x + (g.width - barW) / 2;
@@ -1124,23 +1409,35 @@ export class ZombieEngine {
   private renderCrowd() {
     const { ctx } = this;
 
-    // Squad count badge floating above squad
     ctx.save();
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-    ctx.strokeStyle = '#38bdf8';
-    // Render individual Monkes using offscreen pixel-sharp canvas
     const sprite = this.monkeCanvas || getFallbackMonkeSprite(this.monkeId);
     const cfg = WEAPON_CONFIGS[this.currentWeapon];
     let minY = this.playerY - 20;
+
+    const isInvul = this.invulnerableTimer > 0;
+    const isAdrenaline = this.adrenalineTimer > 0;
 
     for (const unit of this.units) {
       if (unit.y < minY) minY = unit.y;
 
       ctx.save();
+      // Invulnerability flicker
+      if (isInvul && Math.floor(performance.now() / 80) % 2 === 0) {
+        ctx.globalAlpha = 0.4;
+      }
+
       const bob = Math.sin(unit.walkFrame) * 2;
       const stepTilt = Math.sin(unit.walkFrame * 2) * 0.04;
       ctx.translate(unit.x, unit.y + bob);
       ctx.rotate(stepTilt);
+
+      // Adrenaline golden flaming aura under unit
+      if (isAdrenaline) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+        ctx.beginPath();
+        ctx.arc(0, 0, unit.size * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Subtle shadow under unit
       ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
