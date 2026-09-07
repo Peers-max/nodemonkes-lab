@@ -673,7 +673,7 @@ export function normalizeTraitUrl(url: string): string {
   }
   const peerEyesMatch = url.match(/https:\/\/pub-026e5fdeaab545cc9c5aa34738735770\.r2\.dev\/eyes\/([^/]+)/);
   if (peerEyesMatch) {
-    return `/r2-peer/eyes/${peerEyesMatch[1]}`;
+    return `/traits/peer/eyes/${peerEyesMatch[1]}`;
   }
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return url
@@ -1121,8 +1121,11 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
   const meta = MOTION_ACTION_PRESETS.find((p) => p.id === action) || MOTION_ACTION_PRESETS[0];
 
   // Guaranteed Grid Retrieval & Self-Healing:
+  const isPeerMonke = isPeer || headName === 'Peer';
+
   let effectiveHeadGrid = headGrid;
-  if (!effectiveHeadGrid && headName && headName !== 'None') {
+  const isSpecialHead = ['Dog', 'Peer', 'Rabbit', 'Block'].includes(headName || '');
+  if (!effectiveHeadGrid && headName && headName !== 'None' && !isSpecialHead) {
     try {
       const img = await loadCanvasImage(`/traits/normal/head/${encodeURIComponent(headName)}.png`);
       effectiveHeadGrid = imageToGrid(img);
@@ -1131,14 +1134,17 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
 
   let effectiveEyeGrid = eyeGrid;
   if (!effectiveEyeGrid) {
-    if (eyeName && eyeName !== 'None' && eyeName !== 'Classic') {
+    if (eyeName && eyeName !== 'None' && eyeName !== 'Classic' && eyeName !== 'Peer') {
       try {
-        const img = await loadCanvasImage(`/traits/normal/eyes/${encodeURIComponent(eyeName)}.png`);
+        const eyePath = isPeerMonke
+          ? `/traits/peer/eyes/${encodeURIComponent(eyeName)}.png`
+          : `/traits/normal/eyes/${encodeURIComponent(eyeName)}.png`;
+        const img = await loadCanvasImage(eyePath);
         effectiveEyeGrid = imageToGrid(img);
       } catch (_) {}
     }
     if (!effectiveEyeGrid && upperImg && upperImg.complete) {
-      effectiveEyeGrid = extractNativeEyeGrid(upperImg, isPeer || headName === 'Peer');
+      effectiveEyeGrid = extractNativeEyeGrid(upperImg, isPeerMonke);
     }
   }
 
@@ -1150,9 +1156,62 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
     } catch (_) {}
   }
 
+  // Determine active states of micro-FX
+  const isHeadActive = headFxId !== 'none' && !!effectiveHeadGrid;
+  const isEyeActive = eyeFxId !== 'none' && !!effectiveEyeGrid;
+  const isEarringActive = earringFxId !== 'none' && !!effectiveEarringGrid && earringName && earringName !== 'None';
+
+  let totalDurationMs: number;
+  let actionLoops = 1;
+  let eyeCycles = 1;
+  let headCycles = 1;
+  let earringCycles = 1;
+
+  if (action === 'static') {
+    // In Pure Micro-FX (Still Body) mode:
+    // Determine the slowest active effect speed so it gets at least 1 full 8-frame cycle
+    const activeSpeeds: number[] = [];
+    if (isEyeActive) activeSpeeds.push(eSpeed);
+    if (isHeadActive) activeSpeeds.push(hSpeed);
+    if (isEarringActive) activeSpeeds.push(earSpeed);
+
+    const minFxSpeed = activeSpeeds.length > 0 ? Math.min(...activeSpeeds) : 1.0;
+    // Base cycle is 1200ms. At lower speeds (e.g. 0.5x), duration expands (e.g. 2400ms) to play the full animation smoothly
+    totalDurationMs = Math.round(1200 / minFxSpeed);
+    // Cap at 6000ms (6.0s) to support ultra-smooth slow motions
+    if (totalDurationMs > 6000) totalDurationMs = 6000;
+
+    // Calculate how many integer cycles each active effect completes during totalDurationMs (minimum 1)
+    eyeCycles = isEyeActive ? Math.max(1, Math.round(totalDurationMs / (1200 / eSpeed))) : 1;
+    headCycles = isHeadActive ? Math.max(1, Math.round(totalDurationMs / (1200 / hSpeed))) : 1;
+    earringCycles = isEarringActive ? Math.max(1, Math.round(totalDurationMs / (1200 / earSpeed))) : 1;
+  } else {
+    // In Dynamic Body Action mode:
+    const baseActionDuration = action === 'headbang' ? 800 : 1200;
+    const oneActionLoopMs = baseActionDuration / actSpeed;
+
+    // Check if any active micro-FX is running slower than the body action
+    const slowestFxSpeed = Math.min(
+      isEyeActive ? eSpeed : 999,
+      isHeadActive ? hSpeed : 999,
+      isEarringActive ? earSpeed : 999
+    );
+
+    if (slowestFxSpeed < actSpeed && slowestFxSpeed < 999) {
+      // Loop the body action multiple times (up to 4) so that the slow eye/head effect completes a full cycle!
+      actionLoops = Math.min(4, Math.max(1, Math.round(actSpeed / slowestFxSpeed)));
+    }
+
+    totalDurationMs = Math.round(oneActionLoopMs * actionLoops);
+    if (totalDurationMs > 6000) totalDurationMs = 6000;
+    eyeCycles = isEyeActive ? Math.max(1, Math.round(totalDurationMs / (1200 / eSpeed))) : 1;
+    headCycles = isHeadActive ? Math.max(1, Math.round(totalDurationMs / (1200 / hSpeed))) : 1;
+    earringCycles = isEarringActive ? Math.max(1, Math.round(totalDurationMs / (1200 / earSpeed))) : 1;
+  }
+
   // Calculate resolution-adaptive frame budget
-  const cycleDuration = action === 'headbang' ? 800 : (action === 'static' ? 1200 : 1200);
-  const budget = calculateAdaptiveGifBudget(meta.frameCount, resolution, cycleDuration, actSpeed);
+  const baseFrames = Math.round(Math.min(48, Math.max(12, (meta.frameCount || 16) * actionLoops * (action === 'static' ? (totalDurationMs / 1200) : 1))));
+  const budget = calculateAdaptiveGifBudget(baseFrames, resolution, totalDurationMs, 1.0);
   const frameCount = budget.frameCount;
   const frameDelay = budget.frameDelay;
 
@@ -1176,13 +1235,16 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
   upperCompCanvas.width = resolution;
   upperCompCanvas.height = resolution;
   const upperCompCtx = upperCompCanvas.getContext('2d', { willReadFrequently: true })!;
-  console.log(`>>> generateComboMonkeGif: res=${resolution}px, frames=${frameCount}, delay=${frameDelay}ms, total=${frameCount * frameDelay}ms, action=${action}, head=${headName}(${headFxId}), eye=${eyeName}(${eyeFxId}), ear=${earringName}(${earringFxId})`);
+  console.log(`>>> generateComboMonkeGif: res=${resolution}px, frames=${frameCount}, delay=${frameDelay}ms, total=${frameCount * frameDelay}ms, action=${action}(x${actionLoops}), head=${headName}(${headFxId}, x${headCycles}), eye=${eyeName}(${eyeFxId}, x${eyeCycles}), ear=${earringName}(${earringFxId}, x${earringCycles})`);
 
   for (let f = 0; f < frameCount; f++) {
-    const progress = f / frameCount;
-    const headFxFrame = ((Math.floor((f / frameCount) * 8 * (action === 'static' ? hSpeed : (hSpeed / actSpeed))) % 8) + 8) % 8;
-    const eyeFxFrame = ((Math.floor((f / frameCount) * 8 * (action === 'static' ? eSpeed : (eSpeed / actSpeed))) % 8) + 8) % 8;
-    const earringFxFrame = ((Math.floor((f / frameCount) * 8 * (action === 'static' ? earSpeed : (earSpeed / actSpeed))) % 8) + 8) % 8;
+    const globalProgress = f / frameCount;
+    const bodyActionProgress = (globalProgress * actionLoops) % 1;
+
+    // Every active effect completes its integer cycles smoothly without truncation:
+    const headFxFrame = ((Math.floor(globalProgress * headCycles * 8) % 8) + 8) % 8;
+    const eyeFxFrame = ((Math.floor(globalProgress * eyeCycles * 8) % 8) + 8) % 8;
+    const earringFxFrame = ((Math.floor(globalProgress * earringCycles * 8) % 8) + 8) % 8;
 
     upperCompCtx.clearRect(0, 0, resolution, resolution);
     upperCompCtx.imageSmoothingEnabled = false;
@@ -1220,7 +1282,7 @@ export async function generateComboMonkeGif(options: ComboMonkeGifOptions): Prom
       upperCompCanvas,
       lowerImg,
       action,
-      progress,
+      bodyActionProgress,
       backgroundColor,
       fullImg || null,
       antiAlias

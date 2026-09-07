@@ -233,7 +233,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     if (nativeTraits.body === 'Deathbot') return 'Deathbot';
     if (nativeTraits.body === 'Bot') return 'Bot';
     if (nativeTraits.body === 'Pepe') return 'Pepe';
-    if (nativeTraits.head === 'Peer') return 'Peer';
+    if (nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer') return 'Peer';
     return 'Classic';
   }, [nativeTraits.eyes, nativeTraits.body, nativeTraits.head]);
 
@@ -244,9 +244,17 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     if (nativeTraits.body === 'Deathbot') return isZh ? 'Deathbot 机械红眼' : 'Deathbot Red Eyes';
     if (nativeTraits.body === 'Bot') return isZh ? 'Bot 机械蓝眼' : 'Bot Blue Eyes';
     if (nativeTraits.body === 'Pepe') return isZh ? 'Pepe 原生眼' : 'Pepe Eyes';
-    if (nativeTraits.head === 'Peer') return isZh ? 'Peer 原生三眼' : 'Peer 3-Eyes';
+    if (nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer') return isZh ? 'Peer 原生三眼' : 'Peer 3-Eyes';
     return isZh ? '原生眼眸 (Classic)' : 'Native Eyes';
   }, [nativeTraits.eyes, nativeTraits.body, nativeTraits.head, isZh]);
+
+  const isPeer = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
+  const isSpecialSeries = ['Dog', 'Peer', 'Rabbit', 'Block'].includes(nativeTraits.head);
+  const displayHatTrait = mode === 'santa'
+    ? (isZh ? '圣诞红帽' : 'Santa Hat')
+    : isSpecialSeries
+      ? (isZh ? `无 (${nativeTraits.head} 特殊系列)` : `None (${nativeTraits.head})`)
+      : (nativeTraits.head && nativeTraits.head !== 'None' ? nativeTraits.head : (isZh ? '无' : 'None'));
 
   const [sampledSkin, setSampledSkin] = useState<{ r: number; g: number; b: number } | null>(null);
 
@@ -408,8 +416,8 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
       // Extract native eyes from upper image if no dedicated eye accessory trait exists (handles all 1,195 monkeys with Eyes: None)
       if (!nativeTraits.eyes || nativeTraits.eyes === 'None') {
         try {
-          const isPeer = nativeTraits.head === 'Peer';
-          eyeGridRef.current = extractNativeEyeGrid(upperImg, isPeer);
+          const isPeerMonke = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
+          eyeGridRef.current = extractNativeEyeGrid(upperImg, isPeerMonke);
         } catch (err) {
           console.warn('Could not extract native eye grid:', err);
         }
@@ -437,7 +445,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
 
       // Auto-extract native eye grid as instant baseline if not yet loaded
       if (!eyeGridRef.current) {
-        eyeGridRef.current = extractNativeEyeGrid(upperImg, nativeTraits.head === 'Peer');
+        eyeGridRef.current = extractNativeEyeGrid(upperImg, nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer');
       }
 
       checkBothLoaded();
@@ -486,7 +494,8 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     }
 
     // In Normal Mode: load native head trait grid (prefer local static bundle)
-    if (mode === 'normal' && nativeTraits.head && nativeTraits.head !== 'None') {
+    const isSpecialHead = ['Dog', 'Peer', 'Rabbit', 'Block'].includes(nativeTraits.head);
+    if (mode === 'normal' && nativeTraits.head && nativeTraits.head !== 'None' && !isSpecialHead) {
       const headName = encodeURIComponent(nativeTraits.head);
       const localHeadUrl = `/traits/normal/head/${headName}.png`;
       loadCanvasImage(localHeadUrl)
@@ -508,16 +517,18 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     }
 
     // Load native eye trait grid (prefer local static bundle)
+    const isPeerMonke = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
     const targetEyeTrait = (nativeTraits.eyes && nativeTraits.eyes !== 'None')
       ? nativeTraits.eyes
-      : (effectiveEyeName && effectiveEyeName !== 'Classic')
+      : (effectiveEyeName && effectiveEyeName !== 'Classic' && effectiveEyeName !== 'Peer')
         ? effectiveEyeName
         : null;
 
     if (targetEyeTrait) {
       const eyeName = encodeURIComponent(targetEyeTrait);
-      const isPeer = nativeTraits.head === 'Peer';
-      const localEyeUrl = `/traits/normal/eyes/${eyeName}.png`;
+      const localEyeUrl = isPeerMonke
+        ? `/traits/peer/eyes/${eyeName}.png`
+        : `/traits/normal/eyes/${eyeName}.png`;
       loadCanvasImage(localEyeUrl)
         .then((img) => {
           if (isMounted) {
@@ -525,7 +536,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
           }
         })
         .catch(() => {
-          const eyeBaseUrl = isPeer
+          const eyeBaseUrl = isPeerMonke
             ? 'https://pub-026e5fdeaab545cc9c5aa34738735770.r2.dev/eyes'
             : 'https://pub-2f0821e8464b4c139f681d763393f4ee.r2.dev/eyes';
           const r2EyeUrl = `${eyeBaseUrl}/${eyeName}.png`;
@@ -536,13 +547,13 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
             .catch((e) => {
               console.warn('Native eye grid load error:', e);
               if (isMounted && upperImgRef.current && upperImgRef.current.complete) {
-                eyeGridRef.current = extractNativeEyeGrid(upperImgRef.current, isPeer);
+                eyeGridRef.current = extractNativeEyeGrid(upperImgRef.current, isPeerMonke);
               }
             });
         });
     } else {
       if (upperImgRef.current && upperImgRef.current.complete) {
-        eyeGridRef.current = extractNativeEyeGrid(upperImgRef.current, nativeTraits.head === 'Peer');
+        eyeGridRef.current = extractNativeEyeGrid(upperImgRef.current, isPeerMonke);
       }
     }
 
@@ -598,7 +609,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     earringProgressRef.current = 0;
     lastTimeRef.current = 0;
 
-    const currentHatName = mode === 'santa' ? 'Santa' : nativeTraits.head;
+    const currentHatName = mode === 'santa' ? 'Santa' : (isSpecialSeries ? 'None' : nativeTraits.head);
 
     function animate(currentTime?: number) {
       if (!currentTime) {
@@ -648,14 +659,14 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         // Render Eye FX overlay (on native eyes or dedicated accessory)
         const activeEyeGrid = eyeGridRef.current;
         if (eyeFx !== 'none' && activeEyeGrid) {
-          const isPeer = nativeTraits.head === 'Peer';
+          const isPeerMonke = nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer';
           const animEyes = applyEyeEffect(
             effectiveEyeName,
             eyeFx,
             activeEyeGrid,
             eyeFxFrame,
             8,
-            isPeer,
+            isPeerMonke,
             eyelidColor
           );
           renderGridToContext(upperCompCtx, animEyes, resolution);
@@ -711,13 +722,12 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     eyeSpeed,
     earringFx,
     earringSpeed,
-    effectiveEarring,
-    hasEarring,
-    bgColor,
-    nativeTraits.head,
-    nativeTraits.eyes,
-    nativeTraits.earring,
     effectiveEyeName,
+    hasEarring,
+    effectiveEarring,
+    bgColor,
+    mode,
+    nativeTraits.head,
     eyelidColor
   ]);
 
@@ -758,7 +768,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
     setIsGenerating(true);
     setProgress(0);
 
-    const hatName = mode === 'santa' ? 'Santa' : nativeTraits.head;
+    const hatName = mode === 'santa' ? 'Santa' : (isSpecialSeries ? 'None' : nativeTraits.head);
     const eyeName = effectiveEyeName;
 
     try {
@@ -784,7 +794,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
         eyeSpeed,
         earringSpeed,
         antiAlias,
-        isPeer: nativeTraits.head === 'Peer',
+        isPeer: nativeTraits.head === 'Peer' || nativeTraits.body === 'Peer',
         eyelidColor: eyelidColor,
         onProgress: (p) => setProgress(p),
       });
@@ -974,7 +984,7 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
                 ) : (
                   <>
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-slate-200">{isZh ? '帽子: ' : 'Hat: '}{nativeTraits.head}</span>
+                    <span className="text-slate-200">{isZh ? '帽子: ' : 'Hat: '}{displayHatTrait}</span>
                   </>
                 )}
               </span>
@@ -1361,8 +1371,8 @@ export const DiyGifStudio: React.FC<DiyGifStudioProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider block">
                   {isZh
-                    ? `20款 帽子/头部动态光效 ${mode === 'santa' ? '(生效于圣诞红帽)' : `(生效于 ${nativeTraits.head})`}`
-                    : `20 Hat / Head Dynamic FX ${mode === 'santa' ? '(Applied to Santa Hat)' : `(Applied to ${nativeTraits.head})`}`}
+                    ? `20款 帽子/头部动态光效 ${mode === 'santa' ? '(生效于圣诞红帽)' : isSpecialSeries ? `(${nativeTraits.head} 原生无帽子)` : (nativeTraits.head !== 'None' ? `(生效于 ${nativeTraits.head})` : '(无帽子)')}`
+                    : `20 Hat / Head Dynamic FX ${mode === 'santa' ? '(Applied to Santa Hat)' : isSpecialSeries ? `(${nativeTraits.head} No Hat)` : (nativeTraits.head !== 'None' ? `(Applied to ${nativeTraits.head})` : '(No Hat)')}`}
                 </span>
                 <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
                   {isZh ? currentHeadFxMeta.name : currentHeadFxMeta.nameEn}
